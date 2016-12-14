@@ -15,12 +15,12 @@ type Link<T> = Option<Rc<Node<T>>>;
 
 #[derive(Debug)]
 struct Node<T> {
-    elem: T,
+    elem: Rc<T>,
     next: Link<T>,
 }
 
-pub struct Iter<'a, T:'a> {
-    next: Option<&'a Node<T>>,
+pub struct Iter<T> {
+    next: Link<T>,
 }
 
 
@@ -29,15 +29,19 @@ impl<T> Stack<T> {
         Stack { head: None }
     }
 
-    pub fn push(&self, elem: T) -> Stack<T> {
+    pub fn is_empty(&self) -> bool {
+        if let None = self.head { true } else { false }
+    }
+
+    pub fn push(&self, elem: Rc<T>) -> Stack<T> {
         Stack { head: Some(Rc::new(Node {
             elem: elem,
             next: self.head.clone(),
         }))}
     }
 
-    pub fn peek(&self) -> Option<&T> {
-        self.head.as_ref().map(|node| &node.elem)
+    pub fn peek(&self) -> Option<Rc<T>> {
+        self.head.as_ref().map(|ref node| node.elem.clone())
     }
 
     pub fn pull(&self) -> Option<Stack<T>> {
@@ -45,7 +49,7 @@ impl<T> Stack<T> {
     }
 
     pub fn iter(&self) -> Iter<T> {
-        Iter { next: self.head.as_ref().map(|node| &**node) }
+        Iter { next: self.head.clone() }
     }
 }
 
@@ -81,14 +85,15 @@ impl<T> Clone for Stack<T> {
     }
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = &'a T;
+impl<T> Iterator for Iter<T> {
+    type Item = Rc<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next.map(|node| {
-            self.next = node.next.as_ref().map(|node| &**node);
-            &node.elem
-        })
+        let (n,r) = match self.next { None => (None,None),
+            Some(ref node) => (node.next.clone(),Some(node.elem.clone()))
+        };
+        self.next = n;
+        r
     }
 }
 
