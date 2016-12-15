@@ -1,7 +1,9 @@
+extern crate rand;
+
 pub mod zip;
 pub mod stack;
 pub mod seqzip;
-//pub mod raz;
+pub mod raz;
 
 #[cfg(test)]
 mod tests {
