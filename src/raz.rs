@@ -378,7 +378,7 @@ fn integrate_forests<T>(l_forest: &Stack<Tree<T>>, l_tree: &TreeLink<T>,level: L
 		}
 	}
 	// step two: make center tree
-	let center_tree = Some(Rc::new(Tree::Branch(
+	let mut center_tree = Some(Rc::new(Tree::Branch(
 		level,
 		count_tl(&l_tree)+count_tl(&r_tree),
 		l_tree.clone(),
@@ -388,30 +388,70 @@ fn integrate_forests<T>(l_forest: &Stack<Tree<T>>, l_tree: &TreeLink<T>,level: L
 	if (leave_left | l_forest.is_empty()) & (leave_right | r_forest.is_empty()) {
 		return (l_forest,center_tree,r_forest)
 	}
-	// TODO: finish this section, deal with empty forests
-	let next_l_level = level_tl(&l_forest.peek());
-	let next_r_level = level_tl(&r_forest.peek());
-	let pull_from = if next_l_level >= next_r_level { l_forest } else { r_forest };
-	match *pull_from.peek().unwrap_or(panic!("both forests empty")) {
-	  Tree::Branch(l,c,ref t1,None) => unimplemented!(),
-	  Tree::Branch(l,c,None,ref t2) => unimplemented!(),
-	  _ => unimplemented!(),
+	while !l_forest.is_empty() & !r_forest.is_empty() {
+		let next_l_level = level_tl(&l_forest.peek());
+		let next_r_level = level_tl(&r_forest.peek());
+		let pull_from = if next_l_level >= next_r_level { l_forest } else { r_forest };
+		match *pull_from.peek().unwrap_or(panic!("both forests empty")) {
+		  Tree::Branch(l,c,ref t1,None) => {
+		  	l_forest.pull().unwrap();
+		  	center_tree = Some(Rc::new(Tree::Branch(l,c+count_tl(&center_tree),t1.clone(),center_tree.clone())));
+		  	if l_forest.is_empty() & leave_right { return (l_forest,center_tree,r_forest) };
+		  },
+		  Tree::Branch(l,c,None,ref t2) => {
+		  	r_forest.pull().unwrap();
+		  	center_tree = Some(Rc::new(Tree::Branch(l,c+count_tl(&center_tree),center_tree.clone(),t2.clone())));
+		  	if r_forest.is_empty() & leave_left { return (l_forest,center_tree,r_forest) };
+		  },
+		  _ => debug_assert!(true, "forest shouldn't contain leaves"),
+		}
 	}
+	(l_forest,center_tree,r_forest)
 }
 // TODO:: implement these build_'s as O(1) trampolines
-fn build_tree_left<T>(elms: &Stack<(Rc<T>,Level)>) -> (TreeLink<T>,Level) {
-	unimplemented!();
+fn build_tree_left<T>(elms: &Stack<(Rc<T>,Level)>) -> Option<(Level,TreeLink<T>, Stack<Tree<T>>)> {
+	let (ref elm, mut level) = *elms.peek().unwrap_or( return None );
+	let mut tree = Some(Rc::new(Tree::Leaf(elm.clone())));
+	let mut r_forest = Stack::new();
+	let mut l_stack = elms.pull().unwrap();
+	while !l_stack.is_empty() {
+		let (ref elm,lev) = *l_stack.peek().unwrap();
+		l_stack = l_stack.pull().unwrap();
+		let elm_as_tree = Some(Rc::new(Tree::Leaf(elm.clone())));
+		let (_,t,f) = integrate_forests(&Stack::new(), &elm_as_tree, level, &tree, &r_forest, false, true);
+		tree = t;
+		r_forest = f;
+		level = lev;
+	}
+	Some((level,tree,r_forest))
 }
-fn build_tree_right<T>(elms: &Stack<(Rc<T>,Level)>) -> (Level, TreeLink<T>) {
-	unimplemented!();
+fn build_tree_right<T>(elms: &Stack<(Rc<T>,Level)>) -> Option<(Stack<Tree<T>>,TreeLink<T>, Level)> {
+	let (ref elm, mut level) = *elms.peek().unwrap_or( return None );
+	let mut tree = Some(Rc::new(Tree::Leaf(elm.clone())));
+	let mut l_forest = Stack::new();
+	let mut r_stack = elms.pull().unwrap();
+	while !r_stack.is_empty() {
+		let (ref elm,lev) = *r_stack.peek().unwrap();
+		r_stack = r_stack.pull().unwrap();
+		let elm_as_tree = Some(Rc::new(Tree::Leaf(elm.clone())));
+		let (f,t,_) = integrate_forests(&l_forest, &tree, level, &elm_as_tree, &Stack::new(), true, false);
+		tree = t;
+		l_forest = f;
+		level = lev;
+	}
+	Some((l_forest,tree,level))
 }
 
 impl<T: Clone> SeqZip<T,RazSeq<T>> for Raz<T> {
 	fn unzip(&self) -> RazSeq<T> {
-		let (lt,lev) = build_tree_left(&self.one.leaves);
-		let (lf,lt,_) = integrate_forests(&self.one.forest, &self.one.tree, lev, &lt, &Stack::new(), true, false);
-		let (lev,rt) = build_tree_right(&self.two.leaves);
-		let (_,rt,rf) = integrate_forests(&Stack::new(), &rt, lev, &self.two.tree,&self.two.forest, false, true);
+		let (lf,lt,_) = { match build_tree_left(&self.one.leaves) {
+			None => (self.one.forest.clone(), self.one.tree.clone(), Stack::new()),
+			Some((lev,t,f)) => integrate_forests(&self.one.forest, &self.one.tree, lev, &t, &f, true, false),
+		}};
+		let (_,rt,rf) = { match build_tree_right(&self.two.leaves) {
+			None => (self.one.forest.clone(), self.one.tree.clone(), Stack::new()),
+			Some((f,t,lev)) => integrate_forests(&f, &t, lev, &self.two.tree,&self.two.forest, false, true),
+		}};
 		let (_,main_tree,_) = integrate_forests(&lf,&lt,self.level,&rt,&rf, false,false);
 		RazSeq(main_tree)
 	}
