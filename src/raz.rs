@@ -1,6 +1,7 @@
 // Random access zipper
 
 use std::rc::Rc;
+use std::fmt::Debug;
 
 use rand;
 
@@ -12,10 +13,10 @@ type Level = usize;
 type Count = usize;
 
 #[derive(Debug, Clone)]
-pub struct RazSeq<T>(TreeLink<T>);
+pub struct RazSeq<T:Debug>(TreeLink<T>);
 
 #[derive(Debug)]
-pub struct Raz<T> {
+pub struct Raz<T:Debug> {
 	// publicly, side one is left, side two is right
 	// internally they may have other uses, check the fn comments
 	one: RazSide<T>,
@@ -25,7 +26,7 @@ pub struct Raz<T> {
 }
 
 #[derive(Debug, Clone)]
-enum Tree<T> {
+enum Tree<T:Debug> {
     Leaf(Rc<T>),
     Branch(Level,Count,TreeLink<T>,TreeLink<T>)
 }
@@ -33,11 +34,15 @@ enum Tree<T> {
 type TreeLink<T> = Option<Rc<Tree<T>>>;
 
 #[derive(Debug)]
-struct RazSide<T> {
+struct RazSide<T:Debug> {
   forest: Stack<Tree<T>>,
   tree: TreeLink<T>,
   leaves: Stack<(Rc<T>,Level)>,
   left_trees: bool,
+}
+
+pub struct Iter<T:Debug> {
+  next: Raz<T>,
 }
 
 fn gen_level() -> Level {
@@ -47,15 +52,15 @@ fn gen_level() -> Level {
 	options[index] + 1 // level 0 is for empty trees and leaves
 }
 
-fn count_tl<T>(tl: &TreeLink<T>) -> usize {
+fn count_tl<T:Debug>(tl: &TreeLink<T>) -> usize {
 	match *tl { None => 0, Some(ref t) => t.count() }
 }
 
-fn level_tl<T>(tl: &TreeLink<T>) -> usize {
+fn level_tl<T:Debug>(tl: &TreeLink<T>) -> usize {
 	match *tl { None => 0, Some(ref t) => t.level() }
 }
 
-impl<T> Tree<T> {
+impl<T:Debug> Tree<T> {
 	fn count(&self) -> usize {
 		match *self {
 			Tree::Leaf(_) => 1,
@@ -70,8 +75,14 @@ impl<T> Tree<T> {
 	}
 }
 
-impl<T> Raz<T> {
-	fn new() -> Raz<T> {
+impl<T: Clone+Debug> RazSeq<T> {
+  pub fn iter(&self) -> Iter<T> {
+  	Iter{ next: self.zip_to(0).unwrap() }
+  }
+}
+
+impl<T:Debug> Raz<T> {
+	pub fn new() -> Raz<T> {
 		Raz{
 			one: RazSide::new(true),
 			two: RazSide::new(false),
@@ -80,7 +91,7 @@ impl<T> Raz<T> {
 		}
 	}
 
-	fn empty(level: Level) -> Raz<T> {
+	pub fn empty(level: Level) -> Raz<T> {
 		Raz{
 			one: RazSide::new(true),
 			two: RazSide::new(false),
@@ -89,9 +100,24 @@ impl<T> Raz<T> {
 		}
 	}
 
+	pub fn iter_r(&self) -> Iter<T> {
+		Iter{ next: self.clone() }
+	}
+
 }
 
-impl<T> Clone for Raz<T> {
+impl<T: Clone+Debug> Iterator for Iter<T> {
+  type Item = Rc<T>;
+
+  fn next(&mut self) -> Option<Self::Item> {
+  	self.next.peek_r().ok().map(|val|{
+	  	self.next = self.next.pull_r().unwrap();
+	  	val	
+  	})
+  }
+}
+
+impl<T:Debug> Clone for Raz<T> {
   fn clone(&self) -> Self {
   	Raz{
   		one: self.one.clone(),
@@ -102,7 +128,7 @@ impl<T> Clone for Raz<T> {
   }
 }
 
-impl<T> Clone for RazSide<T> {
+impl<T:Debug> Clone for RazSide<T> {
   fn clone(&self) -> Self {
     RazSide {
     	forest: self.forest.clone(),
@@ -113,7 +139,7 @@ impl<T> Clone for RazSide<T> {
   }
 }
 
-impl<T> RazSide<T> {
+impl<T:Debug> RazSide<T> {
 	fn new(left_trees: bool) -> RazSide<T> { RazSide { forest: Stack::new(), tree: None, leaves: Stack::new(), left_trees: left_trees }}
 
 	// prepares for access, returning a side with leaves
@@ -122,7 +148,7 @@ impl<T> RazSide<T> {
 		if !self.needs_trim() { None } else { Some({
 		let mut forest = self.forest.clone();
 		let mut tree = self.tree.clone();
-		while let Tree::Branch(lev,_,ref t1,ref t2) = *tree.take().unwrap_or(panic!("misplaced empty tree")) {
+		while let Tree::Branch(lev,_,ref t1,ref t2) = match tree.take() { None => panic!("misplaced empty tree"), Some(t) => *t} {
 			if self.left_trees {
 			  forest = forest.push(Rc::new(Tree::Branch(lev, count_tl(t1), t1.clone(), None)));
 			  tree = t2.clone();
@@ -131,17 +157,17 @@ impl<T> RazSide<T> {
 			  tree = t1.clone();
 			}
 		}
-		let next_elem = match *tree.unwrap_or(panic!("misplaced empty tree")) {
+		let next_elem = match match tree { None => panic!("misplaced empty tree"), Some(e) => *e } {
 			Tree::Branch(_,_,_,_) => panic!("bad while above"),
 			Tree::Leaf(ref dat) => dat.clone(),
 		};
-		let next_branch = forest.peek().unwrap_or(panic!("has final element"));
+		let next_branch = match forest.peek() {None => panic!("has final element"), Some(f) => f};
 		let (next_level, next_tree) = match *next_branch {
 			Tree::Leaf(_) => panic!("misshapen forest"),
 			Tree::Branch(lev,_,ref t1,ref t2) => if self.left_trees {(lev,t1.clone())} else {(lev,t2.clone())}
 		};
 		RazSide{
-			forest: forest.pull().unwrap_or(panic!("this panic happened above at peek")),
+			forest: match forest.pull() {None => panic!("this panic happened above at peek"), Some(f) => f},
 			tree: next_tree,
 			leaves: Stack::new().push(Rc::new((next_elem, next_level))),
 			.. *self
@@ -175,7 +201,7 @@ impl<T> RazSide<T> {
 	}
 }
 
-impl<T: Clone> Raz<T> {
+impl<T: Clone+Debug> Raz<T> {
 	// pushes to side one
 	fn push_to(raz: &Raz<T>, val: Rc<T>, level: Level) -> Raz<T> {
 		Raz{
@@ -205,7 +231,7 @@ impl<T: Clone> Raz<T> {
 
 }
 
-impl<T: Clone> Zip<T> for Raz<T> {
+impl<T: Clone+Debug> Zip<T> for Raz<T> {
 
 	// peek throws away the work of trimming!
 	// TODO: rewrite to work without trimming
@@ -242,12 +268,13 @@ impl<T: Clone> Zip<T> for Raz<T> {
 		}
 	}
 	fn pull_r(&self) -> Result<Self,&str> {
-		match self.one.pull() {
+		match self.two.pull() {
 			Some(two) => Ok(Raz{ one: self.one.clone() , two: two, level: self.level, count: self.count - 1 }),
 			None => Err("Raz: Pull past end of sequence")
 		}
 	}
 	// zip implemented to maintain levels while moving
+	// TODO: implement other methods to save work and maintain levels
 	fn zip_l(&self) -> Result<Self,&str> {
 		match Self::zip_tf(&self) {
 			Some(raz) => Ok(raz),
@@ -262,7 +289,7 @@ impl<T: Clone> Zip<T> for Raz<T> {
 	}
 }
 
-impl<T: Clone> Seq<T,Raz<T>> for RazSeq<T> {
+impl<T: Clone+Debug> Seq<T,Raz<T>> for RazSeq<T> {
 	fn zip_to(&self, loc: usize) -> Result<Raz<T>,&str> {
 		let RazSeq(mut tree) = self.clone();
 		let max_size = count_tl(&tree);
@@ -270,7 +297,7 @@ impl<T: Clone> Seq<T,Raz<T>> for RazSeq<T> {
 		let mut forest1 = Stack::new();
 		let mut forest2 = Stack::new();
 		let mut loc = loc;
-		while let Tree::Branch(level,size,ref t1, ref t2) = *tree.take().unwrap_or(panic!("unexpected empty branch")) {
+		while let Tree::Branch(level,size,ref t1, ref t2) = match tree.take() { None => panic!("unexpected empty branch"), Some(t) => *t} {
 	    let left_count = count_tl(t1);
 	    if loc == left_count {
 				return Ok(Raz{
@@ -307,7 +334,7 @@ impl<T: Clone> Seq<T,Raz<T>> for RazSeq<T> {
 }
 
 
-fn join_trees_left<T>(forest: Stack<Tree<T>>, tree: TreeLink<T>) -> TreeLink<T> {
+fn join_trees_left<T:Debug>(forest: Stack<Tree<T>>, tree: TreeLink<T>) -> TreeLink<T> {
 	let mut tree = tree.clone();
 	let mut forest = forest;
 	while let Some(tree_hole) = forest.peek() {
@@ -318,7 +345,7 @@ fn join_trees_left<T>(forest: Stack<Tree<T>>, tree: TreeLink<T>) -> TreeLink<T> 
 	}
 	tree
 }
-fn join_trees_right<T>(tree: TreeLink<T>, forest: Stack<Tree<T>>) -> TreeLink<T> {
+fn join_trees_right<T:Debug>(tree: TreeLink<T>, forest: Stack<Tree<T>>) -> TreeLink<T> {
 	let mut tree = tree.clone();
 	let mut forest = forest;
 	while let Some(tree_hole) = forest.peek() {
@@ -331,7 +358,7 @@ fn join_trees_right<T>(tree: TreeLink<T>, forest: Stack<Tree<T>>) -> TreeLink<T>
 }
 
 // TODO: handle far left/right None trees
-fn integrate_forests<T>(l_forest: &Stack<Tree<T>>, l_tree: &TreeLink<T>,level: Level, r_tree: &TreeLink<T>, r_forest: &Stack<Tree<T>>, leave_left: bool, leave_right: bool) -> (Stack<Tree<T>>,TreeLink<T>,Stack<Tree<T>>) {
+fn integrate_forests<T:Debug>(l_forest: &Stack<Tree<T>>, l_tree: &TreeLink<T>,level: Level, r_tree: &TreeLink<T>, r_forest: &Stack<Tree<T>>, leave_left: bool, leave_right: bool) -> (Stack<Tree<T>>,TreeLink<T>,Stack<Tree<T>>) {
 	// step one: shift forests until level is between tree and forest
 	let mut l_forest = l_forest.clone();
 	let mut l_tree = l_tree.clone();
@@ -347,7 +374,7 @@ fn integrate_forests<T>(l_forest: &Stack<Tree<T>>, l_tree: &TreeLink<T>,level: L
 	// lower left side
 	// OPTIMISE: avoid the final pull/push by checking level inside the forest
 	while level_tl(&l_tree) >= level {
-		match *l_tree.unwrap_or(panic!("level was 0")) {
+		match match l_tree { None => panic!("level was 0"), Some(t) => *t} {
 			Tree::Leaf(_) => panic!("level was 0"),
 			Tree::Branch(l,c,ref t1,ref t2) => {
 				l_forest = l_forest.push(Rc::new(Tree::Branch(l,c - count_tl(&t2),t1.clone(),None )));
@@ -369,7 +396,7 @@ fn integrate_forests<T>(l_forest: &Stack<Tree<T>>, l_tree: &TreeLink<T>,level: L
 	// lower right side
 	// OPTIMISE: avoid the final pull/push by checking level inside the forest
 	while level_tl(&r_tree) > level {
-		match *r_tree.unwrap_or(panic!("level was 0")) {
+		match match r_tree { None => panic!("level was 0"), Some(t) => *t } {
 			Tree::Leaf(_) => panic!("level was 0"),
 			Tree::Branch(l,c,ref t1,ref t2) => {
 				r_forest = r_forest.push(Rc::new(Tree::Branch(l,c - count_tl(&t2),None,t2.clone() )));
@@ -392,7 +419,7 @@ fn integrate_forests<T>(l_forest: &Stack<Tree<T>>, l_tree: &TreeLink<T>,level: L
 		let next_l_level = level_tl(&l_forest.peek());
 		let next_r_level = level_tl(&r_forest.peek());
 		let pull_from = if next_l_level >= next_r_level { l_forest } else { r_forest };
-		match *pull_from.peek().unwrap_or(panic!("both forests empty")) {
+		match match pull_from.peek() {None => panic!("both forests empty"), Some(f) => *f} {
 		  Tree::Branch(l,c,ref t1,None) => {
 		  	l_forest.pull().unwrap();
 		  	center_tree = Some(Rc::new(Tree::Branch(l,c+count_tl(&center_tree),t1.clone(),center_tree.clone())));
@@ -409,8 +436,8 @@ fn integrate_forests<T>(l_forest: &Stack<Tree<T>>, l_tree: &TreeLink<T>,level: L
 	(l_forest,center_tree,r_forest)
 }
 // TODO:: implement these build_'s as O(1) trampolines
-fn build_tree_left<T>(elms: &Stack<(Rc<T>,Level)>) -> Option<(Level,TreeLink<T>, Stack<Tree<T>>)> {
-	let (ref elm, mut level) = *elms.peek().unwrap_or( return None );
+fn build_tree_left<T:Debug>(elms: &Stack<(Rc<T>,Level)>) -> Option<(Level,TreeLink<T>, Stack<Tree<T>>)> {
+	let (ref elm, mut level) = match elms.peek() { None => return None, Some(e) => *e };
 	let mut tree = Some(Rc::new(Tree::Leaf(elm.clone())));
 	let mut r_forest = Stack::new();
 	let mut l_stack = elms.pull().unwrap();
@@ -425,8 +452,8 @@ fn build_tree_left<T>(elms: &Stack<(Rc<T>,Level)>) -> Option<(Level,TreeLink<T>,
 	}
 	Some((level,tree,r_forest))
 }
-fn build_tree_right<T>(elms: &Stack<(Rc<T>,Level)>) -> Option<(Stack<Tree<T>>,TreeLink<T>, Level)> {
-	let (ref elm, mut level) = *elms.peek().unwrap_or( return None );
+fn build_tree_right<T:Debug>(elms: &Stack<(Rc<T>,Level)>) -> Option<(Stack<Tree<T>>,TreeLink<T>, Level)> {
+	let (ref elm, mut level) = match elms.peek() { None => return None, Some(e) => *e };
 	let mut tree = Some(Rc::new(Tree::Leaf(elm.clone())));
 	let mut l_forest = Stack::new();
 	let mut r_stack = elms.pull().unwrap();
@@ -442,17 +469,21 @@ fn build_tree_right<T>(elms: &Stack<(Rc<T>,Level)>) -> Option<(Stack<Tree<T>>,Tr
 	Some((l_forest,tree,level))
 }
 
-impl<T: Clone> SeqZip<T,RazSeq<T>> for Raz<T> {
+impl<T: Clone+Debug> SeqZip<T,RazSeq<T>> for Raz<T> {
 	fn unzip(&self) -> RazSeq<T> {
+		//println!("unzipping: {:?}", self);
 		let (lf,lt,_) = { match build_tree_left(&self.one.leaves) {
 			None => (self.one.forest.clone(), self.one.tree.clone(), Stack::new()),
 			Some((lev,t,f)) => integrate_forests(&self.one.forest, &self.one.tree, lev, &t, &f, true, false),
 		}};
+		//println!("made ltree: {:?}", lt);
 		let (_,rt,rf) = { match build_tree_right(&self.two.leaves) {
 			None => (self.one.forest.clone(), self.one.tree.clone(), Stack::new()),
 			Some((f,t,lev)) => integrate_forests(&f, &t, lev, &self.two.tree,&self.two.forest, false, true),
 		}};
+		//println!("made rtree: {:?}", rt);
 		let (_,main_tree,_) = integrate_forests(&lf,&lt,self.level,&rt,&rf, false,false);
+		//println!("returning: {:?}", main_tree);
 		RazSeq(main_tree)
 	}
 }
