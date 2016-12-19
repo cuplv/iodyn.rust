@@ -56,23 +56,14 @@ mod tests {
 
   	// use a zip to edit it
   	let _cur = some.unzip();
-    println!("current tree: {:?}", _cur);
   	let cur = _cur.zip_to(2).unwrap();
-    println!("zipped: {:?}", cur);
   	assert_eq!(Ok(Rc::new(1)), cur.peek_l());
-    println!("saw a 1, fixing 2");
   	let fix = cur.edit(zip::Dir::R, Rc::new(2)).unwrap();
-    println!("fixed!");
 
   	// upzip back to a sequence to see the result
   	let restore = SeqZip::<_,_>::unzip(&fix);
   	let result = restore.iter().collect::<Vec<_>>();
   	assert_eq!(vec!(Rc::new(0),Rc::new(1),Rc::new(2),Rc::new(3)), result);
-
-  	// unzip the other way the other way
-  	let back = fix.unzip();
-  	let result: Vec<_> = back.iter().collect();
-  	assert_eq!(vec!(Rc::new(3),Rc::new(2),Rc::new(1),Rc::new(0)), result);
 
   	// show off that this is a persistent structure
   	assert_eq!(Ok(Rc::new(7)), save.peek_r());
