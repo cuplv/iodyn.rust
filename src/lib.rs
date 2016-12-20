@@ -1,3 +1,4 @@
+#![feature(test)]
 extern crate rand;
 
 pub mod zip;
@@ -69,4 +70,22 @@ mod tests {
   	assert_eq!(Ok(Rc::new(7)), save.peek_r());
   }
 
+  extern crate test;
+  use rand::random;
+  use self::test::Bencher;
+
+  #[bench]
+  fn insert_a_lot(b: &mut Bencher) {
+  	b.iter(|| {
+  		let mut raz = raz::Raz::new();
+  		let mut seq;
+  		for size in 0..10_000 {
+		    let pos = random::<usize>() % (size + 1);
+		    seq = raz.unzip();
+		    raz = seq.zip_to(pos).unwrap();
+		    raz = raz.push_r(Rc::new(size));
+  		}
+  		raz
+  	})
+  }
 }

@@ -481,3 +481,28 @@ impl<T: Clone> SeqZip<T,RazSeq<T>> for Raz<T> {
 		RazSeq(main_tree)
 	}
 }
+
+// avoid recursive drop on branches
+impl<T> Drop for Tree<T> {
+	fn drop(&mut self) {
+		let mut pending_drop = Vec::new();
+		match *self {
+			Tree::Leaf(..) => {},
+			Tree::Branch(_,_,ref mut t1,ref mut t2) => {
+				if let Some(tree) = t1.take() {pending_drop.push(tree);}
+				if let Some(tree) = t2.take() {pending_drop.push(tree);}
+			}
+		}
+		while let Some(shared_tree) = pending_drop.pop() {
+		  if let Ok(mut my_tree) = Rc::try_unwrap(shared_tree) {
+		   	match my_tree {
+					Tree::Leaf(..) => {},
+					Tree::Branch(_,_,ref mut t1,ref mut t2) => {
+						if let Some(tree) = t1.take() {pending_drop.push(tree);}
+						if let Some(tree) = t2.take() {pending_drop.push(tree);}
+					}
+		   	}
+		  }
+		}
+	}
+}
