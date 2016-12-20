@@ -15,16 +15,16 @@ type Link<T> = Option<Rc<Node<T>>>;
 
 #[derive(Debug)]
 struct Node<T> {
-    elem: Rc<T>,
+    elem: T,
     next: Link<T>,
 }
 
-pub struct Iter<T> {
-    next: Link<T>,
+pub struct Iter<'a, T:'a> {
+  next: Option<&'a Node<T>>,
 }
 
 
-impl<T> Stack<T> {
+impl<T: Clone> Stack<T> {
     pub fn new() -> Self {
         Stack { head: None }
     }
@@ -33,15 +33,15 @@ impl<T> Stack<T> {
         if let None = self.head { true } else { false }
     }
 
-    pub fn push(&self, elem: Rc<T>) -> Stack<T> {
+    pub fn push(&self, elem: T) -> Stack<T> {
         Stack { head: Some(Rc::new(Node {
             elem: elem,
             next: self.head.clone(),
         }))}
     }
 
-    pub fn peek(&self) -> Option<Rc<T>> {
-        self.head.as_ref().map(|ref node| node.elem.clone())
+    pub fn peek(&self) -> Option<&T> {
+        self.head.as_ref().map(|ref node| &node.elem)
     }
 
     pub fn pull(&self) -> Option<Stack<T>> {
@@ -49,7 +49,7 @@ impl<T> Stack<T> {
     }
 
     pub fn iter(&self) -> Iter<T> {
-        Iter { next: self.head.clone() }
+        Iter { next: self.head.as_ref().map(|node| &**node) }
     }
 }
 
@@ -64,36 +64,34 @@ impl<T: Clone> Stack<T> {
 }
 
 // the default will recurse through this stack, increasing program's stack,
-// so we iterate
-impl<T> Drop for Stack<T> {
-  fn drop(&mut self) {
-    let mut head = self.head.take();
-    while let Some(node) = head {
-      if let Ok(mut node) = Rc::try_unwrap(node) {
-        head = node.next.take();
-      } else {
-        break;
-      }
-    }
-  }
-}
+// so we iterate (but it's slower)
+// impl<T> Drop for Stack<T> {
+//   fn drop(&mut self) {
+//     let mut head = self.head.take();
+//     while let Some(node) = head {
+//       if let Ok(mut node) = Rc::try_unwrap(node) {
+//         head = node.next.take();
+//       } else {
+//         break;
+//       }
+//     }
+//   }
+// }
 
 // derive will require the inner data be `Clone` for some reason
-impl<T> Clone for Stack<T> {
+impl<T: Clone> Clone for Stack<T> {
     fn clone(&self) -> Self {
         Stack { head: self.head.clone() }
     }
 }
 
-impl<T> Iterator for Iter<T> {
-    type Item = Rc<T>;
+impl<'a, T> Iterator for Iter<'a, T> {
+  type Item = &'a T;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        let (n,r) = match self.next { None => (None,None),
-            Some(ref node) => (node.next.clone(),Some(node.elem.clone()))
-        };
-        self.next = n;
-        r
-    }
+  fn next(&mut self) -> Option<Self::Item> {
+    self.next.map(|node| {
+      self.next = node.next.as_ref().map(|node| &**node);
+      &node.elem
+    })
+  }
 }
-

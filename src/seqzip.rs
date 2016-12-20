@@ -5,11 +5,11 @@
 use zip::Zip;
 use std::ops::Deref;
 
-pub trait Seq<T,Z>: Sized where Z: SeqZip<T,Self> {
+pub trait Seq<T: Clone, Z>: Sized where Z: SeqZip<T, Self> {
 	fn zip_to(&self, loc: usize) -> Result<Z,&str>;
 }
 
-pub trait SeqZip<T,S>: Zip<T> where S: Seq<T,Self> {
+pub trait SeqZip<T: Clone, S>: Zip<T> where S: Seq<T, Self> {
 	fn unzip(&self) -> S;
 }
 
