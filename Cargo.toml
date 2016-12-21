@@ -5,3 +5,5 @@ authors = ["kyleheadley <kyle.headley@colorado.edu>"]
 
 [dependencies]
 rand = "0.3"
+clap = "2"
+time = "0.1"

@@ -74,11 +74,13 @@ mod tests {
   extern crate test;
   use rand::random;
   use self::test::Bencher;
+  //use zip::Stacks;
+  use raz::Raz;
 
   #[bench]
   fn insert_a_lot(b: &mut Bencher) {
   	b.iter(|| {
-  		let mut raz = raz::Raz::new();
+  		let mut raz = Raz::new();
   		let mut seq;
   		for size in 0..1_000 {
 		    let pos = random::<usize>() % (size + 1);

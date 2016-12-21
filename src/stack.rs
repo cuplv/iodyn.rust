@@ -64,19 +64,19 @@ impl<T: Clone> Stack<T> {
 }
 
 // the default will recurse through this stack, increasing program's stack,
-// so we iterate (but it's slower)
-// impl<T> Drop for Stack<T> {
-//   fn drop(&mut self) {
-//     let mut head = self.head.take();
-//     while let Some(node) = head {
-//       if let Ok(mut node) = Rc::try_unwrap(node) {
-//         head = node.next.take();
-//       } else {
-//         break;
-//       }
-//     }
-//   }
-// }
+// so we iterate (but it's slightly slower)
+impl<T> Drop for Stack<T> {
+  fn drop(&mut self) {
+    let mut head = self.head.take();
+    while let Some(node) = head {
+      if let Ok(mut node) = Rc::try_unwrap(node) {
+        head = node.next.take();
+      } else {
+        break;
+      }
+    }
+  }
+}
 
 // derive will require the inner data be `Clone` for some reason
 impl<T: Clone> Clone for Stack<T> {
