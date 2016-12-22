@@ -1,4 +1,6 @@
 #![feature(test)]
+#![feature(core_intrinsics)]
+
 extern crate rand;
 
 pub mod zip;

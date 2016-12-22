@@ -1,5 +1,6 @@
 // Random access zipper
 
+use std::intrinsics;
 use std::rc::Rc;
 //use std::fmt::Debug;
 
@@ -44,10 +45,14 @@ pub struct Iter<T> {
 }
 
 fn gen_level() -> Level {
-	// TODO: better generator, this is suitable for sequences < 50 items
-	let options = vec![0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0];
-	let index = rand::random::<usize>() % options.len();
-	options[index] + 1 // level 0 is for empty trees and leaves
+	// // TODO: better generator, this is suitable for sequences < 50 items
+	// let options = vec![0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0];
+	// let index = rand::random::<usize>() % options.len();
+	// options[index] + 1 // level 0 is for empty trees and leaves
+
+	let num = rand::random::<usize>();
+	let bits = unsafe{ intrinsics::ctlz(num)};
+	bits+1
 }
 
 fn count_tl<T>(tl: &TreeLink<T>) -> usize {

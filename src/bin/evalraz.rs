@@ -26,12 +26,13 @@ fn main() {
   let args = clap::App::new("evalraz")
     .version("0.1")
     .author("Kyle Headley <kyle.headley@colorado.edu>")
-    .about("Tester and Evaluator for RAZ data structure")
+    .about("Evaluator (and eventually tester) for RAZ data structure")
     .args_from_usage("\
       --nohead               'supress csv header'
       --seed=[seed]          'random seeds'
       --tag=[tag]            'user tag'
       --taghead=[taghead]    'header title for tag'
+      --save_mem             'don't dealocate major data while timing'
       -s, --start=[start]    'starting sequence length'
       -i, --insert=[insert]  'number of timed insertions'
       -g, --groups=[groups]  'insertion groups per sequence'
@@ -43,6 +44,7 @@ fn main() {
   let seed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_SEED);
   let tag = args.value_of("tag").unwrap_or(DEFAULT_TAG);
   let taghead = args.value_of("taghead").unwrap_or(DEFAULT_TAGHEAD);
+  let save_mem = args.is_present("save_mem");
 	let start = value_t!(args, "start", usize).unwrap_or(DEFAULT_START);
 	let insert = value_t!(args, "insert", usize).unwrap_or(DEFAULT_INSERT);
 	let groups = value_t!(args, "groups", usize).unwrap_or(DEFAULT_GROUPS);
@@ -86,16 +88,34 @@ fn main() {
   	let ins = if multi {insert * i} else {insert};
 
   	// raz
-  	let mut raz_size = start;
-  	let mut build_raz = raz_start.clone();
-  	for _ in 0..groups {
-			let start_time = time::get_time();
-  		build_raz = insert_n(build_raz, ins, raz_size, StdRng::from_seed(&[seed]));
-			let elapsed = time::get_time() - start_time;
-  		print_result("RAZ",i,raz_size,ins,elapsed);
-  		raz_size += ins;
-  	}
-
+  	if eval_raz {
+  		if save_mem {
+  			let mut seqs = Vec::new();
+  			let mut zips = Vec::new();
+		  	let mut raz_size = start;
+		  	let mut build_raz = raz_start.clone();
+		  	for _ in 0..groups {
+					let start_time = time::get_time();
+		  		let (new_raz,new_seqs,new_zips) = insert_n_save(build_raz, ins, raz_size, StdRng::from_seed(&[seed]),seqs,zips);
+					let elapsed = time::get_time() - start_time;
+	  			print_result("RAZ",i,raz_size,ins,elapsed);
+  				build_raz = new_raz;
+  				seqs = new_seqs;
+  				zips = new_zips;
+		  		raz_size += ins;
+  			}
+  		} else {
+		  	let mut raz_size = start;
+		  	let mut build_raz = raz_start.clone();
+		  	for _ in 0..groups {
+					let start_time = time::get_time();
+		  		build_raz = insert_n(build_raz, ins, raz_size, StdRng::from_seed(&[seed]));
+					let elapsed = time::get_time() - start_time;
+	  			print_result("RAZ",i,raz_size,ins,elapsed);
+		  		raz_size += ins;
+		  	}
+		  }
+	  }
 
   }
 }
@@ -113,4 +133,22 @@ fn insert_n<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(zip: Z, n: usize, size: usize, 
     zip = zip.push_r(size + i);
 	}
 	zip
+}
+
+// same as above but saves all data in vecs to avoid dealocations during timing
+fn insert_n_save<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(
+	zip: Z, n: usize, size: usize, mut rnd_pos: StdRng, mut seqs: Vec<S>, mut zips: Vec<Z>
+) -> (Z,Vec<S>,Vec<Z>) {
+	let mut zip: Z = zip;
+	for i in 0..n {
+    let pos = rnd_pos.gen::<usize>() % (size + 1 + i);
+    let seq = zip.unzip();
+    zips.push(zip);
+    zip = seq.zip_to(pos).unwrap();
+    seqs.push(seq);
+    let new_zip = zip.push_r(size + i);
+    zips.push(zip);
+    zip = new_zip;
+	}
+	(zip,seqs,zips)
 }
