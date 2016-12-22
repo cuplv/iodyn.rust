@@ -346,18 +346,16 @@ impl<T: Clone> Seq<T,Raz<T>> for RazSeq<T> {
 
 // TODO: handle far left/right None trees?
 fn integrate_forests<T: Clone>(
-	l_forest: &Stack<Tree<T>>,
-	l_tree: &TreeLink<T>,
+	mut l_forest: Stack<Tree<T>>,
+	mut l_tree: TreeLink<T>,
 	level: Level,
-	r_tree: &TreeLink<T>,
-	r_forest: &Stack<Tree<T>>,
+	mut r_tree: TreeLink<T>,
+	mut r_forest: Stack<Tree<T>>,
 	leave_left: bool,
 	leave_right: bool
 ) -> (Stack<Tree<T>>,TreeLink<T>,Stack<Tree<T>>) {
 
 	// step one: shift forests until level is between tree and forest
-	let mut l_forest = l_forest.clone();
-	let mut l_tree = l_tree.clone();
 	// raise left side
 	while level_tl(&l_tree) < level {
 		if let Some(higher) = l_forest.peek().take() {
@@ -382,8 +380,6 @@ fn integrate_forests<T: Clone>(
 			}
 		}
 	}
-	let mut r_forest = r_forest.clone();
-	let mut r_tree = r_tree.clone();
 	// raise right side
 	while level_tl(&r_tree) <= level {
 		if let Some(higher) = r_forest.peek().take() {
@@ -451,7 +447,7 @@ fn build_tree_left<T: Clone>(elms: &Stack<(T,Level)>) -> Option<(Level,TreeLink<
 	while !l_stack.is_empty() {
 		if let Some(&(ref elm,lev)) = l_stack.peek() {
 			let elm_as_tree = Some(Rc::new(Tree::Leaf(elm.clone())));
-			let (_,t,f) = integrate_forests(&Stack::new(), &elm_as_tree, level, &tree, &r_forest, false, true);
+			let (_,t,f) = integrate_forests(Stack::new(), elm_as_tree, level, tree, r_forest, false, true);
 			tree = t;
 			r_forest = f;
 			level = lev;
@@ -468,7 +464,7 @@ fn build_tree_right<T: Clone>(elms: &Stack<(T,Level)>) -> Option<(Stack<Tree<T>>
 	while !r_stack.is_empty() {
 		if let Some(&(ref elm,lev)) = r_stack.peek(){
 			let elm_as_tree = Some(Rc::new(Tree::Leaf(elm.clone())));
-			let (f,t,_) = integrate_forests(&l_forest, &tree, level, &elm_as_tree, &Stack::new(), true, false);
+			let (f,t,_) = integrate_forests(l_forest, tree, level, elm_as_tree, Stack::new(), true, false);
 			tree = t;
 			l_forest = f;
 			level = lev;
@@ -482,13 +478,13 @@ impl<T: Clone> SeqZip<T,RazSeq<T>> for Raz<T> {
 	fn unzip(&self) -> RazSeq<T> {
 		let (lf,lt,_) = { match build_tree_left(&self.one.leaves) {
 			None => (self.one.forest.clone(), self.one.tree.clone(), Stack::new()),
-			Some((lev,t,f)) => integrate_forests(&self.one.forest, &self.one.tree, lev, &t, &f, true, false),
+			Some((lev,t,f)) => integrate_forests(self.one.forest.clone(), self.one.tree.clone(), lev, t, f, true, false),
 		}};
 		let (_,rt,rf) = { match build_tree_right(&self.two.leaves) {
 			None => (self.one.forest.clone(), self.one.tree.clone(), Stack::new()),
-			Some((f,t,lev)) => integrate_forests(&f, &t, lev, &self.two.tree,&self.two.forest, false, true),
+			Some((f,t,lev)) => integrate_forests(f, t, lev, self.two.tree.clone(),self.two.forest.clone(), false, true),
 		}};
-		let (_,main_tree,_) = integrate_forests(&lf,&lt,self.level,&rt,&rf, false,false);
+		let (_,main_tree,_) = integrate_forests(lf,lt,self.level,rt,rf, false,false);
 		RazSeq(main_tree)
 	}
 }
