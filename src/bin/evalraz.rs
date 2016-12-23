@@ -35,9 +35,9 @@ fn main() {
       --save_mem             'don't dealocate major data while timing'
       -s, --start=[start]    'starting sequence length'
       -i, --insert=[insert]  'number of timed insertions'
-      -g, --groups=[groups]  'insertion groups per sequence'
+      -g, --groups=[groups]  'measured insertion groups per sequence'
       -r, --reps=[reps]      'number of sequences tested'
-      [multi] -m             'more insertions for each test'
+      [multi] -m             'more insertions for each repetition'
       [raz] -z               'test raz' ")
     .get_matches();
   let nohead = args.is_present("nohead");
@@ -58,11 +58,11 @@ fn main() {
   }
 
 	let print_header = ||{
-	   println!("UnixTime, Seed, SeqType, SeqNum, PriorElements, Insertions, Time, {}", taghead);
+	   println!("UnixTime,Seed,SeqType,SeqNum,PriorElements,Insertions,Time,{}", taghead);
 	};
 
 	let print_result = |version: &str, number: usize, prior_elms: usize, insertions: usize, time: Duration| {
-		println!("{}, {}, {}, {}, {}, {}, {}, {}",
+		println!("{},{},{},{},{},{},{},{}",
 			time::get_time().sec, seed, version, number, prior_elms, insertions, time, tag
 		);
 	};
