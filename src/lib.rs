@@ -10,6 +10,7 @@ pub mod stack;
 pub mod seqzip;
 pub mod persist_raz;
 pub mod split_btree_cursor;
+pub mod gauged_stack;
 
 #[cfg(test)]
 mod tests {

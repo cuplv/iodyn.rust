@@ -5,7 +5,7 @@
 // - in the general case the most efficent heights will be drawn from 
 //   a negative binomial distribution
 
-// TODO: find a good way to abstract the stack implementation
+// TODO: find a good way to abstract the stack implementation; macro?
 
 use std::rc::Rc;
 use pat::AsPattern;
