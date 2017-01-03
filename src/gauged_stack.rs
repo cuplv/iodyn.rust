@@ -4,7 +4,6 @@
 // - copy in high-const O(1) - short array copy then pointer
 
 use std::mem;
-use std::rc::Rc;
 use stack::Stack;
 
 struct GStack<E: Clone,M: Clone> {
@@ -33,7 +32,7 @@ impl<E: Clone, M: Clone> GStack<E,M> {
 		self.size -= 1;
 		self.grain.pop()
 	}
-	pub fn pull_vec(&mut self) -> Option<(M,Vec<E>)> {
+	pub fn pop_vec(&mut self) -> Option<(M,Vec<E>)> {
 		if self.size == 0 { return None }
 		let lost_len = self.grain.len();
 		if lost_len == self.size {
@@ -43,9 +42,9 @@ impl<E: Clone, M: Clone> GStack<E,M> {
 			return Some((self.meta.clone(), old_grain));
 		} else {
 			self.size -= lost_len;
-			let (mut old_meta, mut old_grain);
+			let (old_meta, old_grain);
 			{
-				let &(ref m,ref v) = self.grains.peek().unwrap();
+				let &(ref m,ref v) = self.grains.peek().expect("missing data");
 				old_meta = mem::replace(&mut self.meta, m.clone());
 				old_grain = mem::replace(&mut self.grain, v.clone());
 			}
@@ -63,12 +62,12 @@ impl<E: Clone, M: Clone> GStack<E,M> {
 		// should we ensure that there are no empty vec's archived?
 
 		// why won't the compiler alter this code for me automatically?
-		// self.grains.push((self.meta,self.grain));
+		// self.grains = self.grains.push((self.meta,self.grain));
 		// self.grain = Vec::new();
 		// self.meta = meta;
 		let old_meta = mem::replace(&mut self.meta, new_meta);
 		let old_grain = mem::replace(&mut self.grain, Vec::new());
-		self.grains.push((old_meta, old_grain));
+		self.grains = self.grains.push((old_meta, old_grain));
 	}
 	
 	// pulls the next non-empty grain from the grains archive, overwriting
@@ -95,4 +94,80 @@ impl<E: Clone, M:Clone> Clone for GStack<E,M> {
 			grains: self.grains.clone(),
 		}
 	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[derive(Clone)]
+	struct Unit;
+
+  #[test]
+  fn test_retrieve() {
+  	let mut stack = GStack::new(Unit);
+  	stack.push(5);
+  	stack.push(2);
+  	stack.push(3);
+  	let (_,nums) = stack.pop_vec().unwrap();
+  	assert_eq!(nums, vec!(5,2,3));
+
+  	stack.push(4);
+  	stack.push(2);
+  	stack.push(4);
+  	stack.archive(Unit);
+  	stack.push(9);
+  	stack.push(3);
+  	stack.push(7);
+  	stack.archive(Unit);
+
+  	assert_eq!(stack.len(), 6);
+
+  	let (_,nums) = stack.pop_vec().unwrap();
+  	assert_eq!(nums, vec!());
+  	let (_,nums) = stack.pop_vec().unwrap();
+  	assert_eq!(nums, vec!(9,3,7));
+  	let (_,nums) = stack.pop_vec().unwrap();
+  	assert_eq!(nums, vec!(4,2,4));
+  }
+
+  #[test]
+  fn test_pop_archive() {
+  	let mut stack = GStack::new(Unit);
+  	stack.push(4);
+  	stack.push(2);
+  	stack.push(4);
+  	stack.archive(Unit);
+  	stack.push(9);
+  	stack.push(3);
+
+  	assert_eq!(Some(3), stack.pop());
+  	assert_eq!(Some(9), stack.pop());
+  	assert_eq!(Some(4), stack.pop());
+  	assert_eq!(Some(2), stack.pop());
+  }
+
+  #[test]
+  fn test_peek_archive() {
+  	let mut stack = GStack::new(Unit);
+  	stack.push(4);
+  	stack.push(2);
+  	stack.push(4);
+  	stack.archive(Unit);
+  	stack.push(9);
+  	stack.push(3);
+
+  	assert_eq!(Some(&3), stack.peek());
+  	assert_eq!(Some(&3), stack.peek());
+  	stack.pop();
+  	assert_eq!(Some(&9), stack.peek());
+  	stack.pop();
+  	assert_eq!(Some(&4), stack.peek());
+  	assert_eq!(Some(&4), stack.peek());
+
+  	stack.pop();
+  	stack.pop();
+  	stack.pop();
+  	assert!(stack.is_empty());  	
+  }
 }

@@ -18,6 +18,7 @@ mod tests {
 	use seqzip::{AtLeft,AtRight};
 	use zip::Zip;
 	use seqzip::{Seq, SeqZip};
+  use persist_raz::Raz;
 
   #[test]
   fn test_stack_zipper() {
@@ -54,7 +55,7 @@ mod tests {
   #[test]
   fn test_raz_zipper() {
   	// define a sequence
-  	let none = raz::Raz::new();
+  	let none = Raz::new();
   	let some = none.push_r(3).push_r(7).push_r(1).push_r(0);
 	 	let result = some.iter_r().collect::<Vec<_>>();
 	  assert_eq!(vec!(0,1,7,3), result);
@@ -81,7 +82,6 @@ mod tests {
   use rand::random;
   use self::test::Bencher;
   //use zip::Stacks;
-  use raz::Raz;
 
   #[bench]
   fn insert_a_lot(b: &mut Bencher) {
