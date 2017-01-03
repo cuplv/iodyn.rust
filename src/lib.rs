@@ -3,10 +3,13 @@
 
 extern crate rand;
 
+extern crate pat;
+
 pub mod zip;
 pub mod stack;
 pub mod seqzip;
-pub mod raz;
+pub mod persist_raz;
+pub mod split_btree_cursor;
 
 #[cfg(test)]
 mod tests {

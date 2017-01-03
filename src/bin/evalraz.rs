@@ -11,7 +11,7 @@ use time::{Duration};
 
 //use pmfp_collections::zip::{Zip};
 use pmfp_collections::seqzip::{Seq, SeqZip};
-use pmfp_collections::raz::{Raz};
+use pmfp_collections::persist_raz::{Raz};
 
 const DEFAULT_SEED: usize = 0;
 const DEFAULT_TAG: &'static str = "None";
