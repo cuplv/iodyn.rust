@@ -11,6 +11,7 @@ pub mod seqzip;
 pub mod persist_raz;
 pub mod split_btree_cursor;
 pub mod gauged_stack;
+pub mod gauged_raz;
 
 #[cfg(test)]
 mod tests {

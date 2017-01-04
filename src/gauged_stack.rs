@@ -6,7 +6,7 @@
 use std::mem;
 use stack::Stack;
 
-struct GStack<E: Clone,M: Clone> {
+pub struct GStack<E: Clone,M: Clone> {
 	size: usize,
 	meta: M,
 	grain: Vec<E>,
@@ -100,12 +100,9 @@ impl<E: Clone, M:Clone> Clone for GStack<E,M> {
 mod tests {
 	use super::*;
 
-	#[derive(Clone)]
-	struct Unit;
-
   #[test]
   fn test_retrieve() {
-  	let mut stack = GStack::new(Unit);
+  	let mut stack = GStack::new(());
   	stack.push(5);
   	stack.push(2);
   	stack.push(3);
@@ -115,11 +112,11 @@ mod tests {
   	stack.push(4);
   	stack.push(2);
   	stack.push(4);
-  	stack.archive(Unit);
+  	stack.archive(());
   	stack.push(9);
   	stack.push(3);
   	stack.push(7);
-  	stack.archive(Unit);
+  	stack.archive(());
 
   	assert_eq!(stack.len(), 6);
 
@@ -133,11 +130,11 @@ mod tests {
 
   #[test]
   fn test_pop_archive() {
-  	let mut stack = GStack::new(Unit);
+  	let mut stack = GStack::new(());
   	stack.push(4);
   	stack.push(2);
   	stack.push(4);
-  	stack.archive(Unit);
+  	stack.archive(());
   	stack.push(9);
   	stack.push(3);
 
@@ -149,11 +146,11 @@ mod tests {
 
   #[test]
   fn test_peek_archive() {
-  	let mut stack = GStack::new(Unit);
+  	let mut stack = GStack::new(());
   	stack.push(4);
   	stack.push(2);
   	stack.push(4);
-  	stack.archive(Unit);
+  	stack.archive(());
   	stack.push(9);
   	stack.push(3);
 
