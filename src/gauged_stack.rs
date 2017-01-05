@@ -25,6 +25,7 @@ impl<E: Clone, M: Clone> GStack<E,M> {
 
 	pub fn is_empty(&self) -> bool { self.size == 0 }
 	pub fn len(&self) -> usize { self.size }
+	pub fn set_meta(&mut self, meta: M) { self.meta = meta; }
 	pub fn push(&mut self, elm: E) { self.size += 1; self.grain.push(elm) }
 	pub fn pop(&mut self) -> Option<E> {
 		if self.size == 0 { return None }
@@ -32,6 +33,19 @@ impl<E: Clone, M: Clone> GStack<E,M> {
 		self.size -= 1;
 		self.grain.pop()
 	}
+
+	pub fn extend(&mut self, extra: &[E]) {
+		self.size += extra.len();
+		self.grain.extend_from_slice(extra);
+	}
+
+	// specialized use that will be removed in future updates
+	pub fn extend_rev(&mut self, extra: &[E]) {
+		self.size += extra.len();
+		self.grain.extend_from_slice(extra);
+		self.grain.reverse();
+	}
+
 	pub fn pop_vec(&mut self) -> Option<(M,Vec<E>)> {
 		if self.size == 0 { return None }
 		let lost_len = self.grain.len();
@@ -81,6 +95,17 @@ impl<E: Clone, M: Clone> GStack<E,M> {
 		    self.grain = v.clone();
 		  }
 	    self.grains = self.grains.pull().unwrap()
+		}
+	}
+}
+
+impl<E: Clone> From<Vec<E>> for GStack<E,()> {
+	fn from(v: Vec<E>) -> Self {
+		GStack {
+			size: v.len(),
+			meta: (),
+			grain: v,
+			grains: Stack::new(),
 		}
 	}
 }

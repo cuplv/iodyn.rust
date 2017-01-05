@@ -4,7 +4,9 @@
 // - uses non-increasing heights for each subtree to maintain cannonical form
 // - in the general case the most efficent heights will be drawn from 
 //   a negative binomial distribution
+// - allows and assumes that structural changes will be made: copies data during movement
 
+// TODO: dirty flags in cursor to avoid unnessesary structural changes
 // TODO: find a good way to abstract the stack implementation; macro?
 
 use std::rc::Rc;
@@ -12,7 +14,7 @@ use pat::AsPattern;
 
 #[derive(Clone)]
 pub struct Tree<E>(TreeLink<E>);
-type Height = usize;
+pub type Height = usize;
 
 impl<E> Tree<E> {
 	pub fn empty() -> Tree<E> { Tree(None) }
@@ -110,7 +112,7 @@ impl<E: Clone> Cursor<E> {
 		unimplemented!()
 	}
 
-	pub fn tree(&self) -> Tree<E> {
+	pub fn at_tree(&self) -> Tree<E> {
 		Tree(self.tree.clone())
 	}
 
@@ -118,11 +120,14 @@ impl<E: Clone> Cursor<E> {
 		self.tree.as_ref().map(|ref tree| &tree.data)
 	}
 
+	pub fn peek_height(&self) -> Option<Height> {
+		self.tree.as_ref().map(|ref tree| tree.height)
+	}
+
 	pub fn down_left(&mut self) -> bool {
 		let (new_tree, old_branch) = match self.tree {
 			None => return false,
 			Some(ref t) => {
-				// OPTIMIZE: check Rc::try_unwrap?
 				if t.l_branch.is_none() { return false }
 				(
 					t.l_branch.clone(),
@@ -135,11 +140,22 @@ impl<E: Clone> Cursor<E> {
 		true
 	}
 
+	// discards the current node from this cursor as it moves, 
+	// effectively connecting the upper branch to the left side.
+	// does not fail if moving to an empty branch
+	pub fn down_left_discard(&mut self) -> bool {
+		let new_tree = match self.tree {
+			None => return false,
+			Some(ref t) => { t.l_branch.clone() }
+		};
+		self.tree = new_tree;
+		true
+	}
+
 	pub fn down_right(&mut self) -> bool {
 		let (new_tree, old_branch) = match self.tree {
 			None => return false,
 			Some(ref t) => {
-				// OPTIMIZE: check Rc::try_unwrap?
 				if t.r_branch.is_none() { return false }
 				(
 					t.r_branch.clone(),
@@ -148,6 +164,18 @@ impl<E: Clone> Cursor<E> {
 			}
 		};
 		self.l_forest.push(old_branch);
+		self.tree = new_tree;
+		true
+	}
+
+	// discards the current node from this cursor as it moves, 
+	// effectively connecting the upper branch to the right side.
+	// does not fail if moving to an empty branch
+	pub fn down_right_discard(&mut self) -> bool {
+		let new_tree = match self.tree {
+			None => return false,
+			Some(ref t) => { t.r_branch.clone() }
+		};
 		self.tree = new_tree;
 		true
 	}
