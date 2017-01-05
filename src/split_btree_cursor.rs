@@ -21,6 +21,17 @@ impl<E> Tree<E> {
 		let Tree(r) = right_branch;
 		Tree(Some(Rc::new(TreeNode{height: height, data: element, l_branch: l, r_branch: r})))
 	}
+	pub fn height(&self) -> Height {
+		let Tree(ref t) = *self;
+		match *t {
+			None => 0,
+			Some(ref t) => t.height,
+		}
+	}
+	pub fn peek(&self) -> Option<&E> {
+		let Tree(ref t) = *self;
+		t.as_ref().map(|ref node| &node.data)
+	}
 
 }
 
