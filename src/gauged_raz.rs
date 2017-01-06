@@ -8,6 +8,7 @@ use std::rc::Rc;
 use split_btree_cursor as tree;
 use gauged_stack as stack;
 
+#[derive(Clone)]
 struct Raz<E: Clone> {
 	l_forest: tree::Cursor<TreeData<E>>,
 	l_stack: stack::GStack<E,Option<tree::Height>>,
@@ -20,6 +21,7 @@ enum TreeData<E> {
 	Branch{l_items: usize},
 	Leaf(Rc<Vec<E>>),
 } 
+#[derive(Clone)]
 struct RazTree<E: Clone>{size: usize, tree: tree::Tree<TreeData<E>>}
 
 impl<E:Clone> RazTree<E> {
@@ -28,7 +30,7 @@ impl<E:Clone> RazTree<E> {
 			if size < pos { return None };
 			let mut cursor = tree::Cursor::from(tree);
 			while let TreeData::Branch{l_items} = *cursor.peek().unwrap() {
-				if size <= l_items {
+				if pos <= l_items {
 					assert!(cursor.down_left());
 				} else {
 					pos -= l_items;
@@ -115,5 +117,46 @@ mod tests {
   	assert_eq!(Some(8), raz.pop_right());
   	assert_eq!(Some(5), raz.pop_left());
   	assert_eq!(None, raz.pop_right());
+  }
+
+  #[test]
+  fn test_tree_focus() {
+  	let mut tree = RazTree{
+  		size: 12,
+  		tree: tree::Tree::new(5,TreeData::Branch{l_items:8},
+  			tree::Tree::new(3,TreeData::Branch{l_items:2},
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(1,2))),tree::Tree::empty(),tree::Tree::empty()),
+  				tree::Tree::new(2,TreeData::Branch{l_items:4},
+  					tree::Tree::new(1,TreeData::Branch{l_items:2},
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(3,4))),tree::Tree::empty(),tree::Tree::empty()),
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(5,6))),tree::Tree::empty(),tree::Tree::empty()),
+  					),
+  					tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(7,8))),tree::Tree::empty(),tree::Tree::empty()),
+  				)
+  			),
+  			tree::Tree::new(4,TreeData::Branch{l_items: 2},
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(9,10))),tree::Tree::empty(),tree::Tree::empty()),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(11,12))),tree::Tree::empty(),tree::Tree::empty()),
+  			)
+  		)
+  	};
+  	let mut left = tree.clone().focus(0).unwrap();
+  	let mut deep = tree.clone().focus(5).unwrap();
+  	let mut right = tree.clone().focus(12).unwrap();
+
+  	assert_eq!(Some(1), left.pop_right());
+  	assert_eq!(Some(12), right.pop_left());
+  	assert_eq!(None, right.pop_right());
+  	assert_eq!(Some(5), deep.pop_left());
+
+  	assert_eq!(Some(6), deep.pop_right());
+  	assert_eq!(Some(7), deep.pop_right());
+  	assert_eq!(Some(8), deep.pop_right());
+  	assert_eq!(Some(9), deep.pop_right());
+  	assert_eq!(Some(10), deep.pop_right());
+  	assert_eq!(Some(11), deep.pop_right());
+  	assert_eq!(Some(12), deep.pop_right());
+  	assert_eq!(None, deep.pop_right());
+
   }
 }

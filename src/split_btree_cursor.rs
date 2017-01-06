@@ -68,6 +68,7 @@ impl<E> AsPattern<T<E>> for Tree<E> {
 	}
 }
 
+#[derive(Clone)]
 pub struct Cursor<E: Clone> {
 	l_forest: Vec<(TreeLink<E>,Height,E)>,
 	tree: TreeLink<E>,
