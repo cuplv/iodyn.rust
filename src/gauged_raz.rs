@@ -56,6 +56,14 @@ impl<E:Clone> RazTree<E> {
 }
 
 impl<E:Clone> Raz<E> {
+	pub fn new() -> Raz<E> {
+		Raz{
+			l_forest: tree::Cursor::new(),
+			l_stack: stack::GStack::new(None),
+			r_stack: stack::GStack::new(None),
+			r_forest: tree::Cursor::new(),
+		}
+	}
 	pub fn push_left(&mut self, elm: E) {
 		self.l_stack.push(elm);
 	}
@@ -90,4 +98,22 @@ impl<E:Clone> Raz<E> {
 		}
 		self.r_stack.pop()
 	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+  #[test]
+  fn test_push_pop() {
+  	let mut raz = Raz::new();
+  	raz.push_left(5);
+  	raz.push_left(4);
+  	raz.push_right(8);
+  	raz.pop_left();
+
+  	assert_eq!(Some(8), raz.pop_right());
+  	assert_eq!(Some(5), raz.pop_left());
+  	assert_eq!(None, raz.pop_right());
+  }
 }

@@ -17,7 +17,7 @@ pub struct Tree<E>(TreeLink<E>);
 pub type Height = usize;
 
 impl<E> Tree<E> {
-	pub fn empty() -> Tree<E> { Tree(None) }
+	pub fn empty() -> Self { Tree(None) }
 	pub fn new(height: Height, element: E, left_branch: Tree<E>, right_branch: Tree<E>) -> Tree<E> {
 		let Tree(l) = left_branch;
 		let Tree(r) = right_branch;
@@ -86,6 +86,13 @@ impl<E: Clone> From<Tree<E>> for Cursor<E> {
 }
 
 impl<E: Clone> Cursor<E> {
+	pub fn new() -> Self {
+		Cursor{
+			l_forest: Vec::new(),
+			tree: None,
+			r_forest: Vec::new(),
+		}
+	}
 	pub fn split(self) -> (Cursor<E>, Tree<E>, Cursor<E>) {
 		let (l_tree,r_tree) = match self.tree {
 			None => (None, None),
