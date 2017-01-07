@@ -94,6 +94,9 @@ impl<E: Clone> Cursor<E> {
 			r_forest: Vec::new(),
 		}
 	}
+	// returns the current tree plus two cursors containing
+	//   every node to the left and right, respectively, of the tree's top node.
+	// the returned cursors will be located at the two branches of the returned tree
 	pub fn split(self) -> (Cursor<E>, Tree<E>, Cursor<E>) {
 		let (l_tree,r_tree) = match self.tree {
 			None => (None, None),
@@ -116,12 +119,45 @@ impl<E: Clone> Cursor<E> {
 		)
 	}
 
-	pub fn join(l_cursor: Self, height: Height, data: E, r_cursor: Self) -> Self {
-		unimplemented!()
+	// makes a new cursor at the given data, between the trees of the other cursors
+	pub fn join(mut l_cursor: Self, height: Height, data: E, mut r_cursor: Self) -> Self {
+		// step 1: remove center forests
+		while !l_cursor.r_forest.is_empty() { assert!(l_cursor.up()); }
+		while !r_cursor.l_forest.is_empty() { assert!(r_cursor.up()); }
+		// step 2: find insertion point
+		while let Some(h) = l_cursor.peek_height() {
+			if h < height { break; }
+			else { assert!(l_cursor.force_down_right()); }
+		}
+		while let Some(h) = r_cursor.peek_height() {
+			if h <= height { break; }
+			else { assert!(r_cursor.force_down_left()); }
+		}
+		// step 3: build center tree
+		let tree = Some(Rc::new(TreeNode{
+			height: height,
+			data: data,
+			l_branch: l_cursor.tree.clone(),
+			r_branch: r_cursor.tree.clone(),
+		}));
+		// step4: join structures
+		Cursor{
+			l_forest: l_cursor.l_forest,
+			tree: tree,
+			r_forest: r_cursor.r_forest,
+		}
 	}
 
 	pub fn at_tree(&self) -> Tree<E> {
 		Tree(self.tree.clone())
+	}
+
+	pub fn left_tree(&self) -> Option<Tree<E>> {
+		self.tree.as_ref().map(|ref t| Tree(t.l_branch.clone()))
+	}
+
+	pub fn right_tree(&self) -> Option<Tree<E>> {
+		self.tree.as_ref().map(|ref t| Tree(t.r_branch.clone()))
 	}
 
 	pub fn peek(&self) -> Option<&E> {
@@ -132,11 +168,29 @@ impl<E: Clone> Cursor<E> {
 		self.tree.as_ref().map(|ref tree| tree.height)
 	}
 
+	// move into the left branch, if it exists
 	pub fn down_left(&mut self) -> bool {
 		let (new_tree, old_branch) = match self.tree {
 			None => return false,
 			Some(ref t) => {
 				if t.l_branch.is_none() { return false }
+				(
+					t.l_branch.clone(),
+					(t.height, t.data.clone(), t.r_branch.clone()),
+				)
+			}
+		};
+		self.r_forest.push(old_branch);
+		self.tree = new_tree;
+		true
+	}
+
+	// will move into an empty branch
+	// return false if self is on an empty branch
+	pub fn force_down_left(&mut self) -> bool {
+		let (new_tree, old_branch) = match self.tree {
+			None => return false,
+			Some(ref t) => {
 				(
 					t.l_branch.clone(),
 					(t.height, t.data.clone(), t.r_branch.clone()),
@@ -165,6 +219,21 @@ impl<E: Clone> Cursor<E> {
 			None => return false,
 			Some(ref t) => {
 				if t.r_branch.is_none() { return false }
+				(
+					t.r_branch.clone(),
+					(t.l_branch.clone(), t.height, t.data.clone()),
+				)
+			}
+		};
+		self.l_forest.push(old_branch);
+		self.tree = new_tree;
+		true
+	}
+
+	pub fn force_down_right(&mut self) -> bool {
+		let (new_tree, old_branch) = match self.tree {
+			None => return false,
+			Some(ref t) => {
 				(
 					t.r_branch.clone(),
 					(t.l_branch.clone(), t.height, t.data.clone()),

@@ -28,6 +28,7 @@ impl<E:Clone> RazTree<E> {
 	pub fn focus(self, mut pos: usize) -> Option<Raz<E>> {
 		match self { RazTree{size,tree} => {
 			if size < pos { return None };
+			// step 1: find location with cursor
 			let mut cursor = tree::Cursor::from(tree);
 			while let TreeData::Branch{l_items} = *cursor.peek().unwrap() {
 				if pos <= l_items {
@@ -37,6 +38,7 @@ impl<E:Clone> RazTree<E> {
 					assert!(cursor.down_right());
 				}
 			}
+			// step 2: extract and copy data
 			let (l_cursor, tree, r_cursor) = cursor.split();
 			let (l_slice,r_slice) = match *tree.peek().unwrap() {
 				TreeData::Branch{..} => unreachable!(),
@@ -46,6 +48,7 @@ impl<E:Clone> RazTree<E> {
 			let mut r_gstack = stack::GStack::new(None);
 			l_gstack.extend(l_slice);
 			r_gstack.extend_rev(r_slice);
+			// step 3: integrate
 			Some(Raz{
 				l_forest: l_cursor,
 				l_stack: l_gstack,
@@ -65,6 +68,53 @@ impl<E:Clone> Raz<E> {
 			r_stack: stack::GStack::new(None),
 			r_forest: tree::Cursor::new(),
 		}
+	}
+	pub fn unfocus(mut self) -> RazTree<E> {
+		// step 1: reconstruct local array
+		let mut l_vec = if self.l_stack.get_meta().is_none() {
+			if let Some((_,vec)) = self.l_stack.pop_vec() {
+				Some(vec)
+			} else { None }
+		} else { None };
+		let mut r_vec = if self.r_stack.get_meta().is_none() {
+			if let Some((_,vec)) = self.r_stack.pop_vec() {
+				Some(vec)
+			} else { None }
+		} else { None };
+		let vec = match (self.l_stack.is_empty(), l_vec, r_vec, self.r_stack.is_empty()) {
+			(_,Some(v),None,_) => Some(v),
+			(_,None,Some(mut v),_) => { v.reverse(); Some(v) },
+			(_,Some(mut lv),Some(mut rv),_) => {rv.reverse(); lv.extend(rv); Some(lv) },
+			(false, None, None, _) => {
+				let (_,v) = self.l_stack.pop_vec().unwrap();
+				Some(v)
+			},
+			(true, None, None, false) => {
+				let (_,mut v) = self.r_stack.pop_vec().unwrap();
+				v.reverse();
+				Some(v)
+			},
+			_ => None
+		};
+		// step 2: build center tree
+		let tree = if let Some(v) = vec {
+			// OPTIMIZE: linear algorithm
+			unimplemented!()
+		} else {
+			if !self.l_forest.up() {
+				if !self.r_forest.up() {
+					return RazTree{ size: 0, tree: tree::Tree::empty()};
+				} else {
+					self.r_forest.right_tree().unwrap()
+				}
+			} else {
+				self.l_forest.left_tree().unwrap()
+			}
+		};
+		// step 3: join with forests
+		// step 4: integrate
+
+		unimplemented!()
 	}
 	pub fn push_left(&mut self, elm: E) {
 		self.l_stack.push(elm);
@@ -157,6 +207,15 @@ mod tests {
   	assert_eq!(Some(11), deep.pop_right());
   	assert_eq!(Some(12), deep.pop_right());
   	assert_eq!(None, deep.pop_right());
+
+  	assert_eq!(Some(11), right.pop_left());
+  	assert_eq!(Some(10), right.pop_left());
+
+  	assert_eq!(Some(4), deep.pop_left());
+  	assert_eq!(Some(3), deep.pop_left());
+  	assert_eq!(Some(2), deep.pop_left());
+  	assert_eq!(Some(1), deep.pop_left());
+  	assert_eq!(None, deep.pop_left());
 
   }
 }
