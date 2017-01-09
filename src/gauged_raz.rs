@@ -11,30 +11,30 @@ use gauged_stack as stack;
 #[derive(Clone)]
 struct Raz<E: Clone> {
 	l_forest: tree::Cursor<TreeData<E>>,
-	l_stack: stack::GStack<E,Option<tree::Height>>,
-	r_stack: stack::GStack<E,Option<tree::Height>>,
+	l_stack: stack::GStack<E,Option<tree::Level>>,
+	r_stack: stack::GStack<E,Option<tree::Level>>,
 	r_forest: tree::Cursor<TreeData<E>>,
 }
 
 #[derive(Clone)]
 enum TreeData<E> {
-	Branch{l_items: usize},
+	Branch{l_count: usize, r_count: usize},
 	Leaf(Rc<Vec<E>>),
 } 
 #[derive(Clone)]
-struct RazTree<E: Clone>{size: usize, tree: tree::Tree<TreeData<E>>}
+struct RazTree<E: Clone>{count: usize, tree: tree::Tree<TreeData<E>>}
 
 impl<E:Clone> RazTree<E> {
 	pub fn focus(self, mut pos: usize) -> Option<Raz<E>> {
-		match self { RazTree{size,tree} => {
-			if size < pos { return None };
+		match self { RazTree{count,tree} => {
+			if count < pos { return None };
 			// step 1: find location with cursor
 			let mut cursor = tree::Cursor::from(tree);
-			while let TreeData::Branch{l_items} = *cursor.peek().unwrap() {
-				if pos <= l_items {
+			while let TreeData::Branch{l_count, ..} = *cursor.peek().unwrap() {
+				if pos <= l_count {
 					assert!(cursor.down_left());
 				} else {
-					pos -= l_items;
+					pos -= l_count;
 					assert!(cursor.down_right());
 				}
 			}
@@ -70,7 +70,7 @@ impl<E:Clone> Raz<E> {
 		}
 	}
 	pub fn unfocus(mut self) -> RazTree<E> {
-		// step 1: reconstruct local array
+		// step 1: reconstruct local array from stack
 		let mut l_vec = if self.l_stack.get_meta().is_none() {
 			if let Some((_,vec)) = self.l_stack.pop_vec() {
 				Some(vec)
@@ -103,7 +103,7 @@ impl<E:Clone> Raz<E> {
 		} else {
 			if !self.l_forest.up() {
 				if !self.r_forest.up() {
-					return RazTree{ size: 0, tree: tree::Tree::empty()};
+					return RazTree{ count: 0, tree: tree::Tree::empty() };
 				} else {
 					self.r_forest.right_tree().unwrap()
 				}
@@ -112,9 +112,20 @@ impl<E:Clone> Raz<E> {
 			}
 		};
 		// step 3: join with forests
-		// step 4: integrate
-
-		unimplemented!()
+		let mut join_cursor = tree.into();
+		if self.l_forest.up() {
+			let h = self.l_forest.peek_level().unwrap();
+			self.l_forest.down_left_discard();
+			join_cursor = tree::Cursor::join(self.l_forest,h,TreeData::Branch{l_count: 0, r_count: 0},join_cursor);
+		}
+		if self.r_forest.up() {
+			let h = self.r_forest.peek_level().unwrap();
+			self.r_forest.down_right_discard();
+			join_cursor = tree::Cursor::join(join_cursor,h,TreeData::Branch{l_count: 0, r_count: 0},self.r_forest);
+		}
+		// step 4: convert to final tree
+		while join_cursor.up() {}
+		RazTree{count: 0, tree: join_cursor.at_tree()}
 	}
 	pub fn push_left(&mut self, elm: E) {
 		self.l_stack.push(elm);
@@ -125,7 +136,7 @@ impl<E:Clone> Raz<E> {
 	pub fn pop_left(&mut self) -> Option<E> {
 		if self.l_stack.len() == 0 {
 			if !self.l_forest.up() { return None } else {
-				self.l_stack.set_meta(self.l_forest.peek_height());
+				self.l_stack.set_meta(self.l_forest.peek_level());
 				self.l_forest.down_left_discard();
 				while self.l_forest.down_right() {}
 				match self.l_forest.peek() {
@@ -139,7 +150,7 @@ impl<E:Clone> Raz<E> {
 	pub fn pop_right(&mut self) -> Option<E> {
 		if self.r_stack.len() == 0 {
 			if !self.r_forest.up() { return None } else {
-				self.r_stack.set_meta(self.r_forest.peek_height());
+				self.r_stack.set_meta(self.r_forest.peek_level());
 				self.r_forest.down_right_discard();
 				while self.r_forest.down_left() {}
 				match self.r_forest.peek() {
