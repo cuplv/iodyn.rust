@@ -1,8 +1,8 @@
 // Split Binary Tree Cursor
 // - a cursor within a persistent, ordered, binary tree
 // - optimised for splitting and combining trees at the cursor in a cannonical way
-// - uses non-increasing heights for each subtree to maintain cannonical form
-// - in the general case the most efficent heights will be drawn from 
+// - uses non-increasing levels for each subtree to maintain cannonical form
+// - in the general case the most efficent levels will be drawn from 
 //   a negative binomial distribution
 // - allows and assumes that structural changes will be made: copies data during movement
 
@@ -14,20 +14,20 @@ use pat::AsPattern;
 
 #[derive(Clone)]
 pub struct Tree<E>(TreeLink<E>);
-pub type Height = usize;
+pub type Level = usize;
 
 impl<E> Tree<E> {
 	pub fn empty() -> Self { Tree(None) }
-	pub fn new(height: Height, element: E, left_branch: Tree<E>, right_branch: Tree<E>) -> Tree<E> {
+	pub fn new(level: Level, element: E, left_branch: Tree<E>, right_branch: Tree<E>) -> Tree<E> {
 		let Tree(l) = left_branch;
 		let Tree(r) = right_branch;
-		Tree(Some(Rc::new(TreeNode{height: height, data: element, l_branch: l, r_branch: r})))
+		Tree(Some(Rc::new(TreeNode{level: level, data: element, l_branch: l, r_branch: r})))
 	}
-	pub fn height(&self) -> Height {
+	pub fn level(&self) -> Level {
 		let Tree(ref t) = *self;
 		match *t {
 			None => 0,
-			Some(ref t) => t.height,
+			Some(ref t) => t.level,
 		}
 	}
 	pub fn peek(&self) -> Option<&E> {
@@ -40,12 +40,12 @@ impl<E> Tree<E> {
 // deconstruction patterns
 pub enum T<E> {
 	None,
-	Take(Height, Tree<E>, E, Tree<E>),
+	Take(Level, Tree<E>, E, Tree<E>),
 	Shared(Tree<E>),
 }
 
 struct TreeNode<E>{
-	height: Height,
+	level: Level,
 	data: E,
 	l_branch: TreeLink<E>,
 	r_branch: TreeLink<E>
@@ -59,8 +59,8 @@ impl<E> AsPattern<T<E>> for Tree<E> {
 		match node {
 			None => T::None,
 			Some(n) =>  match Rc::try_unwrap(n) {
-				Ok(TreeNode{height,data,l_branch,r_branch}) => {
-					T::Take(height, Tree(l_branch), data, Tree(r_branch))
+				Ok(TreeNode{level,data,l_branch,r_branch}) => {
+					T::Take(level, Tree(l_branch), data, Tree(r_branch))
 				}
 				Err(n) => T::Shared(Tree(Some(n)))
 			}
@@ -70,9 +70,9 @@ impl<E> AsPattern<T<E>> for Tree<E> {
 
 #[derive(Clone)]
 pub struct Cursor<E: Clone> {
-	l_forest: Vec<(TreeLink<E>,Height,E)>,
+	l_forest: Vec<(TreeLink<E>,Level,E)>,
 	tree: TreeLink<E>,
-	r_forest: Vec<(Height,E,TreeLink<E>)>,
+	r_forest: Vec<(Level,E,TreeLink<E>)>,
 }
 
 impl<E: Clone> From<Tree<E>> for Cursor<E> {
@@ -120,22 +120,22 @@ impl<E: Clone> Cursor<E> {
 	}
 
 	// makes a new cursor at the given data, between the trees of the other cursors
-	pub fn join(mut l_cursor: Self, height: Height, data: E, mut r_cursor: Self) -> Self {
+	pub fn join(mut l_cursor: Self, level: Level, data: E, mut r_cursor: Self) -> Self {
 		// step 1: remove center forests
 		while !l_cursor.r_forest.is_empty() { assert!(l_cursor.up()); }
 		while !r_cursor.l_forest.is_empty() { assert!(r_cursor.up()); }
 		// step 2: find insertion point
-		while let Some(h) = l_cursor.peek_height() {
-			if h < height { break; }
+		while let Some(h) = l_cursor.peek_level() {
+			if h < level { break; }
 			else { assert!(l_cursor.force_down_right()); }
 		}
-		while let Some(h) = r_cursor.peek_height() {
-			if h <= height { break; }
+		while let Some(h) = r_cursor.peek_level() {
+			if h <= level { break; }
 			else { assert!(r_cursor.force_down_left()); }
 		}
 		// step 3: build center tree
 		let tree = Some(Rc::new(TreeNode{
-			height: height,
+			level: level,
 			data: data,
 			l_branch: l_cursor.tree.clone(),
 			r_branch: r_cursor.tree.clone(),
@@ -164,9 +164,15 @@ impl<E: Clone> Cursor<E> {
 		self.tree.as_ref().map(|ref tree| &tree.data)
 	}
 
-	pub fn peek_height(&self) -> Option<Height> {
-		self.tree.as_ref().map(|ref tree| tree.height)
+	pub fn peek_level(&self) -> Option<Level> {
+		self.tree.as_ref().map(|ref tree| tree.level)
 	}
+
+	// need to make sure levels are appropriate
+	// pub fn set_tree(&mut self, tree: Tree) {
+	// 	let Tree(tree) = tree;
+	// 	self.tree = tree;
+	// }
 
 	// move into the left branch, if it exists
 	pub fn down_left(&mut self) -> bool {
@@ -176,7 +182,7 @@ impl<E: Clone> Cursor<E> {
 				if t.l_branch.is_none() { return false }
 				(
 					t.l_branch.clone(),
-					(t.height, t.data.clone(), t.r_branch.clone()),
+					(t.level, t.data.clone(), t.r_branch.clone()),
 				)
 			}
 		};
@@ -193,7 +199,7 @@ impl<E: Clone> Cursor<E> {
 			Some(ref t) => {
 				(
 					t.l_branch.clone(),
-					(t.height, t.data.clone(), t.r_branch.clone()),
+					(t.level, t.data.clone(), t.r_branch.clone()),
 				)
 			}
 		};
@@ -221,7 +227,7 @@ impl<E: Clone> Cursor<E> {
 				if t.r_branch.is_none() { return false }
 				(
 					t.r_branch.clone(),
-					(t.l_branch.clone(), t.height, t.data.clone()),
+					(t.l_branch.clone(), t.level, t.data.clone()),
 				)
 			}
 		};
@@ -236,7 +242,7 @@ impl<E: Clone> Cursor<E> {
 			Some(ref t) => {
 				(
 					t.r_branch.clone(),
-					(t.l_branch.clone(), t.height, t.data.clone()),
+					(t.l_branch.clone(), t.level, t.data.clone()),
 				)
 			}
 		};
@@ -261,21 +267,21 @@ impl<E: Clone> Cursor<E> {
 		let use_left = match (self.l_forest.last(), self.r_forest.last()) {
 			(None, None) => { return false },
 			(Some(_), None) => true,
-			(Some(&(_,l_height,_)), Some(&(r_height,_,_))) if r_height > l_height => true,
+			(Some(&(_,l_level,_)), Some(&(r_level,_,_))) if r_level > l_level => true,
 			_ => false,
 		};
 		if use_left {
-			let (l_branch, l_height, l_data) = self.l_forest.pop().unwrap();
+			let (l_branch, l_level, l_data) = self.l_forest.pop().unwrap();
 			self.tree = Some(Rc::new(TreeNode{
-				height: l_height,
+				level: l_level,
 				data: l_data,
 				l_branch: l_branch,
 				r_branch: self.tree.take(),
 			}));
 		} else {
-			let (r_height, r_data, r_branch) = self.r_forest.pop().unwrap();
+			let (r_level, r_data, r_branch) = self.r_forest.pop().unwrap();
 			self.tree = Some(Rc::new(TreeNode{
-				height: r_height,
+				level: r_level,
 				data: r_data,
 				l_branch: self.tree.take(),
 				r_branch: r_branch
