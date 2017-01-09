@@ -183,19 +183,19 @@ mod tests {
   #[test]
   fn test_tree_focus() {
   	let mut tree = RazTree{
-  		size: 12,
-  		tree: tree::Tree::new(5,TreeData::Branch{l_items:8},
-  			tree::Tree::new(3,TreeData::Branch{l_items:2},
+  		count: 12,
+  		tree: tree::Tree::new(5,TreeData::Branch{l_count:8, r_count: 4},
+  			tree::Tree::new(3,TreeData::Branch{l_count:2, r_count: 6},
   				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(1,2))),tree::Tree::empty(),tree::Tree::empty()),
-  				tree::Tree::new(2,TreeData::Branch{l_items:4},
-  					tree::Tree::new(1,TreeData::Branch{l_items:2},
+  				tree::Tree::new(2,TreeData::Branch{l_count:4, r_count: 2},
+  					tree::Tree::new(1,TreeData::Branch{l_count:2, r_count: 2},
 		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(3,4))),tree::Tree::empty(),tree::Tree::empty()),
 		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(5,6))),tree::Tree::empty(),tree::Tree::empty()),
   					),
   					tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(7,8))),tree::Tree::empty(),tree::Tree::empty()),
   				)
   			),
-  			tree::Tree::new(4,TreeData::Branch{l_items: 2},
+  			tree::Tree::new(4,TreeData::Branch{l_count: 2, r_count: 2},
   				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(9,10))),tree::Tree::empty(),tree::Tree::empty()),
   				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(11,12))),tree::Tree::empty(),tree::Tree::empty()),
   			)
