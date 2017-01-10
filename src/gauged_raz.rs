@@ -4,6 +4,7 @@
 // - combines tree cursor with stack
 
 use std::rc::Rc;
+use std::ops::Deref;
 
 use split_btree_cursor as tree;
 use gauged_stack as stack;
@@ -16,7 +17,6 @@ struct Raz<E: Clone> {
 	r_forest: tree::Cursor<TreeData<E>>,
 }
 
-#[derive(Clone)]
 enum TreeData<E> {
 	Branch{l_count: usize, r_count: usize},
 	Leaf(Rc<Vec<E>>),
@@ -31,6 +31,7 @@ fn count<E>(td: Option<&TreeData<E>>) -> usize {
 }
 
 impl<E> tree::TreeUpdate for TreeData<E> {
+	#[allow(unused_variables)]
 	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self {
 		TreeData::Branch{l_count: count(l_branch), r_count: count(r_branch)}
 	}
@@ -39,7 +40,15 @@ impl<E> tree::TreeUpdate for TreeData<E> {
 #[derive(Clone)]
 struct RazTree<E: Clone>{count: usize, tree: tree::Tree<TreeData<E>>}
 
+impl<E: Clone> Deref for RazTree<E> {
+	type Target = tree::Tree<TreeData<E>>;
+	fn deref(&self) -> &Self::Target {
+		&self.tree
+	}
+}
+
 impl<E:Clone> RazTree<E> {
+	pub fn len(&self) -> usize {self.count}
 	pub fn focus(self, mut pos: usize) -> Option<Raz<E>> {
 		match self { RazTree{count,tree} => {
 			if count < pos { return None };
@@ -114,7 +123,24 @@ impl<E:Clone> Raz<E> {
 		// step 2: build center tree
 		let tree = if let Some(v) = vec {
 			// OPTIMIZE: linear algorithm
-			unimplemented!()
+			let mut cursor = tree::Tree::new(0,TreeData::Leaf(Rc::new(v)),tree::Tree::empty(),tree::Tree::empty()).into();
+			while !self.l_stack.is_empty() {
+				if let Some((Some(l_lev),l_vec)) = self.l_stack.pop_vec() {
+					let l_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(l_vec)),tree::Tree::empty(),tree::Tree::empty()).into();
+					let dummy = TreeData::Branch{l_count: 0, r_count: 0};
+					cursor = tree::Cursor::join(l_curs,l_lev,dummy,cursor);
+				} else { panic!("unfocus: unexpected l_stack structure")}
+			}
+			while !self.r_stack.is_empty() {
+				if let Some((Some(r_lev),mut r_vec)) = self.r_stack.pop_vec() {
+					r_vec.reverse();
+					let r_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(r_vec)),tree::Tree::empty(),tree::Tree::empty()).into();
+					let dummy = TreeData::Branch{l_count: 0, r_count: 0};
+					cursor = tree::Cursor::join(cursor,r_lev,dummy,r_curs);
+				} else { panic!("unfocus: unexpected r_stack structure")}
+			}
+			while cursor.up() {}
+			cursor.at_tree()
 		} else {
 			if !self.l_forest.up() {
 				if !self.r_forest.up() {
@@ -145,12 +171,20 @@ impl<E:Clone> Raz<E> {
 		let tree = join_cursor.at_tree();
 		RazTree{count: count(tree.peek()), tree: tree}
 	}
-	
+
 	pub fn push_left(&mut self, elm: E) {
 		self.l_stack.push(elm);
 	}
 	pub fn push_right(&mut self, elm: E) {
 		self.r_stack.push(elm);
+	}
+	pub fn archive_left(&mut self, level: tree::Level) {
+		self.l_stack.set_meta(Some(level));
+		self.l_stack.archive(None);
+	}
+	pub fn archive_right(&mut self, level: tree::Level) {
+		self.r_stack.set_meta(Some(level));
+		self.r_stack.archive(None);
 	}
 	pub fn pop_left(&mut self) -> Option<E> {
 		if self.l_stack.len() == 0 {
@@ -247,5 +281,54 @@ mod tests {
   	assert_eq!(Some(1), deep.pop_left());
   	assert_eq!(None, deep.pop_left());
 
+  }
+
+  #[test]
+  fn test_unfocus() {
+  	let mut r = Raz::new();
+  	let mut t;
+  	// set same tree as focus example
+  	r.push_left(3);
+  	r.push_left(4);
+  	r.archive_left(1);
+  	r.push_right(8);
+  	r.push_right(7);
+  	r.archive_right(2);
+  	r.push_left(5);
+  	r.push_right(6);
+  	t = r.unfocus();
+  	r = t.focus(0).expect("focus on 0");
+  	r.push_left(1);
+  	r.push_left(2);
+  	r.archive_left(3);
+  	t = r.unfocus();
+
+  	r = t.focus(8).expect("focus on 8");
+  	r.archive_left(5);
+  	r.push_left(9);
+  	r.push_left(10);
+  	r.push_right(12);
+  	r.push_right(11);
+  	r.archive_right(4);
+  	t = r.unfocus();
+
+  	// focus and read
+  	r = t.focus(7).expect("focus on 7");
+  	assert_eq!(Some(7), r.pop_left());
+  	assert_eq!(Some(6), r.pop_left());
+  	assert_eq!(Some(5), r.pop_left());
+  	assert_eq!(Some(4), r.pop_left());
+  	assert_eq!(Some(3), r.pop_left());
+  	assert_eq!(Some(2), r.pop_left());
+  	assert_eq!(Some(1), r.pop_left());
+  	t = r.unfocus();
+  	r = t.focus(5).expect("focus on 5");
+  	assert_eq!(None, r.pop_right());
+  	assert_eq!(Some(12), r.pop_left());
+  	assert_eq!(Some(11), r.pop_left());
+  	assert_eq!(Some(10), r.pop_left());
+  	assert_eq!(Some(9), r.pop_left());
+  	assert_eq!(Some(8), r.pop_left());
+  	assert_eq!(None, r.pop_left());
   }
 }

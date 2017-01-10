@@ -11,7 +11,6 @@ use std::mem;
 use std::rc::Rc;
 use pat::AsPattern;
 
-#[derive(Clone)]
 pub struct Tree<E>(TreeLink<E>);
 pub type Level = usize;
 
@@ -35,6 +34,12 @@ impl<E> Tree<E> {
 	}
 
 }
+impl<E> Clone for Tree<E> {
+	fn clone(&self) -> Self {
+		let Tree(ref t) = *self;
+		Tree(t.clone())
+	}
+}
 
 // deconstruction patterns
 pub enum T<E> {
@@ -49,7 +54,7 @@ struct TreeNode<E>{
 	r_branch: TreeLink<E>
 }
 type TreeLink<E> = Option<(Level,Rc<TreeNode<E>>)>;
-fn link_peek<'a,E>(link: &'a TreeLink<E>) -> Option<&'a E>{
+fn link_peek<E>(link: &TreeLink<E>) -> Option<&E>{
 	link.as_ref().map(|&(_,ref node)| &node.data)
 }
 
@@ -68,7 +73,6 @@ impl<E> AsPattern<T<E>> for Tree<E> {
 	}
 }
 
-#[derive(Clone)]
 pub struct Cursor<E: TreeUpdate> {
 	dirty: bool,
 	// dirty flag, containing tree
@@ -76,12 +80,23 @@ pub struct Cursor<E: TreeUpdate> {
 	tree: TreeLink<E>,
 	r_forest: Vec<(bool,TreeLink<E>)>,
 }
+impl<E: TreeUpdate> Clone for Cursor<E> {
+	fn clone(&self) -> Self {
+		Cursor {
+			dirty: self.dirty,
+			l_forest: self.l_forest.clone(),
+			tree: self.tree.clone(),
+			r_forest: self.r_forest.clone(),
+		}
+	}
+}
 
 pub trait TreeUpdate {
 	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self;
 }
 pub trait DeriveTreeUpdate{}
 impl<E: DeriveTreeUpdate + Clone> TreeUpdate for E {
+	#[allow(unused_variables)]
 	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self { old_data.clone() }
 }
 
@@ -243,7 +258,7 @@ impl<E: TreeUpdate> Cursor<E> {
 				if self.dirty == true {
 					match *t { TreeNode{ref data, ref l_branch, ref r_branch} => {
 						self.tree = Some((lev,Rc::new(TreeNode{
-							data: E::update(link_peek(l_branch), data, link_peek(r_branch)),
+							data: E::update(link_peek(l_branch), data, link_peek(&self.tree)),
 							l_branch: l_branch.clone(),
 							r_branch: self.tree.take(),
 						})));
@@ -255,7 +270,7 @@ impl<E: TreeUpdate> Cursor<E> {
 				if self.dirty == true {
 					match *t { TreeNode{ref data, ref l_branch, ref r_branch} => {
 						self.tree = Some((lev,Rc::new(TreeNode{
-							data: E::update(link_peek(l_branch), data, link_peek(r_branch)),
+							data: E::update(link_peek(&self.tree), data, link_peek(r_branch)),
 							l_branch: self.tree.take(),
 							r_branch: r_branch.clone(),
 						})));
