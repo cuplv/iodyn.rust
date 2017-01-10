@@ -20,7 +20,22 @@ struct Raz<E: Clone> {
 enum TreeData<E> {
 	Branch{l_count: usize, r_count: usize},
 	Leaf(Rc<Vec<E>>),
-} 
+}
+
+fn count<E>(td: Option<&TreeData<E>>) -> usize {
+	match td {
+		None => 0,
+		Some(&TreeData::Branch{l_count,r_count}) => l_count + r_count,
+		Some(&TreeData::Leaf(ref vec)) => vec.len(),
+	}
+}
+
+impl<E> tree::TreeUpdate for TreeData<E> {
+	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self {
+		TreeData::Branch{l_count: count(l_branch), r_count: count(r_branch)}
+	}
+}
+
 #[derive(Clone)]
 struct RazTree<E: Clone>{count: usize, tree: tree::Tree<TreeData<E>>}
 
@@ -71,12 +86,12 @@ impl<E:Clone> Raz<E> {
 	}
 	pub fn unfocus(mut self) -> RazTree<E> {
 		// step 1: reconstruct local array from stack
-		let mut l_vec = if self.l_stack.get_meta().is_none() {
+		let l_vec = if self.l_stack.get_meta().is_none() {
 			if let Some((_,vec)) = self.l_stack.pop_vec() {
 				Some(vec)
 			} else { None }
 		} else { None };
-		let mut r_vec = if self.r_stack.get_meta().is_none() {
+		let r_vec = if self.r_stack.get_meta().is_none() {
 			if let Some((_,vec)) = self.r_stack.pop_vec() {
 				Some(vec)
 			} else { None }
@@ -114,19 +129,23 @@ impl<E:Clone> Raz<E> {
 		// step 3: join with forests
 		let mut join_cursor = tree.into();
 		if self.l_forest.up() {
-			let h = self.l_forest.peek_level().unwrap();
-			self.l_forest.down_left_discard();
-			join_cursor = tree::Cursor::join(self.l_forest,h,TreeData::Branch{l_count: 0, r_count: 0},join_cursor);
+			let lev = self.l_forest.peek_level().unwrap();
+			self.l_forest.down_left_force(tree::Force::Discard);
+			let dummy = TreeData::Branch{l_count: 0, r_count: 0};
+			join_cursor = tree::Cursor::join(self.l_forest,lev,dummy,join_cursor);
 		}
 		if self.r_forest.up() {
-			let h = self.r_forest.peek_level().unwrap();
-			self.r_forest.down_right_discard();
-			join_cursor = tree::Cursor::join(join_cursor,h,TreeData::Branch{l_count: 0, r_count: 0},self.r_forest);
+			let lev = self.r_forest.peek_level().unwrap();
+			self.r_forest.down_right_force(tree::Force::Discard);
+			let dummy = TreeData::Branch{l_count: 0, r_count: 0};
+			join_cursor = tree::Cursor::join(join_cursor,lev,dummy,self.r_forest);
 		}
 		// step 4: convert to final tree
 		while join_cursor.up() {}
-		RazTree{count: 0, tree: join_cursor.at_tree()}
+		let tree = join_cursor.at_tree();
+		RazTree{count: count(tree.peek()), tree: tree}
 	}
+	
 	pub fn push_left(&mut self, elm: E) {
 		self.l_stack.push(elm);
 	}
@@ -137,7 +156,7 @@ impl<E:Clone> Raz<E> {
 		if self.l_stack.len() == 0 {
 			if !self.l_forest.up() { return None } else {
 				self.l_stack.set_meta(self.l_forest.peek_level());
-				self.l_forest.down_left_discard();
+				self.l_forest.down_left_force(tree::Force::Discard);
 				while self.l_forest.down_right() {}
 				match self.l_forest.peek() {
 					Some(&TreeData::Leaf(ref data)) => self.l_stack.extend(&***data),
@@ -151,7 +170,7 @@ impl<E:Clone> Raz<E> {
 		if self.r_stack.len() == 0 {
 			if !self.r_forest.up() { return None } else {
 				self.r_stack.set_meta(self.r_forest.peek_level());
-				self.r_forest.down_right_discard();
+				self.r_forest.down_right_force(tree::Force::Discard);
 				while self.r_forest.down_left() {}
 				match self.r_forest.peek() {
 					Some(&TreeData::Leaf(ref data)) => self.r_stack.extend_rev(&***data),
@@ -182,7 +201,7 @@ mod tests {
 
   #[test]
   fn test_tree_focus() {
-  	let mut tree = RazTree{
+  	let tree = RazTree{
   		count: 12,
   		tree: tree::Tree::new(5,TreeData::Branch{l_count:8, r_count: 4},
   			tree::Tree::new(3,TreeData::Branch{l_count:2, r_count: 6},

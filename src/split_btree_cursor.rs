@@ -31,7 +31,7 @@ impl<E> Tree<E> {
 	}
 	pub fn peek(&self) -> Option<&E> {
 		let Tree(ref t) = *self;
-		t.as_ref().map(|&(_, ref node)| &node.data)
+		link_peek(t)
 	}
 
 }
@@ -49,7 +49,9 @@ struct TreeNode<E>{
 	r_branch: TreeLink<E>
 }
 type TreeLink<E> = Option<(Level,Rc<TreeNode<E>>)>;
-
+fn link_peek<'a,E>(link: &'a TreeLink<E>) -> Option<&'a E>{
+	link.as_ref().map(|&(_,ref node)| &node.data)
+}
 
 impl<E> AsPattern<T<E>> for Tree<E> {
 	fn pat(self) -> T<E> {
@@ -155,7 +157,7 @@ impl<E: TreeUpdate> Cursor<E> {
 		}
 		// step 3: build center tree
 		let tree = Some((level,Rc::new(TreeNode{
-			data: data,
+			data: E::update(link_peek(&l_cursor.tree), &data, link_peek(&r_cursor.tree)),
 			l_branch: l_cursor.tree.clone(),
 			r_branch: r_cursor.tree.clone(),
 		})));
@@ -181,14 +183,12 @@ impl<E: TreeUpdate> Cursor<E> {
 	}
 
 	pub fn peek(&self) -> Option<&E> {
-		self.tree.as_ref().map(|&(_, ref tree)| &tree.data)
+		link_peek(&self.tree)
 	}
 
 	pub fn peek_level(&self) -> Option<Level> {
 		self.tree.as_ref().map(|&(lev, _)| lev)
 	}
-
-
 
 	// move the cursor into the left branch, returning true if successful
 	// based on force:
@@ -242,10 +242,8 @@ impl<E: TreeUpdate> Cursor<E> {
 			if let Some((dirty, Some((lev,t)))) = self.l_forest.pop() {
 				if self.dirty == true {
 					match *t { TreeNode{ref data, ref l_branch, ref r_branch} => {
-						let l_data = l_branch.as_ref().map(|&(_,ref node)| &node.data);
-						let r_data = r_branch.as_ref().map(|&(_,ref node)| &node.data);
 						self.tree = Some((lev,Rc::new(TreeNode{
-							data: E::update(l_data, data, r_data),
+							data: E::update(link_peek(l_branch), data, link_peek(r_branch)),
 							l_branch: l_branch.clone(),
 							r_branch: self.tree.take(),
 						})));
@@ -256,10 +254,8 @@ impl<E: TreeUpdate> Cursor<E> {
 			if let Some((dirty, Some((lev,t)))) = self.r_forest.pop() {
 				if self.dirty == true {
 					match *t { TreeNode{ref data, ref l_branch, ref r_branch} => {
-						let l_data = l_branch.as_ref().map(|&(_,ref node)| &node.data);
-						let r_data = r_branch.as_ref().map(|&(_,ref node)| &node.data);
 						self.tree = Some((lev,Rc::new(TreeNode{
-							data: E::update(l_data, data, r_data),
+							data: E::update(link_peek(l_branch), data, link_peek(r_branch)),
 							l_branch: self.tree.take(),
 							r_branch: r_branch.clone(),
 						})));
