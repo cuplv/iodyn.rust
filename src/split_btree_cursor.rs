@@ -4,11 +4,10 @@
 // - uses non-increasing levels for each subtree to maintain cannonical form
 // - in the general case the most efficent levels will be drawn from 
 //   a negative binomial distribution
-// - allows and assumes that structural changes will be made: copies data during movement
 
-// TODO: dirty flags in cursor to avoid unnessesary structural changes
 // TODO: find a good way to abstract the stack implementation; macro?
 
+use std::mem;
 use std::rc::Rc;
 use pat::AsPattern;
 
@@ -21,18 +20,18 @@ impl<E> Tree<E> {
 	pub fn new(level: Level, element: E, left_branch: Tree<E>, right_branch: Tree<E>) -> Tree<E> {
 		let Tree(l) = left_branch;
 		let Tree(r) = right_branch;
-		Tree(Some(Rc::new(TreeNode{level: level, data: element, l_branch: l, r_branch: r})))
+		Tree(Some((level,Rc::new(TreeNode{data: element, l_branch: l, r_branch: r}))))
 	}
 	pub fn level(&self) -> Level {
 		let Tree(ref t) = *self;
 		match *t {
 			None => 0,
-			Some(ref t) => t.level,
+			Some((lev,_)) => lev,
 		}
 	}
 	pub fn peek(&self) -> Option<&E> {
 		let Tree(ref t) = *self;
-		t.as_ref().map(|ref node| &node.data)
+		t.as_ref().map(|&(_, ref node)| &node.data)
 	}
 
 }
@@ -45,12 +44,11 @@ pub enum T<E> {
 }
 
 struct TreeNode<E>{
-	level: Level,
 	data: E,
 	l_branch: TreeLink<E>,
 	r_branch: TreeLink<E>
 }
-type TreeLink<E> = Option<Rc<TreeNode<E>>>;
+type TreeLink<E> = Option<(Level,Rc<TreeNode<E>>)>;
 
 
 impl<E> AsPattern<T<E>> for Tree<E> {
@@ -58,27 +56,46 @@ impl<E> AsPattern<T<E>> for Tree<E> {
 		let Tree(node) = self;
 		match node {
 			None => T::None,
-			Some(n) =>  match Rc::try_unwrap(n) {
-				Ok(TreeNode{level,data,l_branch,r_branch}) => {
+			Some((level,n)) =>  match Rc::try_unwrap(n) {
+				Ok(TreeNode{data,l_branch,r_branch}) => {
 					T::Take(level, Tree(l_branch), data, Tree(r_branch))
 				}
-				Err(n) => T::Shared(Tree(Some(n)))
+				Err(n) => T::Shared(Tree(Some((level,n))))
 			}
 		}
 	}
 }
 
 #[derive(Clone)]
-pub struct Cursor<E: Clone> {
-	l_forest: Vec<(TreeLink<E>,Level,E)>,
+pub struct Cursor<E: TreeUpdate> {
+	dirty: bool,
+	// dirty flag, containing tree
+	l_forest: Vec<(bool,TreeLink<E>)>,
 	tree: TreeLink<E>,
-	r_forest: Vec<(Level,E,TreeLink<E>)>,
+	r_forest: Vec<(bool,TreeLink<E>)>,
 }
 
-impl<E: Clone> From<Tree<E>> for Cursor<E> {
+pub trait TreeUpdate {
+	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self;
+}
+pub trait DeriveTreeUpdate{}
+impl<E: DeriveTreeUpdate + Clone> TreeUpdate for E {
+	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self { old_data.clone() }
+}
+
+// cursor movement qualifier
+#[derive(Clone,Copy,PartialEq,Eq)]
+pub enum Force {
+	No,
+	Yes,
+	Discard,
+}
+
+impl<E: TreeUpdate> From<Tree<E>> for Cursor<E> {
 	fn from(tree: Tree<E>) -> Self {
 		let Tree(tree) = tree;
 		Cursor{
+			dirty: false,
 			l_forest: Vec::new(),
 			tree: tree,
 			r_forest: Vec::new(),
@@ -86,9 +103,10 @@ impl<E: Clone> From<Tree<E>> for Cursor<E> {
 	}
 }
 
-impl<E: Clone> Cursor<E> {
+impl<E: TreeUpdate> Cursor<E> {
 	pub fn new() -> Self {
 		Cursor{
+			dirty: false,
 			l_forest: Vec::new(),
 			tree: None,
 			r_forest: Vec::new(),
@@ -100,18 +118,20 @@ impl<E: Clone> Cursor<E> {
 	pub fn split(self) -> (Cursor<E>, Tree<E>, Cursor<E>) {
 		let (l_tree,r_tree) = match self.tree {
 			None => (None, None),
-			Some(ref t) => match **t { TreeNode{ ref l_branch, ref r_branch, ..} =>
+			Some((_,ref t)) => match **t { TreeNode{ ref l_branch, ref r_branch, ..} =>
 				(l_branch.clone(), r_branch.clone())
 			}
 		};
 		(
 			Cursor{
+				dirty: true,
 				l_forest: self.l_forest,
 				tree: l_tree,
 				r_forest: Vec::new(),
 			},
 			Tree(self.tree),
 			Cursor{
+				dirty: true,
 				l_forest: Vec::new(),
 				tree: r_tree,
 				r_forest: self.r_forest,
@@ -127,21 +147,21 @@ impl<E: Clone> Cursor<E> {
 		// step 2: find insertion point
 		while let Some(h) = l_cursor.peek_level() {
 			if h < level { break; }
-			else { assert!(l_cursor.force_down_right()); }
+			else { assert!(l_cursor.down_right_force(Force::Yes)); }
 		}
 		while let Some(h) = r_cursor.peek_level() {
 			if h <= level { break; }
-			else { assert!(r_cursor.force_down_left()); }
+			else { assert!(r_cursor.down_left_force(Force::Yes)); }
 		}
 		// step 3: build center tree
-		let tree = Some(Rc::new(TreeNode{
-			level: level,
+		let tree = Some((level,Rc::new(TreeNode{
 			data: data,
 			l_branch: l_cursor.tree.clone(),
 			r_branch: r_cursor.tree.clone(),
-		}));
+		})));
 		// step4: join structures
 		Cursor{
+			dirty: true,
 			l_forest: l_cursor.l_forest,
 			tree: tree,
 			r_forest: r_cursor.r_forest,
@@ -153,139 +173,99 @@ impl<E: Clone> Cursor<E> {
 	}
 
 	pub fn left_tree(&self) -> Option<Tree<E>> {
-		self.tree.as_ref().map(|ref t| Tree(t.l_branch.clone()))
+		self.tree.as_ref().map(|&(_, ref t)| Tree(t.l_branch.clone()))
 	}
 
 	pub fn right_tree(&self) -> Option<Tree<E>> {
-		self.tree.as_ref().map(|ref t| Tree(t.r_branch.clone()))
+		self.tree.as_ref().map(|&(_, ref t)| Tree(t.r_branch.clone()))
 	}
 
 	pub fn peek(&self) -> Option<&E> {
-		self.tree.as_ref().map(|ref tree| &tree.data)
+		self.tree.as_ref().map(|&(_, ref tree)| &tree.data)
 	}
 
 	pub fn peek_level(&self) -> Option<Level> {
-		self.tree.as_ref().map(|ref tree| tree.level)
+		self.tree.as_ref().map(|&(lev, _)| lev)
 	}
 
-	// need to make sure levels are appropriate
-	// pub fn set_tree(&mut self, tree: Tree) {
-	// 	let Tree(tree) = tree;
-	// 	self.tree = tree;
-	// }
 
-	// move into the left branch, if it exists
-	pub fn down_left(&mut self) -> bool {
-		let (new_tree, old_branch) = match self.tree {
-			None => return false,
-			Some(ref t) => {
-				if t.l_branch.is_none() { return false }
-				(
-					t.l_branch.clone(),
-					(t.level, t.data.clone(), t.r_branch.clone()),
-				)
-			}
-		};
-		self.r_forest.push(old_branch);
-		self.tree = new_tree;
-		true
-	}
 
-	// will move into an empty branch
-	// return false if self is on an empty branch
-	pub fn force_down_left(&mut self) -> bool {
-		let (new_tree, old_branch) = match self.tree {
-			None => return false,
-			Some(ref t) => {
-				(
-					t.l_branch.clone(),
-					(t.level, t.data.clone(), t.r_branch.clone()),
-				)
-			}
-		};
-		self.r_forest.push(old_branch);
-		self.tree = new_tree;
-		true
-	}
-
-	// discards the current node from this cursor as it moves, 
-	// effectively connecting the upper branch to the left side.
-	// does not fail if moving to an empty branch
-	pub fn down_left_discard(&mut self) -> bool {
+	// move the cursor into the left branch, returning true if successful
+	// based on force:
+	// No, don't move it there is no branch
+	// Yes, move into an empty branch
+	// Discard: discards the current node from this cursor as it moves, 
+	//   effectively connecting the upper branch to the left side.
+	pub fn down_left_force(&mut self, force: Force) -> bool {
 		let new_tree = match self.tree {
 			None => return false,
-			Some(ref t) => { t.l_branch.clone() }
-		};
-		self.tree = new_tree;
-		true
-	}
-
-	pub fn down_right(&mut self) -> bool {
-		let (new_tree, old_branch) = match self.tree {
-			None => return false,
-			Some(ref t) => {
-				if t.r_branch.is_none() { return false }
-				(
-					t.r_branch.clone(),
-					(t.l_branch.clone(), t.level, t.data.clone()),
-				)
+			Some((_,ref t)) => {
+				if force == Force::No && t.l_branch.is_none() { return false }
+				t.l_branch.clone()
 			}
 		};
-		self.l_forest.push(old_branch);
-		self.tree = new_tree;
+		let old_tree = mem::replace(&mut self.tree, new_tree);
+		if force != Force::Discard {
+			self.r_forest.push((self.dirty, old_tree));
+			self.dirty = false;
+		} else { self.dirty = true; }
 		true
 	}
+	pub fn down_left(&mut self) -> bool { self.down_left_force(Force::No) }
 
-	pub fn force_down_right(&mut self) -> bool {
-		let (new_tree, old_branch) = match self.tree {
-			None => return false,
-			Some(ref t) => {
-				(
-					t.r_branch.clone(),
-					(t.l_branch.clone(), t.level, t.data.clone()),
-				)
-			}
-		};
-		self.l_forest.push(old_branch);
-		self.tree = new_tree;
-		true
-	}
-
-	// discards the current node from this cursor as it moves, 
-	// effectively connecting the upper branch to the right side.
-	// does not fail if moving to an empty branch
-	pub fn down_right_discard(&mut self) -> bool {
+	pub fn down_right_force(&mut self, force: Force) -> bool {
 		let new_tree = match self.tree {
 			None => return false,
-			Some(ref t) => { t.r_branch.clone() }
+			Some((_,ref t)) => {
+				if force == Force::No && t.r_branch.is_none() { return false }
+				t.r_branch.clone()
+			}
 		};
-		self.tree = new_tree;
+		let old_tree = mem::replace(&mut self.tree, new_tree);
+		if force != Force::Discard {
+			self.l_forest.push((self.dirty, old_tree));
+			self.dirty = false;
+		} else { self.dirty = true; }
 		true
 	}
+	pub fn down_right(&mut self) -> bool { self.down_right_force(Force::No) }
+
 
 	pub fn up(&mut self) -> bool {
-		let use_left = match (self.l_forest.last(), self.r_forest.last()) {
+		let to_left = match (self.l_forest.last(), self.r_forest.last()) {
 			(None, None) => { return false },
 			(Some(_), None) => true,
-			(Some(&(_,l_level,_)), Some(&(r_level,_,_))) if r_level > l_level => true,
+			(Some(&(_,Some((l_level,_)))), Some(&(_,Some((r_level,_))))) if r_level > l_level => true,
 			_ => false,
 		};
-		if use_left {
-			let (l_branch, l_level, l_data) = self.l_forest.pop().unwrap();
-			self.tree = Some(Rc::new(TreeNode{
-				level: l_level,
-				data: l_data,
-				l_branch: l_branch,
-				r_branch: self.tree.take(),
-			}));
-		} else {
-			let (r_level, r_data, r_branch) = self.r_forest.pop().unwrap();
-			self.tree = Some(Rc::new(TreeNode{
-				level: r_level,
-				data: r_data,
-				l_branch: self.tree.take(),
-				r_branch: r_branch
-			}));
+		if to_left {
+			if let Some((dirty, Some((lev,t)))) = self.l_forest.pop() {
+				if self.dirty == true {
+					match *t { TreeNode{ref data, ref l_branch, ref r_branch} => {
+						let l_data = l_branch.as_ref().map(|&(_,ref node)| &node.data);
+						let r_data = r_branch.as_ref().map(|&(_,ref node)| &node.data);
+						self.tree = Some((lev,Rc::new(TreeNode{
+							data: E::update(l_data, data, r_data),
+							l_branch: l_branch.clone(),
+							r_branch: self.tree.take(),
+						})));
+					}}
+				} else { self.dirty = dirty; self.tree = Some((lev,t)) }
+			} else { panic!("up: empty left forest item"); }
+		} else { // right side
+			if let Some((dirty, Some((lev,t)))) = self.r_forest.pop() {
+				if self.dirty == true {
+					match *t { TreeNode{ref data, ref l_branch, ref r_branch} => {
+						let l_data = l_branch.as_ref().map(|&(_,ref node)| &node.data);
+						let r_data = r_branch.as_ref().map(|&(_,ref node)| &node.data);
+						self.tree = Some((lev,Rc::new(TreeNode{
+							data: E::update(l_data, data, r_data),
+							l_branch: self.tree.take(),
+							r_branch: r_branch.clone(),
+						})));
+					}}
+				} else { self.dirty = dirty; self.tree = Some((lev,t)) }
+			} else { panic!("up: empty right forest item"); }
 		}
 		return true;
 	}
