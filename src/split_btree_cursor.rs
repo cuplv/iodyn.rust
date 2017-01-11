@@ -9,6 +9,8 @@
 
 use std::mem;
 use std::rc::Rc;
+use std::intrinsics;
+use rand;
 use pat::AsPattern;
 
 pub struct Tree<E>(TreeLink<E>);
@@ -20,6 +22,12 @@ impl<E> Tree<E> {
 		let Tree(l) = left_branch;
 		let Tree(r) = right_branch;
 		Tree(Some((level,Rc::new(TreeNode{data: element, l_branch: l, r_branch: r}))))
+	}
+	pub fn is_empty(&self) -> bool {
+		match *self {
+			Tree(None) => true,
+			_ => false
+		}
 	}
 	pub fn level(&self) -> Level {
 		let Tree(ref t) = *self;
@@ -107,6 +115,13 @@ pub enum Force {
 	Yes,
 	Discard,
 }
+
+pub fn gen_level() -> Level {
+	let num = rand::random::<usize>();
+	let bits = unsafe{ intrinsics::ctlz(num)};
+	bits+1
+}
+
 
 impl<E: TreeUpdate> From<Tree<E>> for Cursor<E> {
 	fn from(tree: Tree<E>) -> Self {

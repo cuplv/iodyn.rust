@@ -70,10 +70,12 @@ impl<E: Clone, M: Clone> AStack<E,M> {
 		&self.current
 	}
 
-	pub fn peek(&mut self) -> Option<&E> {
+	pub fn peek(&self) -> Option<&E> {
 		if self.size == 0 { return None }
-		self.retrieve();
-		self.current.last()
+		if self.current.len() == 0 {
+			let &(_,ref v) = self.archived.peek().unwrap();
+	    v.last()
+		} else { self.current.last() }
 	}
 	pub fn archive(&mut self, new_meta: M) -> bool {
 		if self.current.len() == 0 { return false; }

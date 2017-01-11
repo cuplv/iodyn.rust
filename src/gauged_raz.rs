@@ -10,14 +10,16 @@ use split_btree_cursor as tree;
 use archive_stack as stack;
 
 #[derive(Clone)]
-struct Raz<E: Clone> {
+pub struct Raz<E: Clone> {
+	length: usize,
 	l_forest: tree::Cursor<TreeData<E>>,
 	l_stack: stack::AStack<E,tree::Level>,
 	r_stack: stack::AStack<E,tree::Level>,
 	r_forest: tree::Cursor<TreeData<E>>,
 }
 
-enum TreeData<E> {
+// should this be private?
+pub enum TreeData<E> {
 	Branch{l_count: usize, r_count: usize},
 	Leaf(Rc<Vec<E>>),
 }
@@ -38,7 +40,7 @@ impl<E> tree::TreeUpdate for TreeData<E> {
 }
 
 #[derive(Clone)]
-struct RazTree<E: Clone>{count: usize, tree: tree::Tree<TreeData<E>>}
+pub struct RazTree<E: Clone>{count: usize, tree: tree::Tree<TreeData<E>>}
 
 impl<E: Clone> Deref for RazTree<E> {
 	type Target = tree::Tree<TreeData<E>>;
@@ -51,6 +53,15 @@ impl<E:Clone> RazTree<E> {
 	pub fn len(&self) -> usize {self.count}
 	pub fn focus(self, mut pos: usize) -> Option<Raz<E>> {
 		match self { RazTree{count,tree} => {
+			if tree.is_empty() {
+				return Some(Raz{
+					length: 0,
+					l_forest: tree::Cursor::new(),
+					l_stack: stack::AStack::new(),
+					r_stack: stack::AStack::new(),
+					r_forest: tree::Cursor::new(),
+				})
+			}
 			if count < pos { return None };
 			// step 1: find location with cursor
 			let mut cursor = tree::Cursor::from(tree);
@@ -74,6 +85,7 @@ impl<E:Clone> RazTree<E> {
 			r_gstack.extend_rev(r_slice);
 			// step 3: integrate
 			Some(Raz{
+				length: count,
 				l_forest: l_cursor,
 				l_stack: l_gstack,
 				r_stack: r_gstack,
@@ -87,6 +99,7 @@ impl<E:Clone> RazTree<E> {
 impl<E:Clone> Raz<E> {
 	pub fn new() -> Raz<E> {
 		Raz{
+			length: 0,
 			l_forest: tree::Cursor::new(),
 			l_stack: stack::AStack::new(),
 			r_stack: stack::AStack::new(),
@@ -173,10 +186,18 @@ impl<E:Clone> Raz<E> {
 	}
 
 	pub fn push_left(&mut self, elm: E) {
+		self.length += 1;
 		self.l_stack.push(elm);
 	}
 	pub fn push_right(&mut self, elm: E) {
+		self.length += 1;
 		self.r_stack.push(elm);
+	}
+	pub fn peek_left(&self) -> Option<&E> {
+		self.l_stack.peek()
+	}
+	pub fn peek_right(&self) -> Option<&E> {
+		self.r_stack.peek()
 	}
 	pub fn archive_left(&mut self, level: tree::Level) {
 		self.l_stack.archive(level);
@@ -195,6 +216,7 @@ impl<E:Clone> Raz<E> {
 				}
 			}
 		}
+		self.length -= 1;
 		self.l_stack.pop()
 	}
 	pub fn pop_right(&mut self) -> Option<E> {
@@ -208,9 +230,71 @@ impl<E:Clone> Raz<E> {
 				}
 			}
 		}
+		self.length -= 1;
 		self.r_stack.pop()
 	}
 }
+
+////////////////////////////////
+// Zip and ZipSeq for Gauged RAZ 
+////////////////////////////////
+
+use zip::Zip;
+use seqzip::{Seq, SeqZip};
+
+impl<E: Clone> Zip<E> for Raz<E> {
+	fn peek_l(&self) -> Result<E,&str> {
+		self.peek_left().map(|elm| elm.clone()).ok_or("Gauged RAZ: no elements to peek at")
+	}
+	fn peek_r(&self) -> Result<E,&str> {
+		self.peek_right().map(|elm| elm.clone()).ok_or("Gauged RAZ: no elements to peek at")
+	}
+	fn push_l(&self, val: E) -> Self {
+		let mut raz = self.clone();
+		raz.push_left(val);
+		if raz.length % 50 == 0 { raz.archive_left(tree::gen_level()) }
+		raz
+	}
+	fn push_r(&self, val: E) -> Self {
+		let mut raz = self.clone();
+		raz.push_right(val);
+		if raz.length % 50 == 0 { raz.archive_right(tree::gen_level()) }
+		raz
+	}
+	fn pull_l(&self) -> Result<Self,&str> {
+		let mut raz = self.clone();
+		match raz.pop_left() {
+			Some(_) => Ok(raz),
+			None => Err("Gauged RAZ: no elements to remove")
+		}
+	}
+	fn pull_r(&self) -> Result<Self,&str> {
+		let mut raz = self.clone();
+		match raz.pop_right() {
+			Some(_) => Ok(raz),
+			None => Err("Gauged RAZ: no elements to remove")
+		}
+	}
+}
+
+impl<E: Clone> Seq<E, Raz<E>> for RazTree<E> {
+	fn zip_to(&self, loc: usize) -> Result<Raz<E>,&str> {
+		self.clone().focus(loc).ok_or("Gauged RAZ: focus out of range")
+	}
+}
+
+impl<E: Clone> SeqZip<E, RazTree<E>> for Raz<E> {
+	fn unzip(&self) -> RazTree<E> {
+		self.clone().unfocus()
+	}
+}
+
+
+
+///////////////////////
+// Tests for Gauged RAZ
+///////////////////////
+
 
 #[cfg(test)]
 mod tests {

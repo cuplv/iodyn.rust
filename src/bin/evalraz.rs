@@ -5,13 +5,15 @@ extern crate clap;
 extern crate time;
 extern crate pmfp_collections;
 
+use pmfp_collections::persist_raz as pr;
+use pmfp_collections::gauged_raz as gr;
+
 use rand::{StdRng, Rng, SeedableRng};
 
 use time::{Duration};
 
 //use pmfp_collections::zip::{Zip};
 use pmfp_collections::seqzip::{Seq, SeqZip};
-use pmfp_collections::persist_raz::{Raz};
 
 const DEFAULT_SEED: usize = 0;
 const DEFAULT_TAG: &'static str = "None";
@@ -38,7 +40,8 @@ fn main() {
       -g, --groups=[groups]  'measured insertion groups per sequence'
       -r, --reps=[reps]      'number of sequences tested'
       [multi] -m             'more insertions for each repetition'
-      [raz] -z               'test raz' ")
+      [raz] -z               'test raz'
+      [graz] -Z              'test gauged raz' ")
     .get_matches();
   let nohead = args.is_present("nohead");
   let seed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_SEED);
@@ -51,9 +54,10 @@ fn main() {
 	let reps = value_t!(args, "reps", usize).unwrap_or(DEFAULT_REPS);
   let multi = args.is_present("multi");
   let mut eval_raz = args.is_present("raz");
+  let eval_graz = args.is_present("graz");
 
   // extend this with other evaluations in the future so we always do at least one
-  if !eval_raz & true {
+  if !eval_raz && !eval_graz {
   	eval_raz = true;
   }
 
@@ -68,7 +72,8 @@ fn main() {
 	};
 
   // make empty sequences
-  let mut raz_start = Raz::new();
+  let mut raz_start = pr::Raz::new();
+  let mut graz_start = gr::Raz::new();
 
   // print header
   if !nohead { print_header() }
@@ -80,6 +85,12 @@ fn main() {
 			raz_start = insert_n(raz_start, start, 0, StdRng::from_seed(&[seed]));
 			let elapsed = time::get_time() - start_time;
 			print_result("RAZ", 0, 0, start, elapsed);
+		}
+		if eval_graz {
+			let start_time = time::get_time();
+			graz_start = insert_n(graz_start, start, 0, StdRng::from_seed(&[seed]));
+			let elapsed = time::get_time() - start_time;
+			print_result("GRAZ", 0, 0, start, elapsed);
 		}
 	}
 
@@ -115,6 +126,18 @@ fn main() {
 		  		raz_size += ins;
 		  	}
 		  }
+	  }
+	  // gauged raz
+	  if eval_graz {
+	  	let mut graz_size = start;
+	  	let mut build_graz = graz_start.clone();
+	  	for _ in 0..groups {
+				let start_time = time::get_time();
+	  		build_graz = insert_n(build_graz, ins, graz_size, StdRng::from_seed(&[seed]));
+				let elapsed = time::get_time() - start_time;
+  			print_result("GRAZ",i,graz_size,ins,elapsed);
+	  		graz_size += ins;
+	  	}
 	  }
 
   }
