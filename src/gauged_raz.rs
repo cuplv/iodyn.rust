@@ -7,13 +7,13 @@ use std::rc::Rc;
 use std::ops::Deref;
 
 use split_btree_cursor as tree;
-use gauged_stack as stack;
+use archive_stack as stack;
 
 #[derive(Clone)]
 struct Raz<E: Clone> {
 	l_forest: tree::Cursor<TreeData<E>>,
-	l_stack: stack::GStack<E,Option<tree::Level>>,
-	r_stack: stack::GStack<E,Option<tree::Level>>,
+	l_stack: stack::AStack<E,tree::Level>,
+	r_stack: stack::AStack<E,tree::Level>,
 	r_forest: tree::Cursor<TreeData<E>>,
 }
 
@@ -68,8 +68,8 @@ impl<E:Clone> RazTree<E> {
 				TreeData::Branch{..} => unreachable!(),
 				TreeData::Leaf(ref vec_ref) => vec_ref.split_at(pos)
 			};
-			let mut l_gstack = stack::GStack::new(None);
-			let mut r_gstack = stack::GStack::new(None);
+			let mut l_gstack = stack::AStack::new();
+			let mut r_gstack = stack::AStack::new();
 			l_gstack.extend(l_slice);
 			r_gstack.extend_rev(r_slice);
 			// step 3: integrate
@@ -88,34 +88,36 @@ impl<E:Clone> Raz<E> {
 	pub fn new() -> Raz<E> {
 		Raz{
 			l_forest: tree::Cursor::new(),
-			l_stack: stack::GStack::new(None),
-			r_stack: stack::GStack::new(None),
+			l_stack: stack::AStack::new(),
+			r_stack: stack::AStack::new(),
 			r_forest: tree::Cursor::new(),
 		}
 	}
 	pub fn unfocus(mut self) -> RazTree<E> {
+		let mut l_lev = None;
+		let mut r_lev = None;
 		// step 1: reconstruct local array from stack
-		let l_vec = if self.l_stack.get_meta().is_none() {
-			if let Some((_,vec)) = self.l_stack.pop_vec() {
-				Some(vec)
-			} else { None }
+		let l_vec = if let Some((vec,lev)) = self.l_stack.next_archive() {
+			l_lev = lev;
+			if vec.len() > 0 {Some(vec)} else {None}
 		} else { None };
-		let r_vec = if self.r_stack.get_meta().is_none() {
-			if let Some((_,vec)) = self.r_stack.pop_vec() {
-				Some(vec)
-			} else { None }
+		let r_vec = if let Some((vec,lev)) = self.r_stack.next_archive() {
+			r_lev = lev;
+			if vec.len() > 0 {Some(vec)} else {None}
 		} else { None };
 		let vec = match (self.l_stack.is_empty(), l_vec, r_vec, self.r_stack.is_empty()) {
 			(_,Some(v),None,_) => Some(v),
 			(_,None,Some(mut v),_) => { v.reverse(); Some(v) },
 			(_,Some(mut lv),Some(mut rv),_) => {rv.reverse(); lv.extend(rv); Some(lv) },
 			(false, None, None, _) => {
-				let (_,v) = self.l_stack.pop_vec().unwrap();
+				let (v,lev) = self.l_stack.next_archive().unwrap();
+				l_lev = lev;
 				Some(v)
 			},
 			(true, None, None, false) => {
-				let (_,mut v) = self.r_stack.pop_vec().unwrap();
+				let (mut v,lev) = self.r_stack.next_archive().unwrap();
 				v.reverse();
+				r_lev = lev;
 				Some(v)
 			},
 			_ => None
@@ -124,20 +126,18 @@ impl<E:Clone> Raz<E> {
 		let tree = if let Some(v) = vec {
 			// OPTIMIZE: linear algorithm
 			let mut cursor = tree::Tree::new(0,TreeData::Leaf(Rc::new(v)),tree::Tree::empty(),tree::Tree::empty()).into();
-			while !self.l_stack.is_empty() {
-				if let Some((Some(l_lev),l_vec)) = self.l_stack.pop_vec() {
-					let l_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(l_vec)),tree::Tree::empty(),tree::Tree::empty()).into();
-					let dummy = TreeData::Branch{l_count: 0, r_count: 0};
-					cursor = tree::Cursor::join(l_curs,l_lev,dummy,cursor);
-				} else { panic!("unfocus: unexpected l_stack structure")}
+			while let Some((l_vec,lev)) = self.l_stack.next_archive() {
+				let l_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(l_vec)),tree::Tree::empty(),tree::Tree::empty()).into();
+				let dummy = TreeData::Branch{l_count: 0, r_count: 0};
+				cursor = tree::Cursor::join(l_curs,l_lev.unwrap(),dummy,cursor);
+				l_lev = lev;
 			}
-			while !self.r_stack.is_empty() {
-				if let Some((Some(r_lev),mut r_vec)) = self.r_stack.pop_vec() {
-					r_vec.reverse();
-					let r_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(r_vec)),tree::Tree::empty(),tree::Tree::empty()).into();
-					let dummy = TreeData::Branch{l_count: 0, r_count: 0};
-					cursor = tree::Cursor::join(cursor,r_lev,dummy,r_curs);
-				} else { panic!("unfocus: unexpected r_stack structure")}
+			while let Some((mut r_vec,lev)) = self.r_stack.next_archive() {
+				r_vec.reverse();
+				let r_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(r_vec)),tree::Tree::empty(),tree::Tree::empty()).into();
+				let dummy = TreeData::Branch{l_count: 0, r_count: 0};
+				cursor = tree::Cursor::join(cursor,r_lev.unwrap(),dummy,r_curs);
+				r_lev = lev;
 			}
 			while cursor.up() {}
 			cursor.at_tree()
@@ -179,17 +179,14 @@ impl<E:Clone> Raz<E> {
 		self.r_stack.push(elm);
 	}
 	pub fn archive_left(&mut self, level: tree::Level) {
-		self.l_stack.set_meta(Some(level));
-		self.l_stack.archive(None);
+		self.l_stack.archive(level);
 	}
 	pub fn archive_right(&mut self, level: tree::Level) {
-		self.r_stack.set_meta(Some(level));
-		self.r_stack.archive(None);
+		self.r_stack.archive(level);
 	}
 	pub fn pop_left(&mut self) -> Option<E> {
 		if self.l_stack.len() == 0 {
 			if !self.l_forest.up() { return None } else {
-				self.l_stack.set_meta(self.l_forest.peek_level());
 				self.l_forest.down_left_force(tree::Force::Discard);
 				while self.l_forest.down_right() {}
 				match self.l_forest.peek() {
@@ -203,7 +200,6 @@ impl<E:Clone> Raz<E> {
 	pub fn pop_right(&mut self) -> Option<E> {
 		if self.r_stack.len() == 0 {
 			if !self.r_forest.up() { return None } else {
-				self.r_stack.set_meta(self.r_forest.peek_level());
 				self.r_forest.down_right_force(tree::Force::Discard);
 				while self.r_forest.down_left() {}
 				match self.r_forest.peek() {

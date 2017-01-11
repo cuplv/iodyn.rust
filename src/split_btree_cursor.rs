@@ -256,7 +256,7 @@ impl<E: TreeUpdate> Cursor<E> {
 		if to_left {
 			if let Some((dirty, Some((lev,t)))) = self.l_forest.pop() {
 				if self.dirty == true {
-					match *t { TreeNode{ref data, ref l_branch, ref r_branch} => {
+					match *t { TreeNode{ref data, ref l_branch, ..} => {
 						self.tree = Some((lev,Rc::new(TreeNode{
 							data: E::update(link_peek(l_branch), data, link_peek(&self.tree)),
 							l_branch: l_branch.clone(),
@@ -268,7 +268,7 @@ impl<E: TreeUpdate> Cursor<E> {
 		} else { // right side
 			if let Some((dirty, Some((lev,t)))) = self.r_forest.pop() {
 				if self.dirty == true {
-					match *t { TreeNode{ref data, ref l_branch, ref r_branch} => {
+					match *t { TreeNode{ref data, ref r_branch, ..} => {
 						self.tree = Some((lev,Rc::new(TreeNode{
 							data: E::update(link_peek(&self.tree), data, link_peek(r_branch)),
 							l_branch: self.tree.take(),
