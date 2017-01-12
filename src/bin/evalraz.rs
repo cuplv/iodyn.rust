@@ -41,7 +41,8 @@ fn main() {
       -r, --reps=[reps]      'number of sequences tested'
       [multi] -m             'more insertions for each repetition'
       [raz] -z               'test raz'
-      [graz] -Z              'test gauged raz' ")
+      [graz] -Z              'test gauged raz zip interface'
+      [mraz] -R              'test gauged raz mut interface' ")
     .get_matches();
   let nohead = args.is_present("nohead");
   let seed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_SEED);
@@ -55,9 +56,10 @@ fn main() {
   let multi = args.is_present("multi");
   let mut eval_raz = args.is_present("raz");
   let eval_graz = args.is_present("graz");
+  let eval_mraz = args.is_present("mraz");
 
   // extend this with other evaluations in the future so we always do at least one
-  if !eval_raz && !eval_graz {
+  if !eval_raz && !eval_graz && !eval_mraz {
   	eval_raz = true;
   }
 
@@ -74,6 +76,7 @@ fn main() {
   // make empty sequences
   let mut raz_start = pr::Raz::new();
   let mut graz_start = gr::Raz::new();
+  let mut mraz_start = gr::Raz::new();
 
   // print header
   if !nohead { print_header() }
@@ -91,6 +94,12 @@ fn main() {
 			graz_start = insert_n(graz_start, start, 0, StdRng::from_seed(&[seed]));
 			let elapsed = time::get_time() - start_time;
 			print_result("GRAZ", 0, 0, start, elapsed);
+		}
+		if eval_mraz {
+			let start_time = time::get_time();
+			mraz_start = insert_n_mut(mraz_start, start, 0, StdRng::from_seed(&[seed]));
+			let elapsed = time::get_time() - start_time;
+			print_result("MRAZ", 0, 0, start, elapsed);
 		}
 	}
 
@@ -127,7 +136,7 @@ fn main() {
 		  	}
 		  }
 	  }
-	  // gauged raz
+	  // gauged raz zip
 	  if eval_graz {
 	  	let mut graz_size = start;
 	  	let mut build_graz = graz_start.clone();
@@ -137,6 +146,18 @@ fn main() {
 				let elapsed = time::get_time() - start_time;
   			print_result("GRAZ",i,graz_size,ins,elapsed);
 	  		graz_size += ins;
+	  	}
+	  }
+	  // gauged raz mut
+	  if eval_mraz {
+	  	let mut mraz_size = start;
+	  	let mut build_mraz = mraz_start.clone();
+	  	for _ in 0..groups {
+				let start_time = time::get_time();
+	  		build_mraz = insert_n_mut(build_mraz, ins, mraz_size, StdRng::from_seed(&[seed]));
+				let elapsed = time::get_time() - start_time;
+  			print_result("MRAZ",i,mraz_size,ins,elapsed);
+	  		mraz_size += ins;
 	  	}
 	  }
 
@@ -156,6 +177,14 @@ fn insert_n<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(zip: Z, n: usize, size: usize, 
     zip = zip.push_r(size + i);
 	}
 	zip
+}
+fn insert_n_mut(mut raz: gr::Raz<usize>, n: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<usize> {
+	for i in 0..n {
+    let pos = rnd_pos.gen::<usize>() % (size + 1 + i);
+    raz = raz.unfocus().focus(pos).unwrap();
+    raz.push_right(size + i);
+	}
+  raz
 }
 
 // same as above but saves all data in vecs to avoid dealocations during timing

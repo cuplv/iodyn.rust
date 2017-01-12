@@ -40,6 +40,21 @@ impl<E> Tree<E> {
 		let Tree(ref t) = *self;
 		link_peek(t)
 	}
+	// for debugging, as: debug_assert!(tree.good_levels(),"location of problem")
+	pub fn good_levels(&self) -> bool {
+		let Tree(ref tree) = *self;
+		if let &Some((lev,ref t)) = tree {
+			if lev == 0 { return true }
+			let l = Tree(t.l_branch.clone());
+			let r = Tree(t.r_branch.clone());
+			if l.level() < lev && r.level() <= lev {
+				l.good_levels() && r.good_levels()
+			} else {
+				println!("l: {:?}, t:{:?}, r:{:?}", l.level(),lev,r.level());
+				false
+			}
+		} else { true }
+	}
 
 }
 impl<E> Clone for Tree<E> {
@@ -128,9 +143,9 @@ impl<E: TreeUpdate> From<Tree<E>> for Cursor<E> {
 		let Tree(tree) = tree;
 		Cursor{
 			dirty: false,
-			l_forest: Vec::new(),
+			l_forest: Vec::with_capacity(500),
 			tree: tree,
-			r_forest: Vec::new(),
+			r_forest: Vec::with_capacity(500),
 		}
 	}
 }
@@ -139,9 +154,9 @@ impl<E: TreeUpdate> Cursor<E> {
 	pub fn new() -> Self {
 		Cursor{
 			dirty: false,
-			l_forest: Vec::new(),
+			l_forest: Vec::with_capacity(500),
 			tree: None,
-			r_forest: Vec::new(),
+			r_forest: Vec::with_capacity(500),
 		}
 	}
 	// returns the current tree plus two cursors containing
@@ -159,12 +174,12 @@ impl<E: TreeUpdate> Cursor<E> {
 				dirty: true,
 				l_forest: self.l_forest,
 				tree: l_tree,
-				r_forest: Vec::new(),
+				r_forest: Vec::with_capacity(500),
 			},
 			Tree(self.tree),
 			Cursor{
 				dirty: true,
-				l_forest: Vec::new(),
+				l_forest: Vec::with_capacity(500),
 				tree: r_tree,
 				r_forest: self.r_forest,
 			},
@@ -177,9 +192,17 @@ impl<E: TreeUpdate> Cursor<E> {
 		while !l_cursor.r_forest.is_empty() { assert!(l_cursor.up()); }
 		while !r_cursor.l_forest.is_empty() { assert!(r_cursor.up()); }
 		// step 2: find insertion point
+		while let Some(h) = l_cursor.up_left_level() {
+			if h >= level { break; }
+			else { assert!(l_cursor.up()); }
+		}
 		while let Some(h) = l_cursor.peek_level() {
 			if h < level { break; }
 			else { assert!(l_cursor.down_right_force(Force::Yes)); }
+		}
+		while let Some(h) = r_cursor.up_right_level() {
+			if h > level { break; }
+			else { assert!(r_cursor.up()); }
 		}
 		while let Some(h) = r_cursor.peek_level() {
 			if h <= level { break; }
@@ -218,6 +241,21 @@ impl<E: TreeUpdate> Cursor<E> {
 
 	pub fn peek_level(&self) -> Option<Level> {
 		self.tree.as_ref().map(|&(lev, _)| lev)
+	}
+
+	fn up_left_level(&self) -> Option<Level> {
+		match self.l_forest.last() {
+			None => None,
+			Some(&(_,Some((lev,_)))) => Some(lev),
+			_ => unreachable!(),
+		}
+	}
+	fn up_right_level(&self) -> Option<Level> {
+		match self.r_forest.last() {
+			None => None,
+			Some(&(_,Some((lev,_)))) => Some(lev),
+			_ => unreachable!(),
+		}
 	}
 
 	// move the cursor into the left branch, returning true if successful

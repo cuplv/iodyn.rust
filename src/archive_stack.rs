@@ -16,13 +16,14 @@ impl<E: Clone, M: Clone> AStack<E,M> {
 	pub fn new() -> Self {
 		AStack {
 			size: 0,
-			current: Vec::new(),
+			current: Vec::with_capacity(500),
 			archived: Stack::new(),
 		}
 	}
 
 	pub fn is_empty(&self) -> bool { self.size == 0 }
 	pub fn len(&self) -> usize { self.size }
+	pub fn active_len(&self) -> usize { self.current.len() }
 	pub fn push(&mut self, elm: E) { self.size += 1; self.current.push(elm) }
 	pub fn pop(&mut self) -> Option<E> {
 		if self.size == 0 { return None }
@@ -50,7 +51,7 @@ impl<E: Clone, M: Clone> AStack<E,M> {
 		let lost_len = self.current.len();
 		if lost_len == self.size {
 			self.size = 0;
-			let old_vec = mem::replace(&mut self.current, Vec::new());
+			let old_vec = mem::replace(&mut self.current, Vec::with_capacity(500));
 			self.archived = Stack::new();
 			return Some((old_vec,None));
 		} else {
@@ -79,7 +80,7 @@ impl<E: Clone, M: Clone> AStack<E,M> {
 	}
 	pub fn archive(&mut self, new_meta: M) -> bool {
 		if self.current.len() == 0 { return false; }
-		let old_vec = mem::replace(&mut self.current, Vec::new());
+		let old_vec = mem::replace(&mut self.current, Vec::with_capacity(500));
 		self.archived = self.archived.push((new_meta, old_vec));
 		true
 	}

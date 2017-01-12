@@ -166,7 +166,7 @@ impl<E:Clone> Raz<E> {
 			}
 		};
 		// step 3: join with forests
-		let mut join_cursor = tree.into();
+		let mut join_cursor: tree::Cursor<TreeData<E>> = tree.into();
 		if self.l_forest.up() {
 			let lev = self.l_forest.peek_level().unwrap();
 			self.l_forest.down_left_force(tree::Force::Discard);
@@ -182,16 +182,19 @@ impl<E:Clone> Raz<E> {
 		// step 4: convert to final tree
 		while join_cursor.up() {}
 		let tree = join_cursor.at_tree();
+		debug_assert!(tree.good_levels(), "unfocused tree has bad levels");
 		RazTree{count: count(tree.peek()), tree: tree}
 	}
 
 	pub fn push_left(&mut self, elm: E) {
 		self.length += 1;
 		self.l_stack.push(elm);
+		if self.l_stack.active_len() % 200 == 0 { self.archive_left(tree::gen_level()) }
 	}
 	pub fn push_right(&mut self, elm: E) {
 		self.length += 1;
 		self.r_stack.push(elm);
+		if self.r_stack.active_len() % 200 == 0 { self.archive_right(tree::gen_level()) }
 	}
 	pub fn peek_left(&self) -> Option<&E> {
 		self.l_stack.peek()
@@ -252,13 +255,11 @@ impl<E: Clone> Zip<E> for Raz<E> {
 	fn push_l(&self, val: E) -> Self {
 		let mut raz = self.clone();
 		raz.push_left(val);
-		if raz.length % 50 == 0 { raz.archive_left(tree::gen_level()) }
 		raz
 	}
 	fn push_r(&self, val: E) -> Self {
 		let mut raz = self.clone();
 		raz.push_right(val);
-		if raz.length % 50 == 0 { raz.archive_right(tree::gen_level()) }
 		raz
 	}
 	fn pull_l(&self) -> Result<Self,&str> {
@@ -334,6 +335,8 @@ mod tests {
   			)
   		)
   	};
+  	assert!(tree.good_levels());
+
   	let mut left = tree.clone().focus(0).unwrap();
   	let mut deep = tree.clone().focus(5).unwrap();
   	let mut right = tree.clone().focus(12).unwrap();
@@ -391,6 +394,8 @@ mod tests {
   	r.push_right(11);
   	r.archive_right(4);
   	t = r.unfocus();
+
+  	assert!(t.good_levels());
 
   	// focus and read
   	r = t.focus(7).expect("focus on 7");
