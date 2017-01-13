@@ -213,7 +213,7 @@ impl<E: TreeUpdate> Cursor<E> {
 		}
 	}
 	/// creates a new cursor, with expected depth of underlying tree
-	pub fn with_depth(capacity) -> Self {
+	pub fn with_depth(capacity: usize) -> Self {
 		Cursor{
 			dirty: false,
 			l_forest: Vec::with_capacity(capacity),
