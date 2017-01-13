@@ -97,6 +97,7 @@ struct TreeNode<E>{
 	r_branch: TreeLink<E>
 }
 type TreeLink<E> = Option<(Level,Rc<TreeNode<E>>)>;
+// Nominal Adapton design: type TreeLink<E> = Option<(Level,Option<Name>,Art<TreeNode<E>>)>; 
 fn link_peek<E>(link: &TreeLink<E>) -> Option<&E>{
 	link.as_ref().map(|&(_,ref node)| &node.data)
 }
