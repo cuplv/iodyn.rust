@@ -97,7 +97,7 @@ fn main() {
 		}
 		if eval_mraz {
 			let start_time = time::get_time();
-			mraz_start = insert_n_mut(mraz_start, start, 0, StdRng::from_seed(&[seed]));
+			mraz_start = insert_10n_mut(mraz_start, start, 0, StdRng::from_seed(&[seed]));
 			let elapsed = time::get_time() - start_time;
 			print_result("MRAZ", 0, 0, start, elapsed);
 		}
@@ -129,7 +129,7 @@ fn main() {
 		  	let mut build_raz = raz_start.clone();
 		  	for _ in 0..groups {
 					let start_time = time::get_time();
-		  		build_raz = insert_n(build_raz, ins, raz_size, StdRng::from_seed(&[seed]));
+		  		build_raz = insert_10n(build_raz, ins, raz_size, StdRng::from_seed(&[seed]));
 					let elapsed = time::get_time() - start_time;
 	  			print_result("RAZ",i,raz_size,ins,elapsed);
 		  		raz_size += ins;
@@ -154,7 +154,7 @@ fn main() {
 	  	let mut build_mraz = mraz_start.clone();
 	  	for _ in 0..groups {
 				let start_time = time::get_time();
-	  		build_mraz = insert_n_mut(build_mraz, ins, mraz_size, StdRng::from_seed(&[seed]));
+	  		build_mraz = insert_10n_mut(build_mraz, ins, mraz_size, StdRng::from_seed(&[seed]));
 				let elapsed = time::get_time() - start_time;
   			print_result("MRAZ",i,mraz_size,ins,elapsed);
 	  		mraz_size += ins;
@@ -178,11 +178,40 @@ fn insert_n<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(zip: Z, n: usize, size: usize, 
 	}
 	zip
 }
-fn insert_n_mut(mut raz: gr::Raz<usize>, n: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<usize> {
-	for i in 0..n {
-    let pos = rnd_pos.gen::<usize>() % (size + 1 + i);
+fn insert_10n<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(zip: Z, n: usize, size: usize, mut rnd_pos: StdRng) -> Z {
+	let mut zip: Z = zip;
+	let mut seq: S;
+	for i in 0..(n/10) {
+    let pos = rnd_pos.gen::<usize>() % (size + 1 + i * 10);
+    seq = zip.unzip();
+    zip = seq.zip_to(pos).unwrap();
+    zip = zip.push_r(size + i + 0);
+    zip = zip.push_r(size + i + 1);
+    zip = zip.push_r(size + i + 2);
+    zip = zip.push_r(size + i + 3);
+    zip = zip.push_r(size + i + 4);
+    zip = zip.push_r(size + i + 5);
+    zip = zip.push_r(size + i + 6);
+    zip = zip.push_r(size + i + 7);
+    zip = zip.push_r(size + i + 8);
+    zip = zip.push_r(size + i + 9);
+	}
+	zip
+}
+fn insert_10n_mut(mut raz: gr::Raz<usize>, n: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<usize> {
+	for i in 0..(n/10) {
+    let pos = rnd_pos.gen::<usize>() % (size + 1 + i * 10);
     raz = raz.unfocus().focus(pos).unwrap();
-    raz.push_right(size + i);
+    raz.push_right(size + i + 0);
+    raz.push_right(size + i + 1);
+    raz.push_right(size + i + 2);
+    raz.push_right(size + i + 3);
+    raz.push_right(size + i + 4);
+    raz.push_right(size + i + 5);
+    raz.push_right(size + i + 6);
+    raz.push_right(size + i + 7);
+    raz.push_right(size + i + 8);
+    raz.push_right(size + i + 9);
 	}
   raz
 }
