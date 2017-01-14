@@ -48,8 +48,21 @@ impl<E> Tree<E> {
 		let Tree(ref t) = *self;
 		link_peek(t)
 	}
+
+	pub fn fold_up<R,F>(&self, node_calc: &F) -> Option<R>
+	where
+		F: Fn(Option<R>,&E,Option<R>) -> R
+	{
+		let Tree(ref tree) = *self;
+		link_fold_up(tree, node_calc)
+	}
+
 	/// for debugging, this is an O(n) operation
+	///
 	/// ```
+	/// use pmfp_collections::split_btree_cursor::Tree;
+	///
+	/// let tree = Tree::new(4,(),Tree::empty(),Tree::new(1,(),Tree::empty(),Tree::empty()));
 	/// debug_assert!(tree.good_levels(),"this section of code has a problem");
 	/// ```
 	///
@@ -101,6 +114,22 @@ type TreeLink<E> = Option<(Level,Rc<TreeNode<E>>)>;
 fn link_peek<E>(link: &TreeLink<E>) -> Option<&E>{
 	link.as_ref().map(|&(_,ref node)| &node.data)
 }
+fn link_fold_up<E,R,F>(link: &TreeLink<E>, node_calc: &F) -> Option<R>
+where
+	F: Fn(Option<R>,&E,Option<R>) -> R
+{
+	match *link {
+		None => None,
+		Some((_,ref t)) => match **t { TreeNode{ ref data, ref l_branch, ref r_branch } =>
+			Some(node_calc(
+				link_fold_up(l_branch,node_calc),
+				data,
+				link_fold_up(r_branch,node_calc))
+			)
+		}
+	}
+}
+
 
 impl<E> AsPattern<T<E>> for Tree<E> {
 	fn pat(self) -> T<E> {
@@ -417,3 +446,50 @@ impl<E: TreeUpdate> Cursor<E> {
 	}
 
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+  #[test]
+  fn test_fold_up() {
+  	use std::cmp::max;
+		let t = 
+		Tree::new(5,None,
+			Tree::new(3,None,
+				Tree::new(0,Some(1),Tree::empty(),Tree::empty()),
+				Tree::new(2,None,
+					Tree::new(1,None,
+						Tree::new(0,Some(2),Tree::empty(),Tree::empty()),
+						Tree::new(0,Some(3),Tree::empty(),Tree::empty()),
+					),
+					Tree::new(0,Some(4),Tree::empty(),Tree::empty()),
+				)
+			),
+			Tree::new(4,None,
+				Tree::new(0,Some(5),Tree::empty(),Tree::empty()),
+				Tree::new(0,Some(6),Tree::empty(),Tree::empty()),
+			)
+		);
+		let sum = t.fold_up(&|l,c,r| {
+			l.unwrap_or(0) + c.unwrap_or(0) + r.unwrap_or(0)
+		});
+		let depth = t.fold_up(&|l,c,r| {
+			match *c {
+				None => max(l.unwrap(),r.unwrap()) + 1,
+				Some(_) => 1,
+			}
+		});
+		let in_order = t.fold_up(&|l,c,r|{
+			match *c {
+				None => l.unwrap() >= r.unwrap(),
+				Some(_) => true,
+			}
+		});
+		assert_eq!(Some(21), sum);
+		assert_eq!(Some(5), depth);
+		assert_eq!(Some(true), in_order);
+	}
+}
+
+
