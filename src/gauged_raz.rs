@@ -1,7 +1,7 @@
-// Gauged RAZ - sequence
-// - cursor access in low-const O(1) time
-// - arbirary access in O(log n) time
-// - combines tree cursor with stack
+//! Gauged RAZ - random access sequence
+//! - cursor access in low-const O(1) time
+//! - arbirary access in O(log n) time
+//! - combines tree cursor with stack
 
 use std::rc::Rc;
 use std::ops::Deref;
@@ -9,6 +9,10 @@ use std::ops::Deref;
 use split_btree_cursor as tree;
 use archive_stack as stack;
 
+/// Random access zipper
+///
+/// A cursor into a sequence, optimised for moving to 
+/// arbitrary points in the sequence
 #[derive(Clone)]
 pub struct Raz<E: Clone> {
 	length: usize,
@@ -18,7 +22,9 @@ pub struct Raz<E: Clone> {
 	r_forest: tree::Cursor<TreeData<E>>,
 }
 
-// should this be private?
+/// The data stored in the tree structure of the RAZ.
+/// Currently public for testing purposes
+#[doc(hidden)]
 pub enum TreeData<E> {
 	Branch{l_count: usize, r_count: usize},
 	Leaf(Rc<Vec<E>>),
@@ -39,6 +45,9 @@ impl<E> tree::TreeUpdate for TreeData<E> {
 	}
 }
 
+/// Tree form of a RAZ
+///
+/// used between refocusing, and for running global algorithms
 #[derive(Clone)]
 pub struct RazTree<E: Clone>{count: usize, tree: tree::Tree<TreeData<E>>}
 
@@ -50,15 +59,20 @@ impl<E: Clone> Deref for RazTree<E> {
 }
 
 impl<E:Clone> RazTree<E> {
+	/// the number if items in the sequence
 	pub fn len(&self) -> usize {self.count}
+	/// focus on a location in the sequence to begin editing.
+	///
+	/// `0` is before the first element. This will return `None` if
+	/// `pos` is larger than the number of elements.
 	pub fn focus(self, mut pos: usize) -> Option<Raz<E>> {
 		match self { RazTree{count,tree} => {
 			if tree.is_empty() {
 				return Some(Raz{
 					length: 0,
 					l_forest: tree::Cursor::new(),
-					l_stack: stack::AStack::new(),
-					r_stack: stack::AStack::new(),
+					l_stack: stack::AStack::with_capacity(500),
+					r_stack: stack::AStack::with_capacity(500),
 					r_forest: tree::Cursor::new(),
 				})
 			}
@@ -79,8 +93,8 @@ impl<E:Clone> RazTree<E> {
 				TreeData::Branch{..} => unreachable!(),
 				TreeData::Leaf(ref vec_ref) => vec_ref.split_at(pos)
 			};
-			let mut l_gstack = stack::AStack::new();
-			let mut r_gstack = stack::AStack::new();
+			let mut l_gstack = stack::AStack::with_capacity(500);
+			let mut r_gstack = stack::AStack::with_capacity(500);
 			l_gstack.extend(l_slice);
 			r_gstack.extend_rev(r_slice);
 			// step 3: integrate
@@ -97,15 +111,18 @@ impl<E:Clone> RazTree<E> {
 }
 
 impl<E:Clone> Raz<E> {
+	/// Create a new RAZ, for an empty sequence
 	pub fn new() -> Raz<E> {
 		Raz{
 			length: 0,
 			l_forest: tree::Cursor::new(),
-			l_stack: stack::AStack::new(),
-			r_stack: stack::AStack::new(),
+			l_stack: stack::AStack::with_capacity(500),
+			r_stack: stack::AStack::with_capacity(500),
 			r_forest: tree::Cursor::new(),
 		}
 	}
+	/// unfocus the RAZ before refocusing on a new location
+	/// in the sequence.
 	pub fn unfocus(mut self) -> RazTree<E> {
 		let mut l_lev = None;
 		let mut r_lev = None;
@@ -186,28 +203,35 @@ impl<E:Clone> Raz<E> {
 		RazTree{count: count(tree.peek()), tree: tree}
 	}
 
+	/// add an element to the left of the cursor
 	pub fn push_left(&mut self, elm: E) {
 		self.length += 1;
 		self.l_stack.push(elm);
 		if self.l_stack.active_len() % 200 == 0 { self.archive_left(tree::gen_level()) }
 	}
+	/// add an element to the right of the cursor
 	pub fn push_right(&mut self, elm: E) {
 		self.length += 1;
 		self.r_stack.push(elm);
 		if self.r_stack.active_len() % 200 == 0 { self.archive_right(tree::gen_level()) }
 	}
+	/// peek at the element to the left of the cursor
 	pub fn peek_left(&self) -> Option<&E> {
 		self.l_stack.peek()
 	}
+	/// peek at the element to the left of the cursor
 	pub fn peek_right(&self) -> Option<&E> {
 		self.r_stack.peek()
 	}
+	/// mark the data at the left to be shared
 	pub fn archive_left(&mut self, level: tree::Level) {
 		self.l_stack.archive(level);
 	}
+	/// mark the data at the right to be shared
 	pub fn archive_right(&mut self, level: tree::Level) {
 		self.r_stack.archive(level);
 	}
+	/// remove and return an element to the left of the cursor
 	pub fn pop_left(&mut self) -> Option<E> {
 		if self.l_stack.len() == 0 {
 			if !self.l_forest.up() { return None } else {
@@ -222,6 +246,7 @@ impl<E:Clone> Raz<E> {
 		self.length -= 1;
 		self.l_stack.pop()
 	}
+	/// remove and return an element to the right of the cursor
 	pub fn pop_right(&mut self) -> Option<E> {
 		if self.r_stack.len() == 0 {
 			if !self.r_forest.up() { return None } else {
