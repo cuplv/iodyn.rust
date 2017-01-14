@@ -20,6 +20,7 @@ const DEFAULT_TAG: &'static str = "None";
 const DEFAULT_TAGHEAD: &'static str = "Tag";
 const DEFAULT_START: usize = 0;
 const DEFAULT_INSERT: usize = 10_000;
+const DEFAULT_BATCH: usize = 1;
 const DEFAULT_GROUPS: usize = 10;
 const DEFAULT_REPS: usize = 1;
 
@@ -37,6 +38,7 @@ fn main() {
       --save_mem             'don't dealocate major data while timing'
       -s, --start=[start]    'starting sequence length'
       -i, --insert=[insert]  'number of timed insertions'
+      -b, --batch=[batch]    'number of consequtive insertions before reposition'
       -g, --groups=[groups]  'measured insertion groups per sequence'
       -r, --reps=[reps]      'number of sequences tested'
       [multi] -m             'more insertions for each repetition'
@@ -51,6 +53,7 @@ fn main() {
   let save_mem = args.is_present("save_mem");
 	let start = value_t!(args, "start", usize).unwrap_or(DEFAULT_START);
 	let insert = value_t!(args, "insert", usize).unwrap_or(DEFAULT_INSERT);
+	let batch = value_t!(args, "batch", usize).unwrap_or(DEFAULT_BATCH);
 	let groups = value_t!(args, "groups", usize).unwrap_or(DEFAULT_GROUPS);
 	let reps = value_t!(args, "reps", usize).unwrap_or(DEFAULT_REPS);
   let multi = args.is_present("multi");
@@ -64,12 +67,12 @@ fn main() {
   }
 
 	let print_header = ||{
-	   println!("UnixTime,Seed,SeqType,SeqNum,PriorElements,Insertions,Time,{}", taghead);
+	   println!("UnixTime,Seed,SeqType,SeqNum,PriorElements,Insertions,Batch,Time,{}", taghead);
 	};
 
 	let print_result = |version: &str, number: usize, prior_elms: usize, insertions: usize, time: Duration| {
-		println!("{},{},{},{},{},{},{},{}",
-			time::get_time().sec, seed, version, number, prior_elms, insertions, time, tag
+		println!("{},{},{},{},{},{},{},{},{}",
+			time::get_time().sec, seed, version, number, prior_elms, insertions, batch, time, tag
 		);
 	};
 
@@ -97,7 +100,7 @@ fn main() {
 		}
 		if eval_mraz {
 			let start_time = time::get_time();
-			mraz_start = insert_10n_mut(mraz_start, start, 0, StdRng::from_seed(&[seed]));
+			mraz_start = insert_n_mut(mraz_start, start, 0, StdRng::from_seed(&[seed]));
 			let elapsed = time::get_time() - start_time;
 			print_result("MRAZ", 0, 0, start, elapsed);
 		}
@@ -129,7 +132,7 @@ fn main() {
 		  	let mut build_raz = raz_start.clone();
 		  	for _ in 0..groups {
 					let start_time = time::get_time();
-		  		build_raz = insert_10n(build_raz, ins, raz_size, StdRng::from_seed(&[seed]));
+		  		build_raz = insert_n_batch(build_raz, ins, batch, raz_size, StdRng::from_seed(&[seed]));
 					let elapsed = time::get_time() - start_time;
 	  			print_result("RAZ",i,raz_size,ins,elapsed);
 		  		raz_size += ins;
@@ -154,7 +157,7 @@ fn main() {
 	  	let mut build_mraz = mraz_start.clone();
 	  	for _ in 0..groups {
 				let start_time = time::get_time();
-	  		build_mraz = insert_10n_mut(build_mraz, ins, mraz_size, StdRng::from_seed(&[seed]));
+	  		build_mraz = insert_n_batch_mut(build_mraz, ins, batch, mraz_size, StdRng::from_seed(&[seed]));
 				let elapsed = time::get_time() - start_time;
   			print_result("MRAZ",i,mraz_size,ins,elapsed);
 	  		mraz_size += ins;
@@ -178,40 +181,34 @@ fn insert_n<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(zip: Z, n: usize, size: usize, 
 	}
 	zip
 }
-fn insert_10n<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(zip: Z, n: usize, size: usize, mut rnd_pos: StdRng) -> Z {
+fn insert_n_batch<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(zip: Z, n: usize, b:usize, size: usize, mut rnd_pos: StdRng) -> Z {
 	let mut zip: Z = zip;
 	let mut seq: S;
-	for i in 0..(n/10) {
-    let pos = rnd_pos.gen::<usize>() % (size + 1 + i * 10);
+	for i in 0..(n/b) {
+    let pos = rnd_pos.gen::<usize>() % (size + 1 + i * b);
     seq = zip.unzip();
     zip = seq.zip_to(pos).unwrap();
-    zip = zip.push_r(size + i + 0);
-    zip = zip.push_r(size + i + 1);
-    zip = zip.push_r(size + i + 2);
-    zip = zip.push_r(size + i + 3);
-    zip = zip.push_r(size + i + 4);
-    zip = zip.push_r(size + i + 5);
-    zip = zip.push_r(size + i + 6);
-    zip = zip.push_r(size + i + 7);
-    zip = zip.push_r(size + i + 8);
-    zip = zip.push_r(size + i + 9);
+    for j in 0..b {
+	    zip = zip.push_r(size + i * b + j);
+    }
 	}
 	zip
 }
-fn insert_10n_mut(mut raz: gr::Raz<usize>, n: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<usize> {
-	for i in 0..(n/10) {
-    let pos = rnd_pos.gen::<usize>() % (size + 1 + i * 10);
+fn insert_n_mut(mut raz: gr::Raz<usize>, n: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<usize> {
+	for i in 0..n {
+    let pos = rnd_pos.gen::<usize>() % (size + 1 + i);
     raz = raz.unfocus().focus(pos).unwrap();
-    raz.push_right(size + i + 0);
-    raz.push_right(size + i + 1);
-    raz.push_right(size + i + 2);
-    raz.push_right(size + i + 3);
-    raz.push_right(size + i + 4);
-    raz.push_right(size + i + 5);
-    raz.push_right(size + i + 6);
-    raz.push_right(size + i + 7);
-    raz.push_right(size + i + 8);
-    raz.push_right(size + i + 9);
+	  raz.push_right(size + i);	
+	}
+  raz
+}
+fn insert_n_batch_mut(mut raz: gr::Raz<usize>, n: usize, b: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<usize> {
+	for i in 0..(n/b) {
+    let pos = rnd_pos.gen::<usize>() % (size + 1 + i * b);
+    raz = raz.unfocus().focus(pos).unwrap();
+    for j in 0..(b) {
+	    raz.push_right(size + i * b + j);	
+    }
 	}
   raz
 }
