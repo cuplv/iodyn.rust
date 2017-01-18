@@ -49,9 +49,9 @@ impl<E> Tree<E> {
 		link_peek(t)
 	}
 
-	pub fn fold_up<R,F>(&self, node_calc: &F) -> Option<R>
+	pub fn fold_up<R,F>(&self, node_calc: &mut F) -> Option<R>
 	where
-		F: Fn(Option<R>,&E,Option<R>) -> R
+		F: FnMut(Option<R>,&E,Option<R>) -> R
 	{
 		let Tree(ref tree) = *self;
 		link_fold_up(tree, node_calc)
@@ -114,19 +114,17 @@ type TreeLink<E> = Option<(Level,Rc<TreeNode<E>>)>;
 fn link_peek<E>(link: &TreeLink<E>) -> Option<&E>{
 	link.as_ref().map(|&(_,ref node)| &node.data)
 }
-fn link_fold_up<E,R,F>(link: &TreeLink<E>, node_calc: &F) -> Option<R>
+fn link_fold_up<E,R,F>(link: &TreeLink<E>, node_calc: &mut F) -> Option<R>
 where
-	F: Fn(Option<R>,&E,Option<R>) -> R
+	F: FnMut(Option<R>,&E,Option<R>) -> R
 {
 	match *link {
 		None => None,
-		Some((_,ref t)) => match **t { TreeNode{ ref data, ref l_branch, ref r_branch } =>
-			Some(node_calc(
-				link_fold_up(l_branch,node_calc),
-				data,
-				link_fold_up(r_branch,node_calc))
-			)
-		}
+		Some((_,ref t)) => match **t { TreeNode{ ref data, ref l_branch, ref r_branch } => {
+			let l = link_fold_up(l_branch,node_calc);
+			let r = link_fold_up(r_branch,node_calc);
+			Some(node_calc(l, data, r))
+		}}
 	}
 }
 
@@ -471,16 +469,16 @@ mod tests {
 				Tree::new(0,Some(6),Tree::empty(),Tree::empty()),
 			)
 		);
-		let sum = t.fold_up(&|l,c,r| {
+		let sum = t.fold_up(&mut|l,c,r| {
 			l.unwrap_or(0) + c.unwrap_or(0) + r.unwrap_or(0)
 		});
-		let depth = t.fold_up(&|l,c,r| {
+		let depth = t.fold_up(&mut|l,c,r| {
 			match *c {
 				None => max(l.unwrap(),r.unwrap()) + 1,
 				Some(_) => 1,
 			}
 		});
-		let in_order = t.fold_up(&|l,c,r|{
+		let in_order = t.fold_up(&mut|l,c,r|{
 			match *c {
 				None => l.unwrap() >= r.unwrap(),
 				Some(_) => true,

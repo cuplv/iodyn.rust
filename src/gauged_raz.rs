@@ -61,6 +61,32 @@ impl<E: Clone> Deref for RazTree<E> {
 impl<E:Clone> RazTree<E> {
 	/// the number if items in the sequence
 	pub fn len(&self) -> usize {self.count}
+
+	/// Runs an binary function over the sequence data
+	///
+	/// This is calculated from data in leaves of a tree structure,
+	/// so the operation must be associative. Returns None if there
+	/// are no elements.
+	pub fn fold_up<I,R,B>(&self, mut init: I, mut bin: B) -> Option<R>
+		where I: FnMut(&E) -> R, B: FnMut(R,R) -> R
+	{
+		if self.count == 0 { return None }
+		self.tree.fold_up(&mut |l,c,r|{
+			match *c {
+				TreeData::Leaf(ref vec) => {
+					let mut iter = vec.iter().map(|elm|init(elm));
+					let first = iter.next().expect("leaf with empty vec");
+					iter.fold(first, &mut bin)
+				},
+				TreeData::Branch{..} => { match (l,r) {
+					(None, None) => panic!("branch with no data"),
+					(Some(r),None) | (None, Some(r)) => r,
+					(Some(r1),Some(r2)) => bin(r1,r2),
+				}},
+			}
+		})
+	}
+
 	/// focus on a location in the sequence to begin editing.
 	///
 	/// `0` is before the first element. This will return `None` if
@@ -440,5 +466,45 @@ mod tests {
   	assert_eq!(Some(9), r.pop_left());
   	assert_eq!(Some(8), r.pop_left());
   	assert_eq!(None, r.pop_left());
+  }
+
+  #[test]
+  fn test_fold() {
+  	let tree = RazTree{
+  		count: 12,
+  		tree: tree::Tree::new(5,TreeData::Branch{l_count:8, r_count: 4},
+  			tree::Tree::new(3,TreeData::Branch{l_count:2, r_count: 6},
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(1,2))),tree::Tree::empty(),tree::Tree::empty()),
+  				tree::Tree::new(2,TreeData::Branch{l_count:4, r_count: 2},
+  					tree::Tree::new(1,TreeData::Branch{l_count:2, r_count: 2},
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(3,4))),tree::Tree::empty(),tree::Tree::empty()),
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(5,6))),tree::Tree::empty(),tree::Tree::empty()),
+  					),
+  					tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(7,8))),tree::Tree::empty(),tree::Tree::empty()),
+  				)
+  			),
+  			tree::Tree::new(4,TreeData::Branch{l_count: 2, r_count: 2},
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(9,10))),tree::Tree::empty(),tree::Tree::empty()),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(11,12))),tree::Tree::empty(),tree::Tree::empty()),
+  			)
+  		)
+  	};
+  	assert!(tree.good_levels());
+
+  	let max = tree.fold_up(|e|{*e},|e1,e2|{::std::cmp::max(e1,e2)}).unwrap();
+  	assert_eq!(12, max);
+
+  	let sum = tree.fold_up(|e|{*e},|e1,e2|{e1+e2}).unwrap_or(0);
+  	let iter_sum: usize = (1..13).sum();
+  	assert_eq!(iter_sum, sum);
+
+  	#[derive(PartialEq,Eq,Debug)]
+  	enum EO {Even,Odd}
+  	let even_odd = tree.fold_up(
+  		|e| if *e % 2 == 0 {EO::Even} else {EO::Odd} ,
+  		|e1,e2| if e1 == e2 {EO::Even} else {EO::Odd}
+  	).unwrap();
+  	assert_eq!(EO::Even, even_odd);
+
   }
 }
