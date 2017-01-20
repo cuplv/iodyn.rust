@@ -2,14 +2,16 @@
 #![feature(core_intrinsics)]
 
 extern crate rand;
-
 extern crate pat;
+#[macro_use] extern crate adapton;
 
 pub mod zip;
 pub mod stack;
 pub mod seqzip;
 pub mod persist_raz;
 pub mod split_btree_cursor;
+pub mod level_tree;
+pub mod tree_cursor;
 pub mod archive_stack;
 pub mod gauged_raz;
 

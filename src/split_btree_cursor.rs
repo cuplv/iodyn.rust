@@ -1,9 +1,9 @@
-/// Split Binary Tree Cursor
-/// - a cursor within a persistent, ordered, binary tree
-/// - optimised for splitting and combining trees at the cursor in a cannonical way
-/// - uses non-increasing levels for each subtree to maintain cannonical form
-/// - in the general case the most efficent levels will be drawn from 
-///   a negative binomial distribution
+//! Split Binary Tree Cursor
+//! - a cursor within a persistent, ordered, binary tree
+//! - optimised for splitting and combining trees at the cursor in a cannonical way
+//! - uses non-increasing levels for each subtree to maintain cannonical form
+//! - in the general case the most efficent levels will be drawn from 
+//!   a negative binomial distribution
 
 use std::mem;
 use std::rc::Rc;

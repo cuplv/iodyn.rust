@@ -8,3 +8,7 @@ rand = "0.3"
 clap = "2"
 time = "0.1"
 pat = {git = "https://github.com/kyleheadley/pat"}
+
+[dependencies.adapton]
+git = "https://github.com/cuplv/adapton.rust.git"
+branch = "dev"
