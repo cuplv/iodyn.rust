@@ -13,7 +13,7 @@ use pat::AsPattern;
 
 /// A persistant tree, for use with a cursor. This 
 /// tree is as general as possible to be of arbitrary use.
-#[derive(PartialEq,Eq)]
+#[derive(PartialEq,Eq,Debug)]
 pub struct Tree<E>(TreeLink<E>);
 /// A tree with the cursor here needs "levels", which are
 /// non-decreasing from the root of the tree to the leaves.
@@ -105,7 +105,7 @@ pub enum T<E> {
 }
 
 
-#[derive(PartialEq,Eq)]
+#[derive(PartialEq,Eq,Debug)]
 struct TreeNode<E>{
 	data: E,
 	l_branch: TreeLink<E>,
@@ -202,7 +202,7 @@ impl<E: DeriveTreeUpdate + Clone> TreeUpdate for E {
 /// - Force::Discard, moves to full or empty branchs, discarding the
 ///   currently active branch. This will effectively connect the upper
 ///   node to the lower node, bypassing the current one 
-#[derive(Clone,Copy,PartialEq,Eq)]
+#[derive(Clone,Copy,PartialEq,Eq,Debug)]
 pub enum Force {
 	No,
 	Yes,
