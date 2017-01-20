@@ -13,6 +13,7 @@ use pat::AsPattern;
 
 /// A persistant tree, for use with a cursor. This 
 /// tree is as general as possible to be of arbitrary use.
+#[derive(PartialEq,Eq)]
 pub struct Tree<E>(TreeLink<E>);
 /// A tree with the cursor here needs "levels", which are
 /// non-decreasing from the root of the tree to the leaves.
@@ -104,6 +105,7 @@ pub enum T<E> {
 }
 
 
+#[derive(PartialEq,Eq)]
 struct TreeNode<E>{
 	data: E,
 	l_branch: TreeLink<E>,

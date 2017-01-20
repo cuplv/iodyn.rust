@@ -25,6 +25,7 @@ pub struct Raz<E: Clone> {
 /// The data stored in the tree structure of the RAZ.
 /// Currently public for testing purposes
 #[doc(hidden)]
+#[derive(PartialEq,Eq)]
 pub enum TreeData<E> {
 	Branch{l_count: usize, r_count: usize},
 	Leaf(Rc<Vec<E>>),
@@ -48,7 +49,7 @@ impl<E> tree::TreeUpdate for TreeData<E> {
 /// Tree form of a RAZ
 ///
 /// used between refocusing, and for running global algorithms
-#[derive(Clone)]
+#[derive(Clone,PartialEq,Eq)]
 pub struct RazTree<E: Clone>{count: usize, tree: tree::Tree<TreeData<E>>}
 
 impl<E: Clone> Deref for RazTree<E> {
