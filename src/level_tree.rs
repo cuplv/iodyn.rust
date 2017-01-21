@@ -25,7 +25,7 @@ struct TreeNode<E>{
 }
 
 impl<E> Tree<E> {
-	/// build a new tree from components, return None if levels are inconsistent
+	/// build a new tree from components, panic if levels are inconsistent
 	pub fn new(
 		level: u32,
 		data: E,
@@ -35,10 +35,10 @@ impl<E> Tree<E> {
 		let target_level = level;
 		//check level
 		if let Some(Tree{level, ..}) = l_branch {
-			if level > target_level { return None }
+			if level > target_level { panic!("bad levels") }
 		}
 		if let Some(Tree{level, ..}) = r_branch {
-			if level >= target_level { return None }
+			if level >= target_level { panic!("bad levels") }
 		}
 		// structure the data
 		Some(Tree{

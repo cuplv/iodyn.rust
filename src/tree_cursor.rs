@@ -73,7 +73,10 @@ pub enum Force {
 }
 
 fn peek_op<E>(op: &Option<Tree<E>>) -> Option<&E> {
-	op.as_ref().map(|d|d.peek())
+	match *op {
+		None => None,
+		Some(ref t) => Some(t.peek())
+	}
 }
 
 const DEFAULT_DEPTH: usize = 30;
