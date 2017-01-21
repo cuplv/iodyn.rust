@@ -35,10 +35,10 @@ impl<E> Tree<E> {
 		let target_level = level;
 		//check level
 		if let Some(Tree{level, ..}) = l_branch {
-			if level > target_level { return None }
+			if level >= target_level { return None }
 		}
 		if let Some(Tree{level, ..}) = r_branch {
-			if level >= target_level { return None }
+			if level > target_level { return None }
 		}
 		// structure the data
 		Some(Tree{
