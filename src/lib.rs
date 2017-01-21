@@ -5,16 +5,17 @@ extern crate rand;
 extern crate pat;
 #[macro_use] extern crate adapton;
 
-pub mod zip;
-pub mod stack;
-pub mod seqzip;
-pub mod persist_raz;
-pub mod split_btree_cursor;
-pub mod level_tree;
-pub mod tree_cursor;
-pub mod archive_stack;
-pub mod gauged_raz;
+pub mod zip;                // trait for persistent zips
+pub mod stack;              // persistent stack
+pub mod seqzip;             // traits for persistent raz
+pub mod persist_raz;        // monolithic single-item persistent raz
+pub mod level_tree;         // persistent tree
+pub mod tree_cursor;        // splittable cursor over tree (uses level_tree)
+pub mod archive_stack;      // more complex stack (uses stack)
+pub mod gauged_raz;         // raz of vectors using tree_cursor (uses archive_stack and tree_cursor)
 
+
+// tests on early mods only (persist_raz)
 #[cfg(test)]
 mod tests {
 	use super::*;

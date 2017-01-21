@@ -7,7 +7,7 @@
 
 
 use std::mem;
-use level_tree::Tree;
+pub use level_tree::{Tree, gen_branch_level as gen_level};
 
 /// tree cursor, centered on a node of the underlying persistent tree
 ///

@@ -4,9 +4,10 @@
 //! - combines tree cursor with stack
 
 use std::rc::Rc;
-use std::ops::Deref;
 
-use split_btree_cursor as tree;
+use rand::thread_rng;
+
+use tree_cursor as tree;
 use archive_stack as stack;
 
 /// Random access zipper
@@ -17,32 +18,36 @@ use archive_stack as stack;
 pub struct Raz<E: Clone> {
 	length: usize,
 	l_forest: tree::Cursor<TreeData<E>>,
-	l_stack: stack::AStack<E,tree::Level>,
-	r_stack: stack::AStack<E,tree::Level>,
+	l_stack: stack::AStack<E,u32>,
+	r_stack: stack::AStack<E,u32>,
 	r_forest: tree::Cursor<TreeData<E>>,
 }
 
+const DEFAULT_SECTION_CAPACITY: usize = 500;
+
 /// The data stored in the tree structure of the RAZ.
-/// Currently public for testing purposes
 #[doc(hidden)]
 #[derive(PartialEq,Eq,Debug)]
-pub enum TreeData<E> {
+enum TreeData<E> {
 	Branch{l_count: usize, r_count: usize},
 	Leaf(Rc<Vec<E>>),
 }
 
-fn count<E>(td: Option<&TreeData<E>>) -> usize {
-	match td {
+fn count<E>(elm: &Option<&TreeData<E>>) -> usize {
+	match *elm {
 		None => 0,
 		Some(&TreeData::Branch{l_count,r_count}) => l_count + r_count,
 		Some(&TreeData::Leaf(ref vec)) => vec.len(),
 	}
 }
+fn count_tree_op<E>(tree: &Option<tree::Tree<TreeData<E>>>) -> usize {
+	count(&tree.as_ref().map(|t|t.peek()))
+}
 
 impl<E> tree::TreeUpdate for TreeData<E> {
 	#[allow(unused_variables)]
 	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self {
-		TreeData::Branch{l_count: count(l_branch), r_count: count(r_branch)}
+		TreeData::Branch{l_count: count(&l_branch), r_count: count(&r_branch)}
 	}
 }
 
@@ -50,14 +55,7 @@ impl<E> tree::TreeUpdate for TreeData<E> {
 ///
 /// used between refocusing, and for running global algorithms
 #[derive(Clone,PartialEq,Eq,Debug)]
-pub struct RazTree<E: Clone>{count: usize, tree: tree::Tree<TreeData<E>>}
-
-impl<E: Clone> Deref for RazTree<E> {
-	type Target = tree::Tree<TreeData<E>>;
-	fn deref(&self) -> &Self::Target {
-		&self.tree
-	}
-}
+pub struct RazTree<E: Clone>{count: usize, tree: Option<tree::Tree<TreeData<E>>>}
 
 impl<E:Clone> RazTree<E> {
 	/// the number if items in the sequence
@@ -71,20 +69,21 @@ impl<E:Clone> RazTree<E> {
 	pub fn fold_up<I,R,B>(&self, mut init: I, mut bin: B) -> Option<R>
 		where I: FnMut(&E) -> R, B: FnMut(R,R) -> R
 	{
-		if self.count == 0 { return None }
-		self.tree.fold_up(&mut |l,c,r|{
-			match *c {
-				TreeData::Leaf(ref vec) => {
-					let mut iter = vec.iter().map(|elm|init(elm));
-					let first = iter.next().expect("leaf with empty vec");
-					iter.fold(first, &mut bin)
-				},
-				TreeData::Branch{..} => { match (l,r) {
-					(None, None) => panic!("branch with no data"),
-					(Some(r),None) | (None, Some(r)) => r,
-					(Some(r1),Some(r2)) => bin(r1,r2),
-				}},
-			}
+		self.tree.as_ref().map(|tree| {
+			tree.fold_up(&mut |l,c,r|{
+				match *c {
+					TreeData::Leaf(ref vec) => {
+						let mut iter = vec.iter().map(|elm|init(elm));
+						let first = iter.next().expect("leaf with empty vec");
+						iter.fold(first, &mut bin)
+					},
+					TreeData::Branch{..} => { match (l,r) {
+						(None, None) => panic!("branch with no data"),
+						(Some(r),None) | (None, Some(r)) => r,
+						(Some(r1),Some(r2)) => bin(r1,r2),
+					}},
+				}
+			})
 		})
 	}
 
@@ -93,46 +92,51 @@ impl<E:Clone> RazTree<E> {
 	/// `0` is before the first element. This will return `None` if
 	/// `pos` is larger than the number of elements.
 	pub fn focus(self, mut pos: usize) -> Option<Raz<E>> {
-		match self { RazTree{count,tree} => {
-			if tree.is_empty() {
-				return Some(Raz{
+		match self { 
+			RazTree{tree:None, ..} => {
+				Some(Raz{
 					length: 0,
 					l_forest: tree::Cursor::new(),
-					l_stack: stack::AStack::with_capacity(500),
-					r_stack: stack::AStack::with_capacity(500),
+					l_stack: stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY),
+					r_stack: stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY),
 					r_forest: tree::Cursor::new(),
 				})
-			}
-			if count < pos { return None };
-			// step 1: find location with cursor
-			let mut cursor = tree::Cursor::from(tree);
-			while let TreeData::Branch{l_count, ..} = *cursor.peek().unwrap() {
-				if pos <= l_count {
-					assert!(cursor.down_left());
-				} else {
-					pos -= l_count;
-					assert!(cursor.down_right());
+			},
+			RazTree{count, tree: Some(tree)} => {
+				if count < pos { return None };
+				// step 1: find location with cursor
+				let mut cursor = tree::Cursor::from(tree);
+				while let TreeData::Branch{l_count, ..} = *cursor.peek().unwrap() {
+					if pos <= l_count {
+						assert!(cursor.down_left());
+					} else {
+						pos -= l_count;
+						assert!(cursor.down_right());
+					}
 				}
-			}
-			// step 2: extract and copy data
-			let (l_cursor, tree, r_cursor) = cursor.split();
-			let (l_slice,r_slice) = match *tree.peek().unwrap() {
-				TreeData::Branch{..} => unreachable!(),
-				TreeData::Leaf(ref vec_ref) => vec_ref.split_at(pos)
-			};
-			let mut l_gstack = stack::AStack::with_capacity(500);
-			let mut r_gstack = stack::AStack::with_capacity(500);
-			l_gstack.extend(l_slice);
-			r_gstack.extend_rev(r_slice);
-			// step 3: integrate
-			Some(Raz{
-				length: count,
-				l_forest: l_cursor,
-				l_stack: l_gstack,
-				r_stack: r_gstack,
-				r_forest: r_cursor,
-			})
-		}}
+				// step 2: extract and copy data
+				let (l_cursor, tree, r_cursor) = cursor.split();
+				let (l_slice,r_slice) = match tree {
+					None => unreachable!(),
+					Some(ref t) => match *t.peek() {
+						TreeData::Branch{..} => unreachable!(),
+						TreeData::Leaf(ref vec_ref) => vec_ref.split_at(pos)
+					}
+				};
+				let mut l_astack = stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY);
+				let mut r_astack = stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY);
+				l_astack.extend(l_slice);
+				r_astack.extend_rev(r_slice);
+				// step 3: integrate
+				Some(Raz{
+					length: count,
+					l_forest: l_cursor,
+					l_stack: l_astack,
+					r_stack: r_astack,
+					r_forest: r_cursor,
+				})
+			},
+		}
 	}
 
 }
@@ -143,8 +147,8 @@ impl<E:Clone> Raz<E> {
 		Raz{
 			length: 0,
 			l_forest: tree::Cursor::new(),
-			l_stack: stack::AStack::with_capacity(500),
-			r_stack: stack::AStack::with_capacity(500),
+			l_stack: stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY),
+			r_stack: stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY),
 			r_forest: tree::Cursor::new(),
 		}
 	}
@@ -182,26 +186,26 @@ impl<E:Clone> Raz<E> {
 		// step 2: build center tree
 		let tree = if let Some(v) = vec {
 			// OPTIMIZE: linear algorithm
-			let mut cursor = tree::Tree::new(0,TreeData::Leaf(Rc::new(v)),tree::Tree::empty(),tree::Tree::empty()).into();
+			let mut cursor = tree::Tree::new(0,TreeData::Leaf(Rc::new(v)),None,None).unwrap().into();
 			while let Some((l_vec,lev)) = self.l_stack.next_archive() {
-				let l_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(l_vec)),tree::Tree::empty(),tree::Tree::empty()).into();
+				let l_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(l_vec)),None,None).unwrap().into();
 				let dummy = TreeData::Branch{l_count: 0, r_count: 0};
 				cursor = tree::Cursor::join(l_curs,l_lev.unwrap(),dummy,cursor);
 				l_lev = lev;
 			}
 			while let Some((mut r_vec,lev)) = self.r_stack.next_archive() {
 				r_vec.reverse();
-				let r_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(r_vec)),tree::Tree::empty(),tree::Tree::empty()).into();
+				let r_curs = tree::Tree::new(0,TreeData::Leaf(Rc::new(r_vec)),None,None).unwrap().into();
 				let dummy = TreeData::Branch{l_count: 0, r_count: 0};
 				cursor = tree::Cursor::join(cursor,r_lev.unwrap(),dummy,r_curs);
 				r_lev = lev;
 			}
 			while cursor.up() {}
-			cursor.at_tree()
+			cursor.at_tree().unwrap()
 		} else {
 			if !self.l_forest.up() {
 				if !self.r_forest.up() {
-					return RazTree{ count: 0, tree: tree::Tree::empty() };
+					return RazTree{ count: 0, tree: None };
 				} else {
 					self.r_forest.right_tree().unwrap()
 				}
@@ -210,7 +214,7 @@ impl<E:Clone> Raz<E> {
 			}
 		};
 		// step 3: join with forests
-		let mut join_cursor: tree::Cursor<TreeData<E>> = tree.into();
+		let mut join_cursor = tree::Cursor::from(tree);
 		if self.l_forest.up() {
 			let lev = self.l_forest.peek_level().unwrap();
 			self.l_forest.down_left_force(tree::Force::Discard);
@@ -226,21 +230,20 @@ impl<E:Clone> Raz<E> {
 		// step 4: convert to final tree
 		while join_cursor.up() {}
 		let tree = join_cursor.at_tree();
-		debug_assert!(tree.good_levels(), "unfocused tree has bad levels");
-		RazTree{count: count(tree.peek()), tree: tree}
+		RazTree{count: count_tree_op(&tree), tree: tree}
 	}
 
 	/// add an element to the left of the cursor
 	pub fn push_left(&mut self, elm: E) {
 		self.length += 1;
 		self.l_stack.push(elm);
-		if self.l_stack.active_len() % 200 == 0 { self.archive_left(tree::gen_level()) }
+		if self.l_stack.active_len() % 200 == 0 { self.archive_left(tree::gen_level(thread_rng())) }
 	}
 	/// add an element to the right of the cursor
 	pub fn push_right(&mut self, elm: E) {
 		self.length += 1;
 		self.r_stack.push(elm);
-		if self.r_stack.active_len() % 200 == 0 { self.archive_right(tree::gen_level()) }
+		if self.r_stack.active_len() % 200 == 0 { self.archive_right(tree::gen_level(thread_rng())) }
 	}
 	/// peek at the element to the left of the cursor
 	pub fn peek_left(&self) -> Option<&E> {
@@ -251,11 +254,11 @@ impl<E:Clone> Raz<E> {
 		self.r_stack.peek()
 	}
 	/// mark the data at the left to be shared
-	pub fn archive_left(&mut self, level: tree::Level) {
+	pub fn archive_left(&mut self, level: u32) {
 		self.l_stack.archive(level);
 	}
 	/// mark the data at the right to be shared
-	pub fn archive_right(&mut self, level: tree::Level) {
+	pub fn archive_right(&mut self, level: u32) {
 		self.r_stack.archive(level);
 	}
 	/// remove and return an element to the left of the cursor
@@ -352,6 +355,7 @@ impl<E: Clone> SeqZip<E, RazTree<E>> for Raz<E> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use level_tree::good_levels;
 
   #[test]
   fn test_push_pop() {
@@ -372,22 +376,22 @@ mod tests {
   		count: 12,
   		tree: tree::Tree::new(5,TreeData::Branch{l_count:8, r_count: 4},
   			tree::Tree::new(3,TreeData::Branch{l_count:2, r_count: 6},
-  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(1,2))),tree::Tree::empty(),tree::Tree::empty()),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(1,2))),None,None),
   				tree::Tree::new(2,TreeData::Branch{l_count:4, r_count: 2},
   					tree::Tree::new(1,TreeData::Branch{l_count:2, r_count: 2},
-		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(3,4))),tree::Tree::empty(),tree::Tree::empty()),
-		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(5,6))),tree::Tree::empty(),tree::Tree::empty()),
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(3,4))),None,None),
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(5,6))),None,None),
   					),
-  					tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(7,8))),tree::Tree::empty(),tree::Tree::empty()),
+  					tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(7,8))),None,None),
   				)
   			),
   			tree::Tree::new(4,TreeData::Branch{l_count: 2, r_count: 2},
-  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(9,10))),tree::Tree::empty(),tree::Tree::empty()),
-  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(11,12))),tree::Tree::empty(),tree::Tree::empty()),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(9,10))),None,None),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(11,12))),None,None),
   			)
   		)
   	};
-  	assert!(tree.good_levels());
+  	assert!(good_levels(tree.tree.as_ref().unwrap()));
 
   	let mut left = tree.clone().focus(0).unwrap();
   	let mut deep = tree.clone().focus(5).unwrap();
@@ -447,7 +451,7 @@ mod tests {
   	r.archive_right(4);
   	t = r.unfocus();
 
-  	assert!(t.good_levels());
+  	assert!(good_levels(t.tree.as_ref().unwrap()));
 
   	// focus and read
   	r = t.focus(7).expect("focus on 7");
@@ -475,22 +479,22 @@ mod tests {
   		count: 12,
   		tree: tree::Tree::new(5,TreeData::Branch{l_count:8, r_count: 4},
   			tree::Tree::new(3,TreeData::Branch{l_count:2, r_count: 6},
-  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(1,2))),tree::Tree::empty(),tree::Tree::empty()),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(1,2))),None,None),
   				tree::Tree::new(2,TreeData::Branch{l_count:4, r_count: 2},
   					tree::Tree::new(1,TreeData::Branch{l_count:2, r_count: 2},
-		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(3,4))),tree::Tree::empty(),tree::Tree::empty()),
-		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(5,6))),tree::Tree::empty(),tree::Tree::empty()),
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(3,4))),None,None),
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(5,6))),None,None),
   					),
-  					tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(7,8))),tree::Tree::empty(),tree::Tree::empty()),
+  					tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(7,8))),None,None),
   				)
   			),
   			tree::Tree::new(4,TreeData::Branch{l_count: 2, r_count: 2},
-  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(9,10))),tree::Tree::empty(),tree::Tree::empty()),
-  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(11,12))),tree::Tree::empty(),tree::Tree::empty()),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(9,10))),None,None),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(11,12))),None,None),
   			)
   		)
   	};
-  	assert!(tree.good_levels());
+  	assert!(good_levels(tree.tree.as_ref().unwrap()));
 
   	let max = tree.fold_up(|e|{*e},|e1,e2|{::std::cmp::max(e1,e2)}).unwrap();
   	assert_eq!(12, max);

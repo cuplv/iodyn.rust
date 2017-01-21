@@ -12,10 +12,12 @@ use rand::Rng;
 use pat::AsPattern;
 
 /// A persistent tree with stable, internally defined structure
+#[derive(Debug,PartialEq,Eq)]
 pub struct Tree<E> {
 	level: u32,
 	link: Rc<TreeNode<E>>
 }
+#[derive(Debug,PartialEq,Eq)]
 struct TreeNode<E>{
 	data: E,
 	l_branch: Option<Tree<E>>,
