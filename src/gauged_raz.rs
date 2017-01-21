@@ -152,6 +152,10 @@ impl<E:Clone> Raz<E> {
 			r_forest: tree::Cursor::new(),
 		}
 	}
+
+	/// get the total length of the sequence
+	pub fn len(&self) -> usize { self.length }
+	
 	/// unfocus the RAZ before refocusing on a new location
 	/// in the sequence.
 	pub fn unfocus(mut self) -> RazTree<E> {
