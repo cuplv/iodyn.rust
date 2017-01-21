@@ -147,12 +147,6 @@ impl<E: TreeUpdate> Cursor<E> {
 		while !l_cursor.r_forest.is_empty() { assert!(l_cursor.up()); }
 		while !r_cursor.l_forest.is_empty() { assert!(r_cursor.up()); }
 		// step 2: find insertion point
-		let (ul,ll,ur,lr) = (
-			l_cursor.up_left_level(),
-			l_cursor.peek_level(),
-			r_cursor.up_right_level(),
-			r_cursor.peek_level()
-		);
 		while let Some(h) = l_cursor.up_left_level() {
 			if h >= level { break; }
 			else { assert!(l_cursor.up()); }
@@ -176,8 +170,7 @@ impl<E: TreeUpdate> Cursor<E> {
 			l_cursor.tree.clone(),
 			r_cursor.tree.clone(),
 		);
-		if tree.is_none() { println!("l: {:?}, ul: {:?}, ll: {:?}, ur: {:?}, lr: {:?}", level,ul,ll,ur,lr);}
-
+		assert!(tree.is_some());
 		// step4: join structures
 		Cursor{
 			dirty: true,
