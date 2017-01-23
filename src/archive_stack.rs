@@ -123,6 +123,8 @@ impl<E: Clone, M: Clone> AStack<E,M> {
 	}
 	/// push the entire active vector into the archive, along with
 	/// associated metadata
+	/// return false if the active vector was empty. In this
+	/// case, no archive will happen and the metadata will be unused
 	pub fn archive(&mut self, new_meta: M) -> bool {
 		if self.current.len() == 0 { return false; }
 		let old_vec = mem::replace(&mut self.current, Vec::new());
