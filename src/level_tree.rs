@@ -152,7 +152,7 @@ impl<E> AsPattern<T<E>> for Tree<E> {
 /// 
 /// this will never generate a 0, reserving it for potential
 /// use in tree leaves
-pub fn gen_branch_level<R:Rng>(mut rng: R) -> u32 {
+pub fn gen_branch_level<R:Rng>(rng: &mut R) -> u32 {
 	let num = rng.gen::<u32>();
 	(num << 1).trailing_zeros() as u32
 }

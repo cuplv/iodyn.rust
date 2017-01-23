@@ -241,13 +241,13 @@ impl<E:Clone> Raz<E> {
 	pub fn push_left(&mut self, elm: E) {
 		self.length += 1;
 		self.l_stack.push(elm);
-		if self.l_stack.active_len() % 200 == 0 { self.archive_left(tree::gen_level(thread_rng())) }
+		if self.l_stack.active_len() % 200 == 0 { self.archive_left(tree::gen_level(&mut thread_rng())) }
 	}
 	/// add an element to the right of the cursor
 	pub fn push_right(&mut self, elm: E) {
 		self.length += 1;
 		self.r_stack.push(elm);
-		if self.r_stack.active_len() % 200 == 0 { self.archive_right(tree::gen_level(thread_rng())) }
+		if self.r_stack.active_len() % 200 == 0 { self.archive_right(tree::gen_level(&mut thread_rng())) }
 	}
 	/// peek at the element to the left of the cursor
 	pub fn peek_left(&self) -> Option<&E> {
