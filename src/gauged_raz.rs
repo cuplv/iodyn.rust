@@ -26,7 +26,6 @@ pub struct Raz<E: Clone> {
 const DEFAULT_SECTION_CAPACITY: usize = 500;
 
 /// The data stored in the tree structure of the RAZ.
-#[doc(hidden)]
 #[derive(PartialEq,Eq,Debug)]
 enum TreeData<E> {
 	Branch{l_count: usize, r_count: usize},
@@ -297,6 +296,108 @@ impl<E:Clone> Raz<E> {
 	}
 }
 
+/////////////////////////////
+// Traits for Raz and RazTree
+/////////////////////////////
+use level_tree as ltree;
+use std::convert::From;
+use std::ops::Deref;
+
+fn leaf<E>(v:Vec<E>) -> ltree::Tree<TreeData<E>> {
+	ltree::Tree::new(0,TreeData::Leaf(Rc::new(v)),None,None).unwrap()
+}
+fn bin<E>(
+	t1: ltree::Tree<TreeData<E>>,
+	l:  u32,
+	t2: ltree::Tree<TreeData<E>>
+) -> ltree::Tree<TreeData<E>> {
+	ltree::Tree::new(
+		l, TreeData::Branch{l_count:count(&Some(&*t1)), r_count: count(&Some(&*t2))},
+		Some(t1), Some(t2)
+	).unwrap()
+}
+
+/// Marker type for interpreting the stack as a sequence.
+/// 
+/// Assume the head of the sequence is the edit point.
+/// Rust's default Vec has the edit point at the tail of the data.
+#[derive(Clone)]
+pub struct AtHead<T: Clone>(pub stack::AStack<T,u32>);
+/// Marker type for interpreting the stack as a sequence.
+/// 
+/// Assume the tail of the sequence is the edit point.
+/// Rust's default Vec has the edit point at the tail of the data.
+#[derive(Clone)]
+pub struct AtTail<T: Clone>(pub stack::AStack<T,u32>);
+impl<T: Clone> Deref for AtHead<T> {
+	type Target = stack::AStack<T,u32>;
+	fn deref(&self) -> &Self::Target { &self.0 }
+}
+impl<T: Clone> Deref for AtTail<T> {
+	type Target = stack::AStack<T,u32>;
+	fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+
+impl<E: Clone> From<AtTail<E>> for RazTree<E> {
+	// we build this tree right to left
+	// note that the left branch _cannot_ have
+	// the same level as its parent
+	// while the right branch can.
+	fn from(tailstack: AtTail<E>) -> Self {
+		let AtTail(mut stack) = tailstack;
+		fn from_stack<E: Clone>(
+			stack: &mut stack::AStack<E,u32>,
+			right_tree: ltree::Tree<TreeData<E>>,
+			mid_level: u32,
+			top_level: u32
+		)	-> (ltree::Tree<TreeData<E>>, Option<u32>) {
+			match stack.next_archive() {
+				None => unreachable!(), // if we have a level there will be more data
+				Some((list,meta)) => { match meta {
+					None => (bin(leaf(list), mid_level, right_tree), None),
+					Some(next_level) => {
+						if next_level >= top_level {
+							let tree = bin(leaf(list),mid_level,right_tree);
+							(tree, Some(next_level))
+						} else if next_level >= mid_level {
+							let tree = bin(leaf(list),mid_level,right_tree);
+							return from_stack(stack, tree, next_level, top_level)
+						} else {
+							let (left_tree, left_level) = from_stack(
+								stack, leaf(list), next_level, mid_level
+							);
+							let tree = bin(left_tree, mid_level, right_tree);
+							match left_level {
+								None => (tree, None),
+								Some(left_level) => {
+									if left_level > top_level {
+										(tree, Some(left_level))
+									} else {
+										return from_stack(stack, tree, left_level, top_level)
+									}
+								}
+							}
+						}
+					}
+				}}
+			}
+		}
+		let (level, first_tree) = match stack.next_archive() {
+			None => return RazTree{count: 0, tree: None},
+			Some((list, meta)) => { match meta {
+				None => return RazTree{count: list.len(), tree: Some(leaf(list))},
+				Some(lev) => (lev, leaf(list))
+			}}
+		};
+		let (t,l) = from_stack(&mut stack, first_tree, level, u32::max_value());
+		assert!(l.is_none());
+		RazTree{count: count(&Some(&*t)), tree: Some(t)}
+	}
+}
+
+
+
 ////////////////////////////////
 // Zip and ZipSeq for Gauged RAZ 
 ////////////////////////////////
@@ -514,6 +615,32 @@ mod tests {
   		|e1,e2| if e1 == e2 {EO::Even} else {EO::Odd}
   	).unwrap();
   	assert_eq!(EO::Even, even_odd);
+
+  }
+
+  #[test]
+  fn test_from_stack() {
+  	let mut stack = stack::AStack::new();
+  	stack.push(1);
+  	stack.push(2);
+  	stack.archive(3);
+  	stack.push(3);
+  	stack.push(4);
+  	stack.archive(1);
+  	stack.push(5);
+  	stack.push(6);
+  	stack.archive(2);
+  	stack.push(7);
+  	stack.push(8);
+  	stack.archive(5);
+  	stack.push(9);
+  	stack.push(10);
+  	stack.archive(4);
+  	stack.push(11);
+  	stack.push(12);
+
+  	let raz = RazTree::from(AtTail(stack));
+  	// TODO: see if the structure is right
 
   }
 }
