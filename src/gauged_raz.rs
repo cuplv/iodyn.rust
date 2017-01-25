@@ -303,9 +303,11 @@ use level_tree as ltree;
 use std::convert::From;
 use std::ops::Deref;
 
+/// convenience fn for making a tree from data
 fn leaf<E>(v:Vec<E>) -> ltree::Tree<TreeData<E>> {
 	ltree::Tree::new(0,TreeData::Leaf(Rc::new(v)),None,None).unwrap()
 }
+/// convenience fn for combining two trees as branches
 fn bin<E>(
 	t1: ltree::Tree<TreeData<E>>,
 	l:  u32,
@@ -344,6 +346,7 @@ impl<E: Clone> From<AtTail<E>> for RazTree<E> {
 	// note that the left branch _cannot_ have
 	// the same level as its parent
 	// while the right branch can.
+	// TODO: reimplement using (a new) peek_meta() to avoid half the code
 	fn from(tailstack: AtTail<E>) -> Self {
 		let AtTail(mut stack) = tailstack;
 		fn from_stack<E: Clone>(
@@ -638,9 +641,72 @@ mod tests {
   	stack.archive(4);
   	stack.push(11);
   	stack.push(12);
-
   	let raz = RazTree::from(AtTail(stack));
-  	// TODO: see if the structure is right
+
+  	// check that levels are high-to-low
+  	assert!(good_levels(raz.tree.as_ref().unwrap()));
+  	
+  	// check that all elements are represented
+  	let sum = raz.fold_up(|e|*e,|e1,e2|e1+e2).unwrap_or(0);
+  	let iter_sum: usize = (1..13).sum();
+  	assert_eq!(iter_sum, sum);
+
+  	// check the structure
+  	let mut cursor = tree::Cursor::from(raz.tree.unwrap());
+  	assert!(cursor.down_left());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(&TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![1,2], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up());
+  	assert!(cursor.down_right());
+  	assert!(cursor.down_left());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(&TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![3,4], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up());
+  	assert!(cursor.down_right());
+  	match cursor.peek() {
+  		Some(&TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![5,6], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up());
+  	assert!(cursor.up());
+  	assert!(cursor.down_right());
+  	match cursor.peek() {
+  		Some(&TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![7,8], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up());
+  	assert!(cursor.up());
+  	assert!(cursor.up());
+  	assert!(cursor.down_right());
+  	assert!(cursor.down_right());
+  	match cursor.peek() {
+  		Some(&TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![11,12], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(&TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![9,10], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
 
   }
 }
