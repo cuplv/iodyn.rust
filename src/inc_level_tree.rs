@@ -8,6 +8,8 @@
 //! have the same structure regaurdless of data or order of
 //! operations.
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hasher;
 use std::fmt::Debug;
 use std::hash::Hash;
 use rand::Rng;
@@ -43,10 +45,17 @@ impl<E: Debug+Clone+Eq+Hash> Tree<E> {
 		if let Some(Tree{level, ..}) = r_branch {
 			if level > target_level { return None }
 		}
+		// get hash incremental names
+		// TODO: better naming strategy
+		let mut hasher = DefaultHasher::new();
+    level.hash(&mut hasher);
+    data.hash(&mut hasher);
+    let name = adapt::name_of_hash64(hasher.finish());
+
 		// structure the data
 		Some(Tree{
 			level: level,
-			link: adapt::put(TreeNode{
+			link: adapt::cell(name, TreeNode{
 				data: data,
 				l_branch: l_branch,
 				r_branch: r_branch
@@ -117,7 +126,7 @@ pub fn good_levels<E: Debug+Clone+Eq+Hash>(tree: &Tree<E>) -> bool {
 
 impl<E: Debug+Clone+Eq+Hash> Clone for Tree<E> {
 	fn clone(&self) -> Self {
-		Tree{level: self.level, link: adapt::put(adapt::force(&self.link).clone())}
+		Tree{level: self.level, link: self.link.clone()}
 	}
 }
 
