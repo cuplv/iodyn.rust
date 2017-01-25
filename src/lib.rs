@@ -13,7 +13,10 @@ pub mod level_tree;         // persistent tree
 pub mod tree_cursor;        // splittable cursor over tree (uses level_tree)
 pub mod archive_stack;      // more complex stack (uses stack)
 pub mod gauged_raz;         // raz of vectors using tree_cursor (uses archive_stack and tree_cursor)
-
+// temp for incremental use
+pub mod inc_level_tree;
+pub mod inc_tree_cursor;
+pub mod inc_gauged_raz;
 
 // tests on early mods only (persist_raz)
 #[cfg(test)]
