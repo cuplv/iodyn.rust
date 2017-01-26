@@ -1,14 +1,15 @@
-#![feature(test)]
 #![feature(core_intrinsics)]
 
 extern crate rand;
 extern crate pat;
-#[macro_use] extern crate adapton;
+//#[macro_use]
+extern crate adapton;
 
 pub mod zip;                // trait for persistent zips
 pub mod stack;              // persistent stack
 pub mod seqzip;             // traits for persistent raz
 pub mod persist_raz;        // monolithic single-item persistent raz
+pub mod trees;              // traits for the various forms of trees
 pub mod level_tree;         // persistent tree
 pub mod tree_cursor;        // splittable cursor over tree (uses level_tree)
 pub mod archive_stack;      // more complex stack (uses stack)
@@ -83,25 +84,5 @@ mod tests {
 
   	// show off that this is a persistent structure
   	assert_eq!(Ok(7), save.peek_r());
-  }
-
-  extern crate test;
-  use rand::random;
-  use self::test::Bencher;
-  //use zip::Stacks;
-
-  #[bench]
-  fn insert_a_lot(b: &mut Bencher) {
-  	b.iter(|| {
-  		let mut raz = Raz::new();
-  		let mut seq;
-  		for size in 0..1_000 {
-		    let pos = random::<usize>() % (size + 1);
-		    seq = raz.unzip();
-		    raz = seq.zip_to(pos).unwrap();
-		    raz = raz.push_r(size);
-  		}
-  		raz
-  	})
   }
 }
