@@ -1,5 +1,5 @@
 //! Temporary alteration of level_tree for incremental use
-
+//!
 //! a persistent, cannonical tree that keeps track of the
 //! "level" of each of its branches.
 //!
@@ -94,10 +94,10 @@ impl<E: Debug+Clone+Eq+Hash> Tree<E> {
 /// This is an O(n) operation, so it shouldn't be used in release mode
 ///
 /// ```
-/// use pmfp_collections::level_tree::{self,Tree};
+/// use pmfp_collections::inc_level_tree::{good_levels,Tree};
 ///
 /// let tree = Tree::new(4,(),None,Tree::new(1,(),None,None)).unwrap();
-/// debug_assert!(level_tree::good_levels(&tree),"this section of code has a problem");
+/// debug_assert!(good_levels(&tree),"this section of code has a problem");
 /// ```
 ///
 /// checks that the levels of the tree follow the convention

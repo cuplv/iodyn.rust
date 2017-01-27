@@ -1,4 +1,5 @@
 //! Tree Cursor for `level_tree`
+//!
 //! - a cursor within a persistent, ordered, binary tree
 //! - optimised for splitting and combining trees at the cursor in a cannonical way
 //! - uses non-increasing levels for each subtree to maintain cannonical form
@@ -7,7 +8,9 @@
 
 
 use std::mem;
-pub use level_tree::{Tree, gen_branch_level as gen_level};
+pub use level_tree::Tree;
+
+use trees::{BinTree,LevelTree,Level};
 
 /// tree cursor, centered on a node of the underlying persistent tree
 ///
@@ -18,14 +21,14 @@ pub use level_tree::{Tree, gen_branch_level as gen_level};
 /// the same structure, regaurdless of order of operations.
 /// 
 /// Many operations allow structural mutation of the underlying tree.
-pub struct Cursor<E: TreeUpdate> {
+pub struct Cursor<L: Level, E: TreeUpdate> {
 	dirty: bool,
 	// dirty flag, containing tree
-	l_forest: Vec<(bool,Tree<E>)>,
-	tree: Option<Tree<E>>,
-	r_forest: Vec<(bool,Tree<E>)>,
+	l_forest: Vec<(bool,Tree<L,E>)>,
+	tree: Option<Tree<L,E>>,
+	r_forest: Vec<(bool,Tree<L,E>)>,
 }
-impl<E: TreeUpdate> Clone for Cursor<E> {
+impl<L: Level, E: TreeUpdate> Clone for Cursor<L,E> {
 	fn clone(&self) -> Self {
 		Cursor {
 			dirty: self.dirty,
@@ -72,7 +75,7 @@ pub enum Force {
 	Discard,
 }
 
-fn peek_op<E>(op: &Option<Tree<E>>) -> Option<&E> {
+fn peek_op<L: Level,E>(op: &Option<Tree<L,E>>) -> Option<&E> {
 	match *op {
 		None => None,
 		Some(ref t) => Some(t.peek())
@@ -81,8 +84,8 @@ fn peek_op<E>(op: &Option<Tree<E>>) -> Option<&E> {
 
 const DEFAULT_DEPTH: usize = 30;
 
-impl<E: TreeUpdate> From<Tree<E>> for Cursor<E> {
-	fn from(tree: Tree<E>) -> Self {
+impl<L: Level, E: TreeUpdate> From<Tree<L,E>> for Cursor<L,E> {
+	fn from(tree: Tree<L,E>) -> Self {
 		Cursor{
 			dirty: false,
 			l_forest: Vec::with_capacity(DEFAULT_DEPTH),
@@ -92,7 +95,7 @@ impl<E: TreeUpdate> From<Tree<E>> for Cursor<E> {
 	}
 }
 
-impl<E: TreeUpdate> Cursor<E> {
+impl<L: Level, E: TreeUpdate> Cursor<L,E> {
 
 	/// creates a new cursor, to an empty underlying tree
 	pub fn new() -> Self {
@@ -116,7 +119,7 @@ impl<E: TreeUpdate> Cursor<E> {
 	/// Returns the node the cursor is focused on as a tree, plus two
 	/// cursors containing every node to the left and right, focused
 	/// on at the two branches of the returned tree
-	pub fn split(self) -> (Cursor<E>, Option<Tree<E>>, Cursor<E>) {
+	pub fn split(self) -> (Cursor<L,E>, Option<Tree<L,E>>, Cursor<L,E>) {
 		let (l_tree,r_tree) = match self.tree {
 			None => (None, None),
 			Some(ref t) => (t.l_tree(), t.r_tree())
@@ -142,7 +145,7 @@ impl<E: TreeUpdate> Cursor<E> {
 	///
 	/// The `update()` method of the data type will be called, with the `data`
 	/// parameter passed here as the `old_data` to that method (along with joined branches).
-	pub fn join(mut l_cursor: Self, level: u32, data: E, mut r_cursor: Self) -> Self {
+	pub fn join(mut l_cursor: Self, level: L, data: E, mut r_cursor: Self) -> Self {
 		// step 1: remove center forests
 		while !l_cursor.r_forest.is_empty() { assert!(l_cursor.up()); }
 		while !r_cursor.l_forest.is_empty() { assert!(r_cursor.up()); }
@@ -183,14 +186,14 @@ impl<E: TreeUpdate> Cursor<E> {
 	/// copies the focused node as a tree
 	///
 	/// This is a persistent tree, so copies are Rc clones
-	pub fn at_tree(&self) -> Option<Tree<E>> { self.tree.clone() }
+	pub fn at_tree(&self) -> Option<Tree<L,E>> { self.tree.clone() }
 
 	/// copies the left branch of the focused node
-	pub fn left_tree(&self) -> Option<Tree<E>> {
+	pub fn left_tree(&self) -> Option<Tree<L,E>> {
 		match self.tree { None => None, Some(ref t) => t.l_tree() }
 	}
 	/// copies the right branch of the focused node
-	pub fn right_tree(&self) -> Option<Tree<E>> {
+	pub fn right_tree(&self) -> Option<Tree<L,E>> {
 		match self.tree { None => None, Some(ref t) => t.r_tree() }
 	}
 
@@ -200,14 +203,14 @@ impl<E: TreeUpdate> Cursor<E> {
 	}
 
 	/// peek at the level of the focused tree node
-	pub fn peek_level(&self) -> Option<u32> {
+	pub fn peek_level(&self) -> Option<L> {
 		self.tree.as_ref().map(|t| t.level())
 	}
 
 	/// peek at the level of the next upper node that
 	/// is to the left of this branch, even if its not
 	/// directly above
-	fn up_left_level(&self) -> Option<u32> {
+	fn up_left_level(&self) -> Option<L> {
 		match self.l_forest.last() {
 			None => None,
 			Some(&(_,ref t)) => Some(t.level()),
@@ -216,7 +219,7 @@ impl<E: TreeUpdate> Cursor<E> {
 	/// peek at the level of the next upper node that
 	/// is to the right of this branch, even if its not
 	/// directly above
-	fn up_right_level(&self) -> Option<u32> {
+	fn up_right_level(&self) -> Option<L> {
 		match self.r_forest.last() {
 			None => None,
 			Some(&(_,ref t)) => Some(t.level()),
@@ -309,7 +312,6 @@ impl<E: TreeUpdate> Cursor<E> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use level_tree::Tree;
 
 	impl DeriveTreeUpdate for usize {}
 
@@ -333,7 +335,7 @@ mod tests {
 			)
 		).unwrap();
 
-		let mut c: Cursor<usize> = t.into();
+		let mut c: Cursor<_,_> = t.into();
 		assert_eq!(Some(&1), c.peek());
 
 		assert!(c.down_left());
@@ -380,7 +382,7 @@ mod tests {
 			)
 		).unwrap();
 
-		let mut c: Cursor<usize> = t.into();
+		let mut c: Cursor<_,_> = t.into();
 		assert!(c.down_left());
 		let (mut lc, t, mut rc) = c.split();
 		assert_eq!(Some(&4), lc.peek());

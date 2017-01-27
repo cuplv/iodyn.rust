@@ -1,5 +1,5 @@
 //! Temporary alteration of guaged_raz for incremental use
-
+//!
 //! Gauged RAZ - random access sequence
 //! - cursor access in low-const O(1) time
 //! - arbirary access in O(log n) time

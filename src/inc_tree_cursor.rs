@@ -1,5 +1,5 @@
 //! Temporary alteration of tree_cursor for incremental use
-
+//!
 //! Tree Cursor for `level_tree`
 //! - a cursor within a persistent, ordered, binary tree
 //! - optimised for splitting and combining trees at the cursor in a cannonical way

@@ -7,6 +7,7 @@ extern crate pmfp_collections;
 
 use pmfp_collections::persist_raz as pr;
 use pmfp_collections::gauged_raz as gr;
+use pmfp_collections::trees::{NegBin};
 
 use rand::{StdRng, Rng, SeedableRng};
 
@@ -78,8 +79,8 @@ fn main() {
 
   // make empty sequences
   let mut raz_start = pr::Raz::new();
-  let mut graz_start = gr::Raz::new();
-  let mut mraz_start = gr::Raz::new();
+  let mut graz_start = gr::Raz::<NegBin,usize>::new();
+  let mut mraz_start = gr::Raz::<NegBin,usize>::new();
 
   // print header
   if !nohead { print_header() }
@@ -194,7 +195,7 @@ fn insert_n_batch<Z: SeqZip<usize,S>, S: Seq<usize,Z>>(zip: Z, n: usize, b:usize
 	}
 	zip
 }
-fn insert_n_mut(mut raz: gr::Raz<usize>, n: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<usize> {
+fn insert_n_mut(mut raz: gr::Raz<NegBin,usize>, n: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<NegBin,usize> {
 	for i in 0..n {
     let pos = rnd_pos.gen::<usize>() % (size + 1 + i);
     raz = raz.unfocus().focus(pos).unwrap();
@@ -202,7 +203,7 @@ fn insert_n_mut(mut raz: gr::Raz<usize>, n: usize, size: usize, mut rnd_pos: Std
 	}
   raz
 }
-fn insert_n_batch_mut(mut raz: gr::Raz<usize>, n: usize, b: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<usize> {
+fn insert_n_batch_mut(mut raz: gr::Raz<NegBin,usize>, n: usize, b: usize, size: usize, mut rnd_pos: StdRng) -> gr::Raz<NegBin,usize> {
 	for i in 0..(n/b) {
     let pos = rnd_pos.gen::<usize>() % (size + 1 + i * b);
     raz = raz.unfocus().focus(pos).unwrap();

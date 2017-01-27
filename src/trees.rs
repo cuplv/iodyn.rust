@@ -12,7 +12,7 @@ use adapton::engine::Name;
 /// all trees are immutable and shared.
 /// An owned tree is really a link to a
 /// shared node.
-pub trait BinTree<T> where Self: Sized {
+pub trait BinTree<T> where Self: Sized+Clone {
 	/// construct a new tree with existing nodes
 	#[allow(unused_variables)]
 	fn bin_make(
@@ -46,7 +46,10 @@ pub trait BinTree<T> where Self: Sized {
 ///
 /// Each type should have its own random distribution.
 /// Wrappers of primitive integers would work well.
-pub trait Level: Ord+Copy+Rand {
+/// An implementation for `usize` is available for hand-coded
+/// levels, but the distribution will not create balanced
+/// binary trees. Use `NegBin` for that.
+pub trait Level: Ord+Copy+Rand+Debug {
 	/// construct greatest `Level`
 	fn l_max() -> Self;
 	/// construct least `Level`
@@ -63,8 +66,8 @@ pub trait Level: Ord+Copy+Rand {
 /// If there is a distinction between "leaves" and
 /// "branches", use `l_min()` for leaves and `Rng::gen()`
 /// for branches.
-#[derive(PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
-pub struct NegBin(u8);
+#[derive(PartialEq,Eq,PartialOrd,Ord,Clone,Copy,Debug)]
+pub struct NegBin(pub u8);
 impl Rand for NegBin {
 	/// Generates Levels 1-64 from a negative binomial
 	/// distribution. This is appropriate for binary trees
@@ -80,6 +83,15 @@ impl Level for NegBin {
 	fn l_min() -> Self { NegBin(u8::min_value()) }
 	fn l_inc(self) -> Self { NegBin(self.0+1) }
 	fn l_dec(self) -> Self { NegBin(self.0-1) }
+}
+/// This is for convenience in testing by hand coding
+/// levels. usize is Rand with a flat distribution, so
+/// random levels will not create balanced trees.
+impl Level for usize {
+	fn l_max() -> Self { usize::max_value() }
+	fn l_min() -> Self { usize::min_value() }
+	fn l_inc(self) -> Self { self+1 }
+	fn l_dec(self) -> Self { self-1 }
 }
 
 /// A binary tree with "levels" for each node
@@ -106,7 +118,10 @@ pub trait LevelTree<L: Level, T>: BinTree<T> {
 	fn level(&self) -> L;
 }
 
-pub trait NominalTree<L: Level, T: >: LevelTree<L,T> 
+/// A binary tree with incremental, named links
+///
+/// for use with crate adapton
+pub trait NominalTree<L: Level, T>: LevelTree<L,T> 
 where T: Clone+Debug+Eq+Hash
 {
 	/// construct a new tree
@@ -115,13 +130,15 @@ where T: Clone+Debug+Eq+Hash
 	/// See `LevelTree` in this mod for use of levels.
 	#[allow(unused_variables)]
 	fn nm_make(
-		name: Name,
+		name: Option<Name>,
 		level: L,
 		data: T,
 		l_branch: Option<Self>,
 		r_branch: Option<Self>
 	) -> Option<Self> { panic!("This constructor is unavailable for this type. Use a type specific one instead.")}
 
-	/// get the incremental name from this node
-	fn name(&self) -> Name; 
+	/// get the incremental name from this node, if there is one
+	fn name(&self) -> Option<Name>; 
+	/// get owned copy of data
+	fn data(&self) -> T;
 }

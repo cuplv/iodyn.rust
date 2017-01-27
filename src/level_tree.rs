@@ -8,30 +8,30 @@
 
 use std::ops::Deref;
 use std::rc::Rc;
-use rand::Rng;
-use pat::AsPattern;
+
+use trees::{BinTree,LevelTree,Level};
 
 /// A persistent tree with stable, internally defined structure
 #[derive(Debug,PartialEq,Eq)]
-pub struct Tree<E> {
-	level: u32,
-	link: Rc<TreeNode<E>>
+pub struct Tree<L: Level,E> {
+	level: L,
+	link: Rc<TreeNode<L,E>>
 }
 #[derive(Debug,PartialEq,Eq)]
-struct TreeNode<E>{
+struct TreeNode<L: Level,E>{
 	data: E,
-	l_branch: Option<Tree<E>>,
-	r_branch: Option<Tree<E>>
+	l_branch: Option<Tree<L,E>>,
+	r_branch: Option<Tree<L,E>>
 }
 
-impl<E> Tree<E> {
+impl<L: Level,E> Tree<L,E> {
 	/// build a new tree from components, return None if levels are inconsistent
 	pub fn new(
-		level: u32,
+		level: L,
 		data: E,
-		l_branch: Option<Tree<E>>,
-		r_branch: Option<Tree<E>>
-	) -> Option<Tree<E>> {
+		l_branch: Option<Tree<L,E>>,
+		r_branch: Option<Tree<L,E>>
+	) -> Option<Tree<L,E>> {
 		let target_level = level;
 		//check level
 		if let Some(Tree{level, ..}) = l_branch {
@@ -50,29 +50,41 @@ impl<E> Tree<E> {
 			})
 		})
 	}
+}
 
+impl<L: Level,E> LevelTree<L,E> for Tree<L,E> {
+	fn lev_make(
+		level: L,
+		data: E,
+		l_branch: Option<Self>,
+		r_branch: Option<Self>
+	) -> Option<Self> {
+		Tree::new(level,data,l_branch,r_branch)
+	}
 	/// peek at the level of the root of this tree
-	pub fn level(&self) -> u32 { self.level }
+	fn level(&self) -> L { self.level }
+}
 
+impl<L: Level, E> BinTree<E> for Tree<L,E> {
 	/// obtain the left subtree if it exists
-	pub fn l_tree(&self) -> Option<Tree<E>> { (*self.link).l_branch.clone() }
+	fn l_tree(&self) -> Option<Tree<L,E>> { (*self.link).l_branch.clone() }
 
 	/// obtain the right subtree if it exists
-	pub fn r_tree(&self) -> Option<Tree<E>> { (*self.link).r_branch.clone() }
+	fn r_tree(&self) -> Option<Tree<L,E>> { (*self.link).r_branch.clone() }
 
 	/// peek at the data contained at the top node of the tree
 	///
 	/// this functionality is also available through Deref
-	pub fn peek(&self) -> &E { &(*self.link).data }
+	fn peek(&self) -> &E { &(*self.link).data }
 
-	pub fn fold_up<R,F>(&self, node_calc: &mut F) -> R
+	fn fold_up<R,F>(&self, node_calc: &mut F) -> R
 	where
-		F: FnMut(Option<R>,&E,Option<R>) -> R
+		F: FnMut(&E,Option<R>,Option<R>) -> R
 	{
 		match *self.link { TreeNode{ ref data, ref l_branch, ref r_branch } => {
 			let l = l_branch.as_ref().map(|t| t.fold_up(node_calc));
 			let r = r_branch.as_ref().map(|t| t.fold_up(node_calc));
-			node_calc(l, data, r)
+			node_calc(data, l, r)
 		}}
 	}
 }
@@ -83,8 +95,9 @@ impl<E> Tree<E> {
 ///
 /// ```
 /// use pmfp_collections::level_tree::{self,Tree};
+/// use pmfp_collections::trees::NegBin;
 ///
-/// let tree = Tree::new(4,(),None,Tree::new(1,(),None,None)).unwrap();
+/// let tree = Tree::new(NegBin(4),(),None,Tree::new(NegBin(1),(),None,None)).unwrap();
 /// debug_assert!(level_tree::good_levels(&tree),"this section of code has a problem");
 /// ```
 ///
@@ -93,7 +106,7 @@ impl<E> Tree<E> {
 /// right branch
 ///
 /// also prints the levels of the failing trees and branchs
-pub fn good_levels<E>(tree: &Tree<E>) -> bool {
+pub fn good_levels<L: Level, E>(tree: &Tree<L,E>) -> bool {
 	let mut good = true;
 	if let Some(ref t) = (*tree.link).l_branch {
 		if t.level > tree.level {
@@ -113,48 +126,17 @@ pub fn good_levels<E>(tree: &Tree<E>) -> bool {
 }
 
 /// dereference to the data stored in this tree node
-impl<E> Deref for Tree<E> {
+impl<L: Level,E> Deref for Tree<L,E> {
 	type Target = E;
 	fn deref(&self) -> &E {
 		self.peek()
 	}
 }
 
-impl<E> Clone for Tree<E> {
+impl<L: Level,E> Clone for Tree<L,E> {
 	fn clone(&self) -> Self {
 		Tree{level: self.level, link: self.link.clone()}
 	}
-}
-
-/// deconstruction pattern
-///
-/// experimental deconstruction api to use with AsPattern trait
-pub enum T<E> {
-	Owned{level: u32, l_branch: Option<Tree<E>>, data: E, r_branch: Option<Tree<E>>},
-	Shared(Tree<E>),
-}
-
-impl<E> AsPattern<T<E>> for Tree<E> {
-	fn pat(self) -> T<E> {
-		match Rc::try_unwrap(self.link) {
-			Ok(TreeNode{data,l_branch,r_branch}) => {
-				T::Owned{level: self.level, l_branch: l_branch, data: data, r_branch: r_branch}
-			}
-			Err(t) => T::Shared(Tree{level: self.level, link: t})
-		}
-	}
-}
-
-/// generate a random level appropriate for a balanced binary tree
-///
-/// uses a negative binomial distribution, equivalent to the
-/// height of nodes (root is highest) in a balanced binary tree.
-/// 
-/// this will never generate a 0, reserving it for potential
-/// use in tree leaves
-pub fn gen_branch_level<R:Rng>(rng: &mut R) -> u32 {
-	let num = rng.gen::<u32>();
-	(num << 1).trailing_zeros() as u32
 }
 
 #[cfg(test)]
@@ -181,17 +163,17 @@ mod tests {
 				Tree::new(0,Some(6),None,None),
 			)
 		).unwrap();
-		let sum = t.fold_up(&mut|l,c,r| {
-			l.unwrap_or(0) + c.unwrap_or(0) + r.unwrap_or(0)
+		let sum = t.fold_up(&mut|d,l,r| {
+			l.unwrap_or(0) + d.unwrap_or(0) + r.unwrap_or(0)
 		});
-		let depth = t.fold_up(&mut|l,c,r| {
-			match *c {
+		let depth = t.fold_up(&mut|d,l,r| {
+			match *d {
 				None => max(l.unwrap(),r.unwrap()) + 1,
 				Some(_) => 1,
 			}
 		});
-		let in_order = t.fold_up(&mut|l,c,r|{
-			match *c {
+		let in_order = t.fold_up(&mut|d,l,r|{
+			match *d {
 				None => l.unwrap() >= r.unwrap(),
 				Some(_) => true,
 			}
