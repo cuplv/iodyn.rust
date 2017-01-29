@@ -22,14 +22,14 @@ pub use inc_level_tree::{Tree, gen_branch_level as gen_level};
 /// the same structure, regaurdless of order of operations.
 /// 
 /// Many operations allow structural mutation of the underlying tree.
-pub struct Cursor<E: TreeUpdate+Debug+Clone+Eq+Hash> {
+pub struct Cursor<E: 'static+TreeUpdate+Debug+Clone+Eq+Hash> {
 	dirty: bool,
 	// dirty flag, containing tree
 	l_forest: Vec<(bool,Tree<E>)>,
 	tree: Option<Tree<E>>,
 	r_forest: Vec<(bool,Tree<E>)>,
 }
-impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Clone for Cursor<E> {
+impl<E: 'static+TreeUpdate+Debug+Clone+Eq+Hash> Clone for Cursor<E> {
 	fn clone(&self) -> Self {
 		Cursor {
 			dirty: self.dirty,

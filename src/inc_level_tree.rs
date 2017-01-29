@@ -18,18 +18,18 @@ use adapton::engine::{Art, self as adapt};
 
 /// A persistent tree with stable, internally defined structure
 #[derive(Debug,PartialEq,Eq,Hash)]
-pub struct Tree<E: Debug+Clone+Eq+Hash> {
+pub struct Tree<E: 'static+Debug+Clone+Eq+Hash> {
 	level: u32,
 	link: Art<TreeNode<E>>
 }
 #[derive(Debug,PartialEq,Eq,Clone,Hash)]
-struct TreeNode<E: Debug+Clone+Eq+Hash>{
+struct TreeNode<E: 'static+Debug+Clone+Eq+Hash>{
 	data: E,
 	l_branch: Option<Tree<E>>,
 	r_branch: Option<Tree<E>>
 }
 
-impl<E: Debug+Clone+Eq+Hash> Tree<E> {
+impl<E: 'static+Debug+Clone+Eq+Hash> Tree<E> {
 	/// build a new tree from components, return None if levels are inconsistent
 	pub fn new(
 		level: u32,
@@ -124,7 +124,7 @@ pub fn good_levels<E: Debug+Clone+Eq+Hash>(tree: &Tree<E>) -> bool {
 	good
 }
 
-impl<E: Debug+Clone+Eq+Hash> Clone for Tree<E> {
+impl<E: Debug+Clone+Eq+Hash+'static> Clone for Tree<E> {
 	fn clone(&self) -> Self {
 		Tree{level: self.level, link: self.link.clone()}
 	}

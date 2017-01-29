@@ -19,7 +19,7 @@ use archive_stack as stack;
 /// A cursor into a sequence, optimised for moving to 
 /// arbitrary points in the sequence
 #[derive(Clone)]
-pub struct Raz<E: Debug+Clone+Eq+Hash> {
+pub struct Raz<E: 'static+Debug+Clone+Eq+Hash> {
 	length: usize,
 	l_forest: tree::Cursor<TreeData<E>>,
 	l_stack: stack::AStack<E,u32>,
@@ -58,7 +58,7 @@ impl<E: Debug+Clone+Eq+Hash> tree::TreeUpdate for TreeData<E> {
 ///
 /// used between refocusing, and for running global algorithms
 #[derive(Clone,PartialEq,Eq,Debug)]
-pub struct RazTree<E: Debug+Clone+Eq+Hash>{count: usize, tree: Option<tree::Tree<TreeData<E>>>}
+pub struct RazTree<E: 'static+Debug+Clone+Eq+Hash>{count: usize, tree: Option<tree::Tree<TreeData<E>>>}
 
 impl<E: Debug+Clone+Eq+Hash> RazTree<E> {
 	/// the number if items in the sequence
