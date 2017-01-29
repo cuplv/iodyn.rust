@@ -50,7 +50,7 @@ impl<E: Debug+Clone+Eq+Hash> Tree<E> {
 		let mut hasher = DefaultHasher::new();
     level.hash(&mut hasher);
     data.hash(&mut hasher);
-    let name = adapt::name_of_hash64(hasher.finish());
+    let name = adapt::name_of_usize(hasher.finish() as usize);
 
 		// structure the data
 		Some(Tree{
