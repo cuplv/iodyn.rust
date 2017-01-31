@@ -2,7 +2,7 @@
 
 extern crate rand;
 extern crate pat;
-//#[macro_use]
+#[macro_use]
 extern crate adapton;
 
 pub mod zip;                // trait for persistent zips

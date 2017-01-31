@@ -12,6 +12,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::mem;
 pub use inc_level_tree::{Tree, gen_branch_level as gen_level};
+use adapton::engine::Name;
 
 /// tree cursor, centered on a node of the underlying persistent tree
 ///
@@ -22,14 +23,14 @@ pub use inc_level_tree::{Tree, gen_branch_level as gen_level};
 /// the same structure, regaurdless of order of operations.
 /// 
 /// Many operations allow structural mutation of the underlying tree.
-pub struct Cursor<E: TreeUpdate+Debug+Clone+Eq+Hash> {
+pub struct Cursor<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> {
 	dirty: bool,
 	// dirty flag, containing tree
 	l_forest: Vec<(bool,Tree<E>)>,
 	tree: Option<Tree<E>>,
 	r_forest: Vec<(bool,Tree<E>)>,
 }
-impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Clone for Cursor<E> {
+impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Clone for Cursor<E> {
 	fn clone(&self) -> Self {
 		Cursor {
 			dirty: self.dirty,
@@ -76,7 +77,7 @@ pub enum Force {
 	Discard,
 }
 
-fn peek_op<E: Debug+Clone+Eq+Hash>(op: &Option<Tree<E>>) -> Option<E> {
+fn peek_op<E: Debug+Clone+Eq+Hash+'static>(op: &Option<Tree<E>>) -> Option<E> {
 	match *op {
 		None => None,
 		Some(ref t) => Some(t.peek())
@@ -85,7 +86,7 @@ fn peek_op<E: Debug+Clone+Eq+Hash>(op: &Option<Tree<E>>) -> Option<E> {
 
 const DEFAULT_DEPTH: usize = 30;
 
-impl<E: TreeUpdate+Debug+Clone+Eq+Hash> From<Tree<E>> for Cursor<E> {
+impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> From<Tree<E>> for Cursor<E> {
 	fn from(tree: Tree<E>) -> Self {
 		Cursor{
 			dirty: false,
@@ -96,7 +97,7 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash> From<Tree<E>> for Cursor<E> {
 	}
 }
 
-impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Cursor<E> {
+impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 
 	/// creates a new cursor, to an empty underlying tree
 	pub fn new() -> Self {
@@ -146,7 +147,7 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Cursor<E> {
 	///
 	/// The `update()` method of the data type will be called, with the `data`
 	/// parameter passed here as the `old_data` to that method (along with joined branches).
-	pub fn join(mut l_cursor: Self, level: u32, data: E, mut r_cursor: Self) -> Self {
+	pub fn join(mut l_cursor: Self, level: u32, name: Option<Name>, data: E, mut r_cursor: Self) -> Self {
 		// step 1: remove center forests
 		while !l_cursor.r_forest.is_empty() { assert!(l_cursor.up()); }
 		while !r_cursor.l_forest.is_empty() { assert!(r_cursor.up()); }
@@ -169,7 +170,7 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Cursor<E> {
 		}
 		// step 3: build center tree
 		let tree = Tree::new(
-			level,
+			level, name,
 			E::update(peek_op(&l_cursor.tree), &data, peek_op(&r_cursor.tree)),
 			l_cursor.tree.clone(),
 			r_cursor.tree.clone(),
@@ -206,6 +207,15 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Cursor<E> {
 	/// peek at the level of the focused tree node
 	pub fn peek_level(&self) -> Option<u32> {
 		self.tree.as_ref().map(|t| t.level())
+	}
+
+	/// peek at the name of the focused tree node
+	/// if there is a focused tree and it has a name
+	pub fn peek_name(&self) -> Option<Name> {
+		match self.tree {
+			None => None,
+			Some(ref t) => t.name()
+		}
 	}
 
 	/// peek at the level of the next upper node that
@@ -285,7 +295,7 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Cursor<E> {
 				if self.dirty == true {
 					let l_branch = upper_tree.l_tree();
 					self.tree = Tree::new(
-						upper_tree.level(),
+						upper_tree.level(), upper_tree.name(),
 						E::update(peek_op(&l_branch), &upper_tree.peek(), peek_op(&self.tree)),
 						l_branch,
 						self.tree.take(),
@@ -297,7 +307,7 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Cursor<E> {
 				if self.dirty == true {
 					let r_branch = upper_tree.r_tree();
 					self.tree = Tree::new(
-						upper_tree.level(),
+						upper_tree.level(), upper_tree.name(),
 						E::update(peek_op(&self.tree), &upper_tree.peek(), peek_op(&r_branch)),
 						self.tree.take(),
 						r_branch,
@@ -313,26 +323,27 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash> Cursor<E> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use adapton::engine::*;
 
 	impl DeriveTreeUpdate for usize {}
 
   #[test]
   fn test_movement() {
 		let t = 
-		Tree::new(5,1,
-			Tree::new(3,2,
-				Tree::new(0,4,None,None),
-				Tree::new(2,5,
-					Tree::new(1,8,
-						Tree::new(0,10,None,None),
-						Tree::new(0,11,None,None),
+		Tree::new(5, Some(name_of_usize(5)),1,
+			Tree::new(3, Some(name_of_usize(3)),2,
+				Tree::new(0,None,4,None,None),
+				Tree::new(2, Some(name_of_usize(2)),5,
+					Tree::new(1, Some(name_of_usize(1)),8,
+						Tree::new(0,None,10,None,None),
+						Tree::new(0,None,11,None,None),
 					),
-					Tree::new(0,9,None,None),
+					Tree::new(0,None,9,None,None),
 				)
 			),
-			Tree::new(4,3,
-				Tree::new(0,6,None,None),
-				Tree::new(0,7,None,None),
+			Tree::new(4, Some(name_of_usize(4)),3,
+				Tree::new(0,None,6,None,None),
+				Tree::new(0,None,7,None,None),
 			)
 		).unwrap();
 
@@ -366,20 +377,20 @@ mod tests {
 	#[test]
 	fn test_split_join() {
 		let t = 
-		Tree::new(5,1,
-			Tree::new(3,2,
-				Tree::new(0,4,None,None),
-				Tree::new(2,5,
-					Tree::new(1,8,
-						Tree::new(0,10,None,None),
-						Tree::new(0,11,None,None),
+		Tree::new(5, Some(name_of_usize(5)),1,
+			Tree::new(3, Some(name_of_usize(3)),2,
+				Tree::new(0,None,4,None,None),
+				Tree::new(2, Some(name_of_usize(2)),5,
+					Tree::new(1, Some(name_of_usize(1)),8,
+						Tree::new(0,None,10,None,None),
+						Tree::new(0,None,11,None,None),
 					),
-					Tree::new(0,9,None,None),
+					Tree::new(0,None,9,None,None),
 				)
 			),
-			Tree::new(4,3,
-				Tree::new(0,6,None,None),
-				Tree::new(0,7,None,None),
+			Tree::new(4, Some(name_of_usize(4)),3,
+				Tree::new(0,None,6,None,None),
+				Tree::new(0,None,7,None,None),
 			)
 		).unwrap();
 
@@ -394,7 +405,7 @@ mod tests {
 		assert_eq!(Some(1), rc.peek());
 
 		let t = t.unwrap();
-		let mut j = Cursor::join(rc, t.level(), t.peek(), lc);
+		let mut j = Cursor::join(rc, t.level(), t.name(), t.peek(), lc);
 		assert_eq!(Some(2), j.peek());
 
 		assert!(j.down_left());

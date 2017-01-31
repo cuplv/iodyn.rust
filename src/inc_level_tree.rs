@@ -8,18 +8,19 @@
 //! have the same structure regaurdless of data or order of
 //! operations.
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::Hasher;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::rc::Rc;
 use rand::Rng;
 
-use adapton::engine::{Art, self as adapt};
+use adapton::macros::*;
+use adapton::engine::*;
 
 /// A persistent tree with stable, internally defined structure
 #[derive(Debug,PartialEq,Eq,Hash)]
 pub struct Tree<E: Debug+Clone+Eq+Hash> {
 	level: u32,
+	name: Option<Name>,
 	link: Art<TreeNode<E>>
 }
 #[derive(Debug,PartialEq,Eq,Clone,Hash)]
@@ -29,10 +30,11 @@ struct TreeNode<E: Debug+Clone+Eq+Hash>{
 	r_branch: Option<Tree<E>>
 }
 
-impl<E: Debug+Clone+Eq+Hash> Tree<E> {
+impl<E: Debug+Clone+Eq+Hash+'static> Tree<E> {
 	/// build a new tree from components, return None if levels are inconsistent
 	pub fn new(
 		level: u32,
+		name: Option<Name>,
 		data: E,
 		l_branch: Option<Tree<E>>,
 		r_branch: Option<Tree<E>>
@@ -45,48 +47,67 @@ impl<E: Debug+Clone+Eq+Hash> Tree<E> {
 		if let Some(Tree{level, ..}) = r_branch {
 			if level > target_level { return None }
 		}
-		// get hash incremental names
-		// TODO: better naming strategy
-		let mut hasher = DefaultHasher::new();
-    level.hash(&mut hasher);
-    data.hash(&mut hasher);
-    let name = adapt::name_of_hash64(hasher.finish());
 
 		// structure the data
-		Some(Tree{
-			level: level,
-			link: adapt::cell(name, TreeNode{
-				data: data,
-				l_branch: l_branch,
-				r_branch: r_branch
-			})
-		})
+		match name {
+			Some(name) => Some(Tree{
+				level: level, name: Some(name.clone()),
+				link: cell(name, TreeNode{
+					data: data,
+					l_branch: l_branch,
+					r_branch: r_branch
+				})
+			}),
+			None => Some(Tree{
+				level: level, name: None,
+				link: put(TreeNode{
+					data: data,
+					l_branch: l_branch,
+					r_branch: r_branch
+				})
+			}),
+		}
 	}
 
 	/// peek at the level of the root of this tree
 	pub fn level(&self) -> u32 { self.level }
 
+	/// peek at the name of the root of this tree
+	pub fn name(&self) -> Option<Name> { self.name.clone() }
+
 	/// obtain the left subtree if it exists
-	pub fn l_tree(&self) -> Option<Tree<E>> { adapt::force(&self.link).l_branch.clone() }
+	pub fn l_tree(&self) -> Option<Tree<E>> { force(&self.link).l_branch.clone() }
 
 	/// obtain the right subtree if it exists
-	pub fn r_tree(&self) -> Option<Tree<E>> { adapt::force(&self.link).r_branch.clone() }
+	pub fn r_tree(&self) -> Option<Tree<E>> { force(&self.link).r_branch.clone() }
 
 	/// peek at the data contained at the top node of the tree
 	///
 	/// this functionality is _not_ available through Deref
-	pub fn peek(&self) -> E { adapt::force(&self.link).data }
+	pub fn peek(&self) -> E { force(&self.link).data }
 
-	pub fn fold_up<R,F>(&self, node_calc: &mut F) -> R
-	where
-		F: FnMut(Option<R>,&E,Option<R>) -> R
-	{
-		match adapt::force(&self.link) { TreeNode{ ref data, ref l_branch, ref r_branch } => {
-			let l = l_branch.as_ref().map(|t| t.fold_up(node_calc));
-			let r = r_branch.as_ref().map(|t| t.fold_up(node_calc));
-			node_calc(l, data, r)
-		}}
-	}
+	/// memoized fold operation
+	pub fn fold_up<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R
+  where
+    F: 'static + Fn(Option<R>,E,Option<R>) -> R
+  {
+    match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
+      let (l,r) = match self.name {
+      	None => {(
+      		l_branch.map(|t| t.fold_up(node_calc.clone())),
+      		r_branch.map(|t| t.fold_up(node_calc.clone())),
+      	)},
+      	Some(name) => {
+		      let (n1, n2) = name_fork(name);
+      		(
+			      l_branch.map(|t| memo!( n1 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
+			      r_branch.map(|t| memo!( n2 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
+      		)
+      	}
+      };
+      node_calc(l, data, r)
+    }}
+  }
 }
 
 /// Use good_levels to verify level consistancy when debugging
@@ -96,7 +117,7 @@ impl<E: Debug+Clone+Eq+Hash> Tree<E> {
 /// ```
 /// use pmfp_collections::inc_level_tree::{good_levels,Tree};
 ///
-/// let tree = Tree::new(4,(),None,Tree::new(1,(),None,None)).unwrap();
+/// let tree = Tree::new(4,None,(),None,Tree::new(1,None,(),None,None)).unwrap();
 /// debug_assert!(good_levels(&tree),"this section of code has a problem");
 /// ```
 ///
@@ -105,16 +126,16 @@ impl<E: Debug+Clone+Eq+Hash> Tree<E> {
 /// right branch
 ///
 /// also prints the levels of the failing trees and branchs
-pub fn good_levels<E: Debug+Clone+Eq+Hash>(tree: &Tree<E>) -> bool {
+pub fn good_levels<E: Debug+Clone+Eq+Hash+'static>(tree: &Tree<E>) -> bool {
 	let mut good = true;
-	if let Some(ref t) = adapt::force(&tree.link).l_branch {
+	if let Some(ref t) = force(&tree.link).l_branch {
 		if t.level > tree.level {
 			println!("Tree with level {:?} has left branch with level {:?}", tree.level, t.level);
 			good = false;
 		}
 		if !good_levels(t) { good = false }
 	}
-	if let Some(ref t) = adapt::force(&tree.link).r_branch {
+	if let Some(ref t) = force(&tree.link).r_branch {
 		if t.level >= tree.level {
 			println!("Tree with level {:?} has right branch with level {:?}", tree.level, t.level);
 			good = false;
@@ -126,7 +147,7 @@ pub fn good_levels<E: Debug+Clone+Eq+Hash>(tree: &Tree<E>) -> bool {
 
 impl<E: Debug+Clone+Eq+Hash> Clone for Tree<E> {
 	fn clone(&self) -> Self {
-		Tree{level: self.level, link: self.link.clone()}
+		Tree{level: self.level, name: self.name.clone(), link: self.link.clone()}
 	}
 }
 
@@ -150,37 +171,37 @@ mod tests {
   fn test_fold_up() {
   	use std::cmp::max;
 		let t = 
-		Tree::new(5,None,
-			Tree::new(3,None,
-				Tree::new(0,Some(1),None,None),
-				Tree::new(2,None,
-					Tree::new(1,None,
-						Tree::new(0,Some(2),None,None),
-						Tree::new(0,Some(3),None,None),
+		Tree::new(5, Some(name_of_usize(5)),None,
+			Tree::new(3, Some(name_of_usize(3)),None,
+				Tree::new(0,None,Some(1),None,None),
+				Tree::new(2, Some(name_of_usize(2)),None,
+					Tree::new(1, Some(name_of_usize(1)),None,
+						Tree::new(0,None,Some(2),None,None),
+						Tree::new(0,None,Some(3),None,None),
 					),
-					Tree::new(0,Some(4),None,None),
+					Tree::new(0,None,Some(4),None,None),
 				)
 			),
-			Tree::new(4,None,
-				Tree::new(0,Some(5),None,None),
-				Tree::new(0,Some(6),None,None),
+			Tree::new(4, Some(name_of_usize(4)),None,
+				Tree::new(0,None,Some(5),None,None),
+				Tree::new(0,None,Some(6),None,None),
 			)
 		).unwrap();
-		let sum = t.fold_up(&mut|l,c,r| {
+		let sum = t.clone().fold_up(Rc::new(|l: Option<usize>,c: Option<usize>,r: Option<usize>| {
 			l.unwrap_or(0) + c.unwrap_or(0) + r.unwrap_or(0)
-		});
-		let depth = t.fold_up(&mut|l,c,r| {
-			match *c {
+		}));
+		let depth = t.clone().fold_up(Rc::new(|l: Option<usize>,c: Option<usize>,r: Option<usize>| {
+			match c {
 				None => max(l.unwrap(),r.unwrap()) + 1,
 				Some(_) => 1,
 			}
-		});
-		let in_order = t.fold_up(&mut|l,c,r|{
-			match *c {
+		}));
+		let in_order = t.clone().fold_up(Rc::new(|l: Option<bool>,c: Option<usize>,r: Option<bool>|{
+			match c {
 				None => l.unwrap() >= r.unwrap(),
 				Some(_) => true,
 			}
-		});
+		}));
 		assert_eq!(21, sum);
 		assert_eq!(5, depth);
 		assert_eq!(true, in_order);

@@ -13,7 +13,8 @@ use adapton::engine::Name;
 /// An owned tree is really a link to a
 /// shared node.
 pub trait BinTree<T> where Self: Sized+Clone {
-	/// construct a new tree with existing nodes
+	/// construct a new tree with existing nodes. The default
+	/// implementation is a `panic!()` requesting use of a type constructor.
 	#[allow(unused_variables)]
 	fn bin_make(
 		data: T,
@@ -105,7 +106,10 @@ pub trait LevelTree<L: Level, T>: BinTree<T> {
 	///
 	/// This should return `None` if the levels are
 	/// inappropriate. Left-branch levels must be lesser than
-	/// the root and right-branch levels must not be greater. 
+	/// the root and right-branch levels must not be greater.
+	///
+	/// The default implementation is a `panic!()` requesting
+	/// use of a type constructor.
 	#[allow(unused_variables)]
 	fn lev_make(
 		level: L,
@@ -128,6 +132,9 @@ where T: Clone+Debug+Eq+Hash
 	///
 	/// See `adapton` crate for uses of names.
 	/// See `LevelTree` in this mod for use of levels.
+	///
+	/// The default implementation is a `panic!()` requesting
+	/// use of a type constructor.
 	#[allow(unused_variables)]
 	fn nm_make(
 		name: Option<Name>,
