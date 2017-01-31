@@ -18,13 +18,13 @@ use adapton::engine::*;
 
 /// A persistent tree with stable, internally defined structure
 #[derive(Debug,PartialEq,Eq,Hash)]
-pub struct Tree<E: Debug+Clone+Eq+Hash> {
+pub struct Tree<E: 'static+Debug+Clone+Eq+Hash> {
 	level: u32,
 	name: Option<Name>,
 	link: Art<TreeNode<E>>
 }
 #[derive(Debug,PartialEq,Eq,Clone,Hash)]
-struct TreeNode<E: Debug+Clone+Eq+Hash>{
+struct TreeNode<E: 'static+Debug+Clone+Eq+Hash>{
 	data: E,
 	l_branch: Option<Tree<E>>,
 	r_branch: Option<Tree<E>>
@@ -47,7 +47,6 @@ impl<E: Debug+Clone+Eq+Hash+'static> Tree<E> {
 		if let Some(Tree{level, ..}) = r_branch {
 			if level > target_level { return None }
 		}
-
 		// structure the data
 		match name {
 			Some(name) => Some(Tree{
@@ -145,7 +144,7 @@ pub fn good_levels<E: Debug+Clone+Eq+Hash+'static>(tree: &Tree<E>) -> bool {
 	good
 }
 
-impl<E: Debug+Clone+Eq+Hash> Clone for Tree<E> {
+impl<E: Debug+Clone+Eq+Hash+'static> Clone for Tree<E> {
 	fn clone(&self) -> Self {
 		Tree{level: self.level, name: self.name.clone(), link: self.link.clone()}
 	}
