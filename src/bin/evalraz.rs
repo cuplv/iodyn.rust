@@ -1,3 +1,6 @@
+//! rough util for benchmarking some forms of the
+//! raz data structure in this crate
+
 extern crate rand;
 
 #[macro_use]

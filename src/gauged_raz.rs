@@ -47,7 +47,7 @@ fn count_tree_op<L: Level,E>(tree: &Option<tree::Tree<L,TreeData<E>>>) -> usize 
 
 impl<E> tree::TreeUpdate for TreeData<E> {
 	#[allow(unused_variables)]
-	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self {
+	fn rebuild(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self {
 		TreeData::Branch{l_count: count(&l_branch), r_count: count(&r_branch)}
 	}
 }

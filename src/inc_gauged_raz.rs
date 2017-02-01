@@ -51,7 +51,7 @@ fn count_tree_op<E: Debug+Clone+Eq+Hash+'static>(tree: &Option<tree::Tree<TreeDa
 
 impl<E: Debug+Clone+Eq+Hash+'static> tree::TreeUpdate for TreeData<E> {
 	#[allow(unused_variables)]
-	fn update(l_branch: Option<Self>, old_data: &Self, r_branch: Option<Self>) -> Self {
+	fn rebuild(l_branch: Option<Self>, old_data: &Self, r_branch: Option<Self>) -> Self {
 		TreeData::Branch{l_count: count(&l_branch), r_count: count(&r_branch)}
 	}
 }

@@ -19,6 +19,27 @@ pub mod inc_level_tree;
 pub mod inc_tree_cursor;
 pub mod inc_gauged_raz;
 
+/// Persistent Raz - original design, simple but works
+pub type PRaz<E> = persist_raz::Raz<E>;
+/// Raz - Sequence editing. Vectorized leaves, manualy defined
+pub type Raz<E> = gauged_raz::Raz<trees::NegBin,E>;
+/// Incremental Raz - Experimental for use with Adapton
+pub type IRaz<E> = inc_gauged_raz::Raz<E>;
+/// Stack-based sequence editing
+pub type Zipper<E> = zip::Stacks<E>;
+/// Functional programming's common list, persistent
+pub type Stack<E> = stack::Stack<E>;
+/// Cross between vector and persistent stack
+pub type ArchiveStack<E> = archive_stack::AStack<E,()>;
+/// Persistent Tree, structured by Levels
+pub type Tree<E> = level_tree::Tree<trees::NegBin,E>;
+/// Cursor for use with `Tree`
+///
+/// The element type is required to implement `TreeUpdate`
+/// to provide a method that reconstructs data as updated
+/// branches are recombined into larger trees
+pub type TCursor<E> = tree_cursor::Cursor<trees::NegBin,E>;
+
 // tests on early mods only (persist_raz)
 #[cfg(test)]
 mod tests {

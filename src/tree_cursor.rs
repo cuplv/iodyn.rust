@@ -49,7 +49,7 @@ pub trait TreeUpdate {
 	/// right branches of a tree node, along with the old data in that node.
 	/// For example, read size from left and right to get the new size of the branch,
 	/// or copy the old data without modification for the new branch.
-	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self;
+	fn rebuild(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self;
 }
 /// marker that allows a default implementation of TreeUpdate if the data is also `Clone`
 ///
@@ -57,7 +57,7 @@ pub trait TreeUpdate {
 pub trait DeriveTreeUpdate{}
 impl<E: DeriveTreeUpdate + Clone> TreeUpdate for E {
 	#[allow(unused_variables)]
-	fn update(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self { old_data.clone() }
+	fn rebuild(l_branch: Option<&Self>, old_data: &Self, r_branch: Option<&Self>) -> Self { old_data.clone() }
 }
 
 /// cursor movement qualifier
@@ -143,7 +143,7 @@ impl<L: Level, E: TreeUpdate> Cursor<L,E> {
 
 	/// makes a new cursor at the given data, between the trees of the other cursors
 	///
-	/// The `update()` method of the data type will be called, with the `data`
+	/// The `rebuild()` method of the data type will be called, with the `data`
 	/// parameter passed here as the `old_data` to that method (along with joined branches).
 	pub fn join(mut l_cursor: Self, level: L, data: E, mut r_cursor: Self) -> Self {
 		// step 1: remove center forests
@@ -169,7 +169,7 @@ impl<L: Level, E: TreeUpdate> Cursor<L,E> {
 		// step 3: build center tree
 		let tree = Tree::new(
 			level,
-			E::update(peek_op(&l_cursor.tree), &data, peek_op(&r_cursor.tree)),
+			E::rebuild(peek_op(&l_cursor.tree), &data, peek_op(&r_cursor.tree)),
 			l_cursor.tree.clone(),
 			r_cursor.tree.clone(),
 		);
@@ -270,7 +270,7 @@ impl<L: Level, E: TreeUpdate> Cursor<L,E> {
 
 	/// move the cursor up towards the root of the underlying persistent tree
 	///
-	/// If the tree has been changed, the `update()` method of the tree's data
+	/// If the tree has been changed, the `rebuild()` method of the tree's data
 	/// type will be called as a new persistent node is created.
 	pub fn up(&mut self) -> bool {
 		let to_left = match (self.l_forest.last(), self.r_forest.last()) {
@@ -285,7 +285,7 @@ impl<L: Level, E: TreeUpdate> Cursor<L,E> {
 					let l_branch = upper_tree.l_tree();
 					self.tree = Tree::new(
 						upper_tree.level(),
-						E::update(peek_op(&l_branch), upper_tree.peek(), peek_op(&self.tree)),
+						E::rebuild(peek_op(&l_branch), upper_tree.peek(), peek_op(&self.tree)),
 						l_branch,
 						self.tree.take(),
 					)
@@ -297,7 +297,7 @@ impl<L: Level, E: TreeUpdate> Cursor<L,E> {
 					let r_branch = upper_tree.r_tree();
 					self.tree = Tree::new(
 						upper_tree.level(),
-						E::update(peek_op(&self.tree), upper_tree.peek(), peek_op(&r_branch)),
+						E::rebuild(peek_op(&self.tree), upper_tree.peek(), peek_op(&r_branch)),
 						self.tree.take(),
 						r_branch,
 					)
