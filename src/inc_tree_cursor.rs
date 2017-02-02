@@ -11,7 +11,7 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::mem;
-pub use inc_level_tree::{Tree, gen_branch_level as gen_level};
+pub use inc_level_tree::Tree;
 use adapton::engine::Name;
 
 /// tree cursor, centered on a node of the underlying persistent tree

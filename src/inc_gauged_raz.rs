@@ -9,7 +9,6 @@ use std::rc::Rc;
 
 use std::fmt::Debug;
 use std::hash::Hash;
-use rand::thread_rng;
 
 use inc_tree_cursor as tree;
 use archive_stack as stack;
@@ -272,19 +271,11 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 		self.l_stack.push(elm);
 		self.l_stack.active_len()
 	}
-	/// add a name to the left of the cursor
-	pub fn push_name_left(&mut self, name: Option<Name>) {
-		self.archive_left(tree::gen_level(&mut thread_rng()),name)
-	}
 	/// add an element to the right of the cursor
 	pub fn push_right(&mut self, elm: E) -> usize {
 		self.length += 1;
 		self.r_stack.push(elm);
 		self.r_stack.active_len()
-	}
-	/// add an element to the right of the cursor
-	pub fn push_name_right(&mut self, name: Option<Name>) {
-		self.archive_right(tree::gen_level(&mut thread_rng()),name);
 	}
 	/// peek at the element to the left of the cursor
 	pub fn peek_left(&self) -> Option<&E> {

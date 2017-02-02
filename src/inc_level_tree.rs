@@ -158,7 +158,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Clone for Tree<E> {
 /// this will never generate a 0, reserving it for potential
 /// use in tree leaves
 pub fn gen_branch_level<R:Rng>(rng: &mut R) -> u32 {
-	let num = rng.gen::<u32>();
+	let num = rng.gen::<u64>();
 	(num << 1).trailing_zeros() as u32
 }
 

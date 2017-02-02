@@ -7,6 +7,7 @@ authors = ["kyleheadley <kyle.headley@colorado.edu>"]
 rand = "0.3"
 clap = "2"
 time = "0.1"
+streaming-stats = "0.1"
 pat = {git = "https://github.com/kyleheadley/pat"}
 
 [dependencies.adapton]

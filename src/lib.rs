@@ -5,8 +5,14 @@ extern crate pat;
 #[macro_use]
 extern crate adapton;
 
+/// Early work on traits for zippers
+///
 pub mod zip;                // trait for persistent zips
+/// Persistent stack, modified slightly from "Learning Rust With Entirely Too Many Linked Lists"
+///
 pub mod stack;              // persistent stack
+/// Early work on traits for the raz
+///
 pub mod seqzip;             // traits for persistent raz
 pub mod persist_raz;        // monolithic single-item persistent raz
 pub mod trees;              // traits for the various forms of trees
@@ -21,10 +27,16 @@ pub mod inc_gauged_raz;
 
 /// Persistent Raz - original design, simple but works
 pub type PRaz<E> = persist_raz::Raz<E>;
+/// Unfocused `PRaz`
+pub type PRazTree<E> = persist_raz::RazSeq<E>;
 /// Raz - Sequence editing. Vectorized leaves, manualy defined
 pub type Raz<E> = gauged_raz::Raz<trees::NegBin,E>;
+/// Unfocused `Raz`
+pub type RazTree<E> = gauged_raz::RazTree<trees::NegBin,E>;
 /// Incremental Raz - Experimental for use with Adapton
 pub type IRaz<E> = inc_gauged_raz::Raz<E>;
+/// Unfocused `IRaz`
+pub type IRazTree<E> = inc_gauged_raz::RazTree<E>;
 /// Stack-based sequence editing
 pub type Zipper<E> = zip::Stacks<E>;
 /// Functional programming's common list, persistent
@@ -39,6 +51,11 @@ pub type Tree<E> = level_tree::Tree<trees::NegBin,E>;
 /// to provide a method that reconstructs data as updated
 /// branches are recombined into larger trees
 pub type TCursor<E> = tree_cursor::Cursor<trees::NegBin,E>;
+
+///level generator for inc_* structures (others use `Rng::gen()`)
+pub fn inc_level() -> u32 {
+  inc_level_tree::gen_branch_level(&mut rand::thread_rng())
+}
 
 // tests on early mods only (persist_raz)
 #[cfg(test)]

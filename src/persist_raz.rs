@@ -1,4 +1,12 @@
-// Random access zipper
+//! Random access zipper, early version
+//!
+//! This version uses a tree structure to
+//! represent a sequence. The tree contains
+//! one element per leaf, so the search depth
+//! may be higher than the version in `gauged_raz`.
+//! This version is fully persistent, with
+//! every edit sharing all other data. Cloning
+//! is fast and expected
 
 use std::intrinsics;
 use std::rc::Rc;
