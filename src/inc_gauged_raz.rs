@@ -76,6 +76,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 			I: 'static + Fn(&E) -> R,
 			B: 'static + Fn(R,R) -> R
 	{
+		// TODO: memo! fold_up (only first rec call is not)
 		self.tree.map(|tree| {
 			tree.fold_up(Rc::new(move |l,c,r|{
 				match c {
@@ -95,6 +96,31 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 			}))
 		})
 	}
+
+	/// returns a new tree with data mapped from the old tree
+	pub fn map<R,F>(self, f: Rc<F>) -> RazTree<R>
+		where
+			R: 'static + Eq+Clone+Hash+Debug,
+			F: 'static + Fn(&E) -> R,
+	{
+		// TODO: memo! map (only the first rec call is not)
+		RazTree{count: self.count, tree:
+			self.tree.map(|tree| {
+				tree.map(Rc::new(move |d|{
+					match d {
+						TreeData::Leaf(ref vec) => {
+							let mapped = vec.iter().map(|e|f(e)).collect();
+							TreeData::Leaf(Rc::new(mapped))
+						},
+						TreeData::Branch{l_count,r_count} => {
+							TreeData::Branch{l_count:l_count,r_count:r_count}
+						},
+					}
+				}))
+			})
+		}
+	}
+
 
 	/// focus on a location in the sequence to begin editing.
 	///
@@ -654,6 +680,54 @@ mod tests {
 
   }
 
+  #[test]
+  fn test_map() {
+  	let tree = RazTree{
+  		count: 12,
+  		tree: tree::Tree::new(5, Some(name_of_usize(5)),TreeData::Branch{l_count:8, r_count: 4},
+  			tree::Tree::new(3, Some(name_of_usize(3)),TreeData::Branch{l_count:2, r_count: 6},
+  				tree::Tree::new(0, None,TreeData::Leaf(Rc::new(vec!(1,2))),None,None),
+  				tree::Tree::new(2, Some(name_of_usize(2)),TreeData::Branch{l_count:4, r_count: 2},
+  					tree::Tree::new(1, Some(name_of_usize(1)),TreeData::Branch{l_count:2, r_count: 2},
+		  				tree::Tree::new(0, None,TreeData::Leaf(Rc::new(vec!(3,4))),None,None),
+		  				tree::Tree::new(0, None,TreeData::Leaf(Rc::new(vec!(5,6))),None,None),
+  					),
+  					tree::Tree::new(0, None,TreeData::Leaf(Rc::new(vec!(7,8))),None,None),
+  				)
+  			),
+  			tree::Tree::new(4, Some(name_of_usize(4)),TreeData::Branch{l_count: 2, r_count: 2},
+  				tree::Tree::new(0, None,TreeData::Leaf(Rc::new(vec!(9,10))),None,None),
+  				tree::Tree::new(0, None,TreeData::Leaf(Rc::new(vec!(11,12))),None,None),
+  			)
+  		)
+  	};
+
+  	let plus1 = tree.map(Rc::new(|e: &usize|*e+1));
+  	let sum = plus1.clone().fold_up(Rc::new(|e:&usize|*e),Rc::new(|e1:usize,e2:usize|e1+e2)).unwrap_or(0);
+  	let iter_sum: usize = (2..14).sum();
+  	assert_eq!(iter_sum, sum);
+
+  	// check the structure
+  	let mut cursor = tree::Cursor::from(plus1.tree.unwrap());
+  	assert!(cursor.down_left());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![2,3], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up());
+  	assert!(cursor.down_right());
+  	assert!(cursor.down_left());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![4,5], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  }
   #[test]
   fn test_from_stack() {
   	let mut stack = stack::AStack::new();

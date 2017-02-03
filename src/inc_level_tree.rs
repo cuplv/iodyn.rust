@@ -107,6 +107,29 @@ impl<E: Debug+Clone+Eq+Hash+'static> Tree<E> {
       node_calc(l, data, r)
     }}
   }
+
+  /// memoized map operation
+  pub fn map<R:Eq+Clone+Hash+Debug+'static,F>(self, map_val: Rc<F>) -> Tree<R>
+  where
+  	F: 'static + Fn(E) -> R
+  {
+    match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
+      let (l,r) = match self.name {
+      	None => {(
+      		l_branch.map(|t| t.map(map_val.clone())),
+      		r_branch.map(|t| t.map(map_val.clone())),
+      	)},
+      	Some(ref name) => {
+		      let (n1, n2) = name_fork(name.clone());
+      		(
+			      l_branch.map(|t| memo!( n1 =>> Self::map , t:t ;; f:map_val.clone() )),
+			      r_branch.map(|t| memo!( n2 =>> Self::map , t:t ;; f:map_val.clone() )),
+      		)
+      	}
+      };
+      Tree::new(self.level, self.name, map_val(data), l, r).unwrap()
+    }}
+  }
 }
 
 /// Use good_levels to verify level consistancy when debugging
@@ -204,6 +227,38 @@ mod tests {
 		assert_eq!(21, sum);
 		assert_eq!(5, depth);
 		assert_eq!(true, in_order);
+	}
+
+  #[test]
+  fn test_map() {
+		let t = 
+		Tree::new(5, Some(name_of_usize(5)),None,
+			Tree::new(3, Some(name_of_usize(3)),None,
+				Tree::new(0,None,Some(1),None,None),
+				Tree::new(2, Some(name_of_usize(2)),None,
+					Tree::new(1, Some(name_of_usize(1)),None,
+						Tree::new(0,None,Some(2),None,None),
+						Tree::new(0,None,Some(3),None,None),
+					),
+					Tree::new(0,None,Some(4),None,None),
+				)
+			),
+			Tree::new(4, Some(name_of_usize(4)),None,
+				Tree::new(0,None,Some(5),None,None),
+				Tree::new(0,None,Some(6),None,None),
+			)
+		).unwrap();
+		let tree_plus1 = t.clone().map(Rc::new(|d: Option<usize>| {
+			d.map(|n|n+1)
+		}));
+		let leaf = tree_plus1.l_tree().unwrap().r_tree().unwrap().l_tree().unwrap().r_tree().unwrap();
+		assert_eq!(Some(4), leaf.peek());
+
+		let sum = tree_plus1.clone().fold_up(Rc::new(|l: Option<usize>,c: Option<usize>,r: Option<usize>| {
+			l.unwrap_or(0) + c.unwrap_or(0) + r.unwrap_or(0)
+		}));
+
+		assert_eq!(27, sum);
 	}
 }
 

@@ -88,6 +88,27 @@ impl<L: Level, E:Clone> RazTree<L,E> {
 		})
 	}
 
+	/// returns a new tree with data mapped from the old tree
+	pub fn map<R: Clone,F>(&self, mut f: F) -> RazTree<L,R>
+		where F: FnMut(&E) -> R
+	{
+		RazTree{count: self.count, tree:
+			self.tree.as_ref().map(|tree| {
+				tree.map(&mut|d|{
+					match *d {
+						TreeData::Leaf(ref vec) => {
+							let mapped = vec.iter().map(|e|f(e)).collect();
+							TreeData::Leaf(Rc::new(mapped))
+						},
+						TreeData::Branch{l_count,r_count} => {
+							TreeData::Branch{l_count:l_count,r_count:r_count}
+						},
+					}
+				})
+			})
+		}
+	}
+
 	/// focus on a location in the sequence to begin editing.
 	///
 	/// `0` is before the first element. This will return `None` if
@@ -621,6 +642,56 @@ mod tests {
   	).unwrap();
   	assert_eq!(EO::Even, even_odd);
 
+  }
+
+  #[test]
+  fn test_map() {
+  	let tree = RazTree{
+  		count: 12,
+  		tree: tree::Tree::new(5,TreeData::Branch{l_count:8, r_count: 4},
+  			tree::Tree::new(3,TreeData::Branch{l_count:2, r_count: 6},
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(1,2))),None,None),
+  				tree::Tree::new(2,TreeData::Branch{l_count:4, r_count: 2},
+  					tree::Tree::new(1,TreeData::Branch{l_count:2, r_count: 2},
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(3,4))),None,None),
+		  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(5,6))),None,None),
+  					),
+  					tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(7,8))),None,None),
+  				)
+  			),
+  			tree::Tree::new(4,TreeData::Branch{l_count: 2, r_count: 2},
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(9,10))),None,None),
+  				tree::Tree::new(0,TreeData::Leaf(Rc::new(vec!(11,12))),None,None),
+  			)
+  		)
+  	};
+
+  	let plus1 = tree.map(|e|*e+1);
+  	let sum = plus1.fold_up(|e|{*e},|e1,e2|{e1+e2}).unwrap_or(0);
+  	let iter_sum: usize = (2..14).sum();
+  	assert_eq!(iter_sum, sum);
+
+
+  	// check the structure
+  	let mut cursor = tree::Cursor::from(plus1.tree.unwrap());
+  	assert!(cursor.down_left());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(&TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![2,3], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up());
+  	assert!(cursor.down_right());
+  	assert!(cursor.down_left());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(&TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![4,5], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
   }
 
   #[test]

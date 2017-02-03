@@ -1,7 +1,7 @@
 #![feature(core_intrinsics)]
 
 extern crate rand;
-extern crate pat;
+//extern crate pat; // pattern match trait for deconstruction
 #[macro_use]
 extern crate adapton;
 

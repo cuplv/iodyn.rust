@@ -50,6 +50,18 @@ impl<L: Level,E> Tree<L,E> {
 			})
 		})
 	}
+
+	pub fn map<R,F>(&self, map_val: &mut F) -> Tree<L,R>
+	where
+		F: FnMut(&E) -> R
+	{
+		match *self.link { TreeNode{ ref data, ref l_branch, ref r_branch } => {
+			let l = l_branch.as_ref().map(|t| t.map(map_val));
+			let r = r_branch.as_ref().map(|t| t.map(map_val));
+			Tree::new(self.level,map_val(data),l,r).unwrap()
+		}}
+	}
+
 }
 
 impl<L: Level,E> LevelTree<L,E> for Tree<L,E> {
@@ -87,6 +99,7 @@ impl<L: Level, E> BinTree<E> for Tree<L,E> {
 			node_calc(data, l, r)
 		}}
 	}
+
 }
 
 /// Use good_levels to verify level consistancy when debugging
@@ -181,6 +194,35 @@ mod tests {
 		assert_eq!(21, sum);
 		assert_eq!(5, depth);
 		assert_eq!(true, in_order);
+	}
+
+  #[test]
+  fn test_map() {
+		let t = 
+		Tree::new(5,None,
+			Tree::new(3,None,
+				Tree::new(0,Some(1),None,None),
+				Tree::new(2,None,
+					Tree::new(1,None,
+						Tree::new(0,Some(2),None,None),
+						Tree::new(0,Some(3),None,None),
+					),
+					Tree::new(0,Some(4),None,None),
+				)
+			),
+			Tree::new(4,None,
+				Tree::new(0,Some(5),None,None),
+				Tree::new(0,Some(6),None,None),
+			)
+		).unwrap();
+		let tree_plus1 = t.map(&mut|d| { d.map(|n|n+1) });
+		let leaf = tree_plus1.l_tree().unwrap().r_tree().unwrap().l_tree().unwrap().r_tree().unwrap();
+		assert_eq!(&Some(4), leaf.peek());
+
+		let sum = tree_plus1.fold_up(&mut|d,l,r| {
+			l.unwrap_or(0) + d.unwrap_or(0) + r.unwrap_or(0)
+		});
+		assert_eq!(27, sum);
 	}
 }
 
