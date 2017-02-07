@@ -105,8 +105,8 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 	{
 		// TODO: memo! map (only the first rec call is not)
 		RazTree{count: self.count, tree:
-			self.tree.map(|tree| {
-				tree.map(Rc::new(move |d|{
+			self.tree.map(|tree| { // map over Option
+				tree.map(Rc::new(move |d|{ // inc map over tree data
 					match d {
 						TreeData::Leaf(ref vec) => {
 							let mapped = vec.iter().map(|e|f(e)).collect();

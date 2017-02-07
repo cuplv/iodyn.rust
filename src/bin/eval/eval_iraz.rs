@@ -7,7 +7,7 @@ use pmfp_collections::inc_tree_cursor::gen_level;
 use Params;
 use eval::*;
 
-pub struct EvalIRaz<'a, E:Eval,G:ElemGen<E>> {
+pub struct EvalIRaz<'a, E:Eval,G:ItemGen<E>> {
 	// Option for cleaner code, None means uninitialized
 	raztree: Option<IRazTree<E>>,
 	names: usize,
@@ -15,7 +15,7 @@ pub struct EvalIRaz<'a, E:Eval,G:ElemGen<E>> {
 	glob: &'a Params
 }
 
-impl<'a, E: Eval,G:ElemGen<E>> EvalIRaz<'a, E,G> {
+impl<'a, E: Eval,G:ItemGen<E>> EvalIRaz<'a, E,G> {
 	pub fn new(p: &'a Params, data:G) -> Self {
 		EvalIRaz {
 			raztree: None,
@@ -34,7 +34,10 @@ impl<'a, E: Eval,G:ElemGen<E>> EvalIRaz<'a, E,G> {
 /// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
 // uses Params::{start,namesize,unitsize}
-impl<'a, 'b, E:Eval,G:ElemGen<E>> DataInit<'a,'b,E,G> for EvalIRaz<'a, E,G> {
+impl<'a, 'b, E:Eval,G:ItemGen<E>>
+DataInit<'a,'b,G>
+for EvalIRaz<'a, E,G> {
+	type Item = E;
 	fn init(p: &'a Params, data: G, mut rng: &'b mut StdRng) -> (Duration,Self)
 	{
 		let mut eval = EvalIRaz::new(p,data);
@@ -90,7 +93,8 @@ impl<'a, 'b, E:Eval,G:ElemGen<E>> DataInit<'a,'b,E,G> for EvalIRaz<'a, E,G> {
 /// Appends to a `RazTree` by focusing to the end, pushing
 /// data, levels, and names, then unfocusing
 // uses (saved) Params::{namesize,unitsize}, EditParams::{batch_size}
-impl<'a, E:Eval,G:ElemGen<E>> DataAppend for EvalIRaz<'a, E,G> {
+impl<'a, E:Eval,G:ItemGen<E>>
+DataAppend for EvalIRaz<'a, E,G> {
 	fn edit(mut self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap();
 		let namesize = self.glob.namesize;
@@ -184,7 +188,9 @@ impl<'a, E:Eval,G:ElemGen<E>> DataAppend for EvalIRaz<'a, E,G> {
 	}
 }
 
-impl<'a, E:Eval+Ord,G:ElemGen<E>> DataMax<E> for EvalIRaz<'a, E,G> {
+impl<'a, E:Eval+Ord,G:ItemGen<E>>
+DataMax for EvalIRaz<'a, E,G> {
+	type Item = E;
 	type Target = Option<E>;
 	fn compute(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let clone = self.raztree.clone().unwrap();

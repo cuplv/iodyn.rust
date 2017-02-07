@@ -16,7 +16,7 @@ pub struct EditParams {
 pub trait Eval: 'static+Eq+Clone+Hash+Debug {}
 impl<E> Eval for E where E: 'static+Eq+Clone+Hash+Debug {}
 
-pub trait ElemGen<E:Eval> {
+pub trait ItemGen<E:Eval> {
 	fn gen(&mut self, p: &Params) -> E;
 	fn gen_count(&mut self, count: usize, p:&Params) -> Vec<E> {
 		let mut data_vec = Vec::with_capacity(count);
@@ -27,7 +27,8 @@ pub trait ElemGen<E:Eval> {
 	}
 }
 
-trait DataInit<'a,'b,E:Eval,G:ElemGen<E>> {
+trait DataInit<'a,'b,G:ItemGen<Self::Item>> {
+	type Item: Eval;
 	fn init(p: &'a Params, data: G, rng: &'b mut StdRng) -> (Duration,Self);
 }
 trait DataAppend {
@@ -36,7 +37,8 @@ trait DataAppend {
 trait DataInsert {
 	fn edit(self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self);
 }
-trait DataMax<E:Eval+Ord> {
+trait DataMax {
+	type Item: Eval+Ord;
 	type Target;
 	fn compute(&self, rng: &mut StdRng) -> (Duration,Self::Target);
 }
@@ -52,7 +54,7 @@ trait Tester<'a,'b>: Sized {
 /////////////////////
 
 impl<E:Eval+Rand>
-ElemGen<E> for StdRng {
+ItemGen<E> for StdRng {
 	fn gen(&mut self, _p: &Params) -> E {
 		Rng::gen::<E>(self)
 	}
