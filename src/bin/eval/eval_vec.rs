@@ -21,11 +21,11 @@ EvalVec<'a, E,G> {
 /// Creates a `Vec` by pushing individual elements into
 /// an initially unallocated `Vec`.
 // uses Params::{start} 
-impl<'a, 'b, E:Eval,G:ItemGen<E>>
-DataInit<'a,'b,G>
+impl<'a, E:Eval,G:ItemGen<E>>
+DataInit<'a,G>
 for EvalVec<'a, E,G> {
 	type Item = E;
-	fn init(p: &'a Params, data: G, mut _rng: &'b mut StdRng) -> (Duration,Self) {
+	fn init<'b>(p: &'a Params, data: G, mut _rng: &'b mut StdRng) -> (Duration,Self) {
 		let mut eval = EvalVec::new(p,data);
 		let mut data_iter = eval.data.gen_count(p.start,p).into_iter();
 		let time = Duration::span(||{
@@ -40,7 +40,7 @@ for EvalVec<'a, E,G> {
 /// Appends to a `Vec` "batch-at-once" by `Vec::append`
 // uses EditPArams::{batch_size} 
 impl<'a, E:Eval,G:ItemGen<E>>
-DataAppend for EvalVec<'a, E,G> {
+EditAppend for EvalVec<'a, E,G> {
 	fn edit(mut self, p: &EditParams, _rng: &mut StdRng) -> (Duration,Self) {
 		let mut data_vec = self.data.gen_count(p.batch_size,self.glob);
 		let time = Duration::span(||{
@@ -51,7 +51,7 @@ DataAppend for EvalVec<'a, E,G> {
 }
 
 impl<'a, E:Eval+Ord,G:ItemGen<E>>
-DataMax for EvalVec<'a, E,G> {
+CompMax for EvalVec<'a, E,G> {
 	type Item = E;
 	type Target = Option<E>;
 	fn compute(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {

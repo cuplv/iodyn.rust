@@ -10,6 +10,7 @@ extern crate adapton;
 extern crate pmfp_collections;
 
 mod eval;
+use eval::*;
 
 use time::{Duration};
 //use adapton::engine::*;
@@ -32,17 +33,6 @@ enum WhichVary {
 	Nil,S,U,N,E,B,C
 }
 use WhichVary::*;
-
-pub struct Params {
-	dataseed: [usize;1],
-	start: usize,
-	unitsize: usize,
-	namesize: usize,
-	edits: usize,
-	batches: usize,
-	changes: usize,
-	trials: usize,
-}
 
 fn main() {
   //command-line

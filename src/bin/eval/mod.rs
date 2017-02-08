@@ -1,12 +1,21 @@
 pub mod eval_iraz;
 pub mod eval_vec;
-pub mod triple_test;
+pub mod seq_test;
 
 use std::fmt::Debug;
 use std::hash::Hash;
 use rand::{Rand, Rng, StdRng};
 use time::Duration;
-use Params;
+
+pub struct Params {
+	start: usize,
+	unitsize: usize,
+	namesize: usize,
+	edits: usize,
+	batches: usize,
+	changes: usize,
+	trials: usize,
+}
 
 pub struct EditParams {
 	loc: usize,
@@ -16,37 +25,32 @@ pub struct EditParams {
 pub trait Eval: 'static+Eq+Clone+Hash+Debug {}
 impl<E> Eval for E where E: 'static+Eq+Clone+Hash+Debug {}
 
-pub trait ItemGen<E:Eval> {
-	fn gen(&mut self, p: &Params) -> E;
+pub trait ItemGen<E:Eval>: Clone {
+	fn gen_item(&mut self, p: &Params) -> E;
 	fn gen_count(&mut self, count: usize, p:&Params) -> Vec<E> {
 		let mut data_vec = Vec::with_capacity(count);
 		for _ in 0..p.start {
-			data_vec.push(self.gen(p));
+			data_vec.push(self.gen_item(p));
 		}
 		data_vec
 	}
 }
 
-trait DataInit<'a,'b,G:ItemGen<Self::Item>> {
+trait DataInit<'a,G:ItemGen<Self::Item>> {
 	type Item: Eval;
-	fn init(p: &'a Params, data: G, rng: &'b mut StdRng) -> (Duration,Self);
+	/// generate an initial sequence, based on Params
+	fn init<'b>(p: &'a Params, data: G, rng: &'b mut StdRng) -> (Duration,Self);
 }
-trait DataAppend {
+trait EditAppend {
 	fn edit(self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self);
 }
-trait DataInsert {
+trait EditInsert {
 	fn edit(self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self);
 }
-trait DataMax {
+trait CompMax {
 	type Item: Eval+Ord;
 	type Target;
 	fn compute(&self, rng: &mut StdRng) -> (Duration,Self::Target);
-}
-
-trait Tester<'a,'b>: Sized {
-	fn init(&mut self, &'a Params, &'b mut StdRng) -> Vec<Duration>;
-	fn edit(&mut self, &EditParams, &mut StdRng) -> Vec<Duration>;
-	fn run(&mut self, &mut StdRng) -> Vec<Duration>;
 }
 
 /////////////////////
@@ -55,7 +59,7 @@ trait Tester<'a,'b>: Sized {
 
 impl<E:Eval+Rand>
 ItemGen<E> for StdRng {
-	fn gen(&mut self, _p: &Params) -> E {
+	fn gen_item(&mut self, _p: &Params) -> E {
 		Rng::gen::<E>(self)
 	}
 }

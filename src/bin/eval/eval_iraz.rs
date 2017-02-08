@@ -34,11 +34,11 @@ impl<'a, E: Eval,G:ItemGen<E>> EvalIRaz<'a, E,G> {
 /// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
 // uses Params::{start,namesize,unitsize}
-impl<'a, 'b, E:Eval,G:ItemGen<E>>
-DataInit<'a,'b,G>
+impl<'a, E:Eval,G:ItemGen<E>>
+DataInit<'a,G>
 for EvalIRaz<'a, E,G> {
 	type Item = E;
-	fn init(p: &'a Params, data: G, mut rng: &'b mut StdRng) -> (Duration,Self)
+	fn init<'b>(p: &'a Params, data: G, mut rng: &'b mut StdRng) -> (Duration,Self)
 	{
 		let mut eval = EvalIRaz::new(p,data);
 		let mut raz = IRaz::new();
@@ -94,7 +94,7 @@ for EvalIRaz<'a, E,G> {
 /// data, levels, and names, then unfocusing
 // uses (saved) Params::{namesize,unitsize}, EditParams::{batch_size}
 impl<'a, E:Eval,G:ItemGen<E>>
-DataAppend for EvalIRaz<'a, E,G> {
+EditAppend for EvalIRaz<'a, E,G> {
 	fn edit(mut self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap();
 		let namesize = self.glob.namesize;
@@ -189,8 +189,8 @@ DataAppend for EvalIRaz<'a, E,G> {
 }
 
 impl<'a, E:Eval+Ord,G:ItemGen<E>>
-DataMax for EvalIRaz<'a, E,G> {
-	type Item = E;
+CompMax for EvalIRaz<'a, E,G> {
+	//type Item = E;
 	type Target = Option<E>;
 	fn compute(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let clone = self.raztree.clone().unwrap();
