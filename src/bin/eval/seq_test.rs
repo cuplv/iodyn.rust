@@ -11,21 +11,23 @@ pub struct TestResult {
 	full_computes: Vec<Duration>,
 }
 
-trait Seq_Test<'a,G: ItemGen<Self::Item>> {
+// TODO: Put this trait in a macro (for trait polymorphism)
+// requiring name, edit, computation, additonal trait bounds
+// let it be implemented to generate a test
+
+trait Seq_Test<'a,G: ItemGen<Self::Item>,R> {
 	type Item: Eval;
-	type Results;
-	fn run(self, p: &'a Params, data_gen: &G, rng: &mut StdRng) -> Self::Results;
+	fn run(self, p: &'a Params, data_gen: &G, rng: &mut StdRng) -> R;
 }
 
-impl<'a,E,S,G> Seq_Test<'a,G> for S
+impl<'a,E,S,G> Seq_Test<'a,G,TestResult> for S
 where
 	E: Eval + Ord,
 	S: DataInit<'a,G,Item=E> + EditAppend + CompMax,
 	G: ItemGen<E>,
 {
 	type Item = E;
-	type Results = TestResult;
-	fn run(self, p: &'a Params, data_gen: &G, rng: &mut StdRng) -> Self::Results {
+	fn run(self, p: &'a Params, data_gen: &G, rng: &mut StdRng) -> TestResult {
 		let mut testdata;
 		let mut edit_result = None;
 		let data = (*data_gen).clone();
