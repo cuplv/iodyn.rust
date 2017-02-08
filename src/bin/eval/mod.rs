@@ -48,7 +48,6 @@ trait EditInsert {
 	fn edit(self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self);
 }
 trait CompMax {
-	type Item: Eval+Ord;
 	type Target;
 	fn compute(&self, rng: &mut StdRng) -> (Duration,Self::Target);
 }

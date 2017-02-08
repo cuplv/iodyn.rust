@@ -190,7 +190,6 @@ EditAppend for EvalIRaz<'a, E,G> {
 
 impl<'a, E:Eval+Ord,G:ItemGen<E>>
 CompMax for EvalIRaz<'a, E,G> {
-	//type Item = E;
 	type Target = Option<E>;
 	fn compute(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let clone = self.raztree.clone().unwrap();

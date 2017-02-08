@@ -52,7 +52,6 @@ EditAppend for EvalVec<'a, E,G> {
 
 impl<'a, E:Eval+Ord,G:ItemGen<E>>
 CompMax for EvalVec<'a, E,G> {
-	type Item = E;
 	type Target = Option<E>;
 	fn compute(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let mut max = None;
