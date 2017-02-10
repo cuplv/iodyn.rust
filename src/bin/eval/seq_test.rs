@@ -1,34 +1,36 @@
-use time::{Duration, precise_time_ns};
-use rand::{StdRng,SeedableRng};
+use time::{Duration};
+use rand::{StdRng};
 use eval::*;
 use actions::*;
 
-pub struct TestResult<D> {
-	edits: Vec<Duration>,
-	full_edits: Vec<Duration>,
-	computes: Vec<Duration>,
-	full_computes: Vec<Duration>,
-	final_data: D,
+pub struct TestResult<D,A> {
+	pub edits: Vec<Duration>,
+	pub full_edits: Vec<Duration>,
+	pub computes: Vec<Duration>,
+	pub full_computes: Vec<Duration>,
+	pub answers: Vec<A>,
+	pub final_data: D,
 }
 
 pub struct FirstCrossover<I:Eval,G:ItemGen<I>> {
-	init: SizedSeq<I,G>,
-	edit: SingleAppend,
-	comp: FindMax,
+	pub init: SizedSeq<I,G>,
+	pub edit: BatchInsert,
+	pub comp: FindMax,
 }
 
 impl<'a,D,G>
-Testor<TestResult<D>>
+Testor<TestResult<D,D::Target>>
 for FirstCrossover<D::Item,G> where
-	D: InitSeq<G>+EditAppend+CompMax,
+	D: InitSeq<G>+EditInsert+CompMax,
 	G:ItemGen<D::Item>,
 {
-	fn test(&mut self, rng: &mut StdRng) -> TestResult<D> {
+	fn test(&mut self, rng: &mut StdRng) -> TestResult<D,D::Target> {
 		let mut testdata;
 		let mut edits = Vec::with_capacity(self.init.params.changes);
 		let mut full_edits = Vec::with_capacity(self.init.params.changes);
 		let mut computes = Vec::with_capacity(self.init.params.changes);
 		let mut full_computes = Vec::with_capacity(self.init.params.changes);
+		let mut answers = Vec::with_capacity(self.init.params.changes);
 
 		// step 1: initialize sequence
 		let mut edit_result = None;
@@ -45,6 +47,7 @@ for FirstCrossover<D::Item,G> where
 		});
 		let comp_time = comp_result.unwrap();
 		computes.push(comp_time);
+		//answers.push(answer);
 		full_computes.push(full_comp_time);
 
 		// step 2: run a bunch of edits	
@@ -63,6 +66,7 @@ for FirstCrossover<D::Item,G> where
 			});
 			let comp_time = comp_result.unwrap();
 			computes.push(comp_time);
+			//answers.push(answer);
 			full_computes.push(full_comp_time);
 		}
 
@@ -71,6 +75,7 @@ for FirstCrossover<D::Item,G> where
 			full_edits: full_edits,
 			computes: computes,
 			full_computes: full_computes,
+			answers: answers,
 			final_data: testdata,
 		}
 	}

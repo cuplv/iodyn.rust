@@ -20,14 +20,13 @@ EvalVec<E,G> {
 
 /// Creates a `Vec` by pushing individual elements into
 /// an initially unallocated `Vec`.
-// uses Params::{start} 
 impl<E:Eval,G:ItemGen<E>>
 InitSeq<G>
 for EvalVec<E,G> {
 	type Item = E;
 	fn init(p: &Params, data: &G, mut _rng: &mut StdRng) -> (Duration,Self) {
 		let mut eval = EvalVec::new(p,data.clone());
-		let mut data_iter = eval.data.gen_count(p.start,p).into_iter();
+		let data_iter = eval.data.gen_count(p.start,p).into_iter();
 		let time = Duration::span(||{
 			for dat in data_iter {
 				eval.vec.push(dat)
@@ -38,13 +37,39 @@ for EvalVec<E,G> {
 }
 
 /// Appends to a `Vec` "batch-at-once" by `Vec::append`
-// uses EditParams::{batch_size} 
 impl<E:Eval,G:ItemGen<E>>
-EditAppend for EvalVec<E,G> {
-	fn append(mut self, batch_size: usize, _rng: &mut StdRng) -> (Duration,Self) {
+EditExtend for EvalVec<E,G> {
+	fn extend(mut self, batch_size: usize, _rng: &mut StdRng) -> (Duration,Self) {
 		let mut data_vec = self.data.gen_count(batch_size,&self.glob);
 		let time = Duration::span(||{
 			self.vec.append(&mut data_vec);
+		});
+		(time,self)
+	}
+}
+
+impl<E:Eval,G:ItemGen<E>>
+EditAppend for EvalVec<E,G> {
+	fn append(mut self, batch_size: usize, _rng: &mut StdRng) -> (Duration,Self) {
+		let data_vec = self.data.gen_count(batch_size,&self.glob);
+		let time = Duration::span(||{
+			for val in data_vec {
+				self.vec.push(val);
+			}
+		});
+		(time,self)
+	}
+}
+
+impl<E:Eval,G:ItemGen<E>>
+EditInsert for EvalVec<E,G> {
+	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
+		let data_vec = self.data.gen_count(batch_size,&self.glob);
+		let loc = rng.gen::<usize>() % self.vec.len();
+		let time = Duration::span(||{
+			for val in data_vec {
+				self.vec.insert(loc,val);
+			}
 		});
 		(time,self)
 	}

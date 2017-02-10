@@ -12,6 +12,7 @@ pub struct EvalIRaz<E:Eval,G:ItemGen<E>> {
 	raztree: Option<IRazTree<E>>,
 	names: usize,
 	data: G,
+	counter: usize, // for name/levels during edit
 	glob: Params
 }
 
@@ -21,6 +22,7 @@ impl<E: Eval,G:ItemGen<E>> EvalIRaz<E,G> {
 			raztree: None,
 			names: 0,
 			data: data,
+			counter: 0,
 			glob: (*p).clone(),
 		}
 	}
@@ -45,9 +47,9 @@ for EvalIRaz<E,G> {
 		// measure stuff
 		let names = p.start/(p.namesize*p.unitsize); // integer division
 		let levels = p.start / p.unitsize; 
-		let nonames = p.start - names;
+		let nonames = p.start - (names*p.namesize*p.unitsize);
 		let units = nonames / p.unitsize; // integer division
-		let nounits = nonames - units;
+		let nounits = nonames - (units*p.unitsize);
 		// pregenerate data
 		let mut lev_vec = Vec::with_capacity(levels);
 		for _ in 0..levels {
@@ -69,20 +71,20 @@ for EvalIRaz<E,G> {
 			for _ in 0..names {
 				for _ in 0..p.namesize {
 					for _ in 0..p.unitsize {
-						raz.push_left(data_iter.next().unwrap());
+						raz.push_left(data_iter.next().unwrap_or_else(||panic!("init")));
 					}
-					raz.archive_left(level_iter.next().unwrap(), name_iter.next().unwrap());
+					raz.archive_left(level_iter.next().unwrap_or_else(||panic!("init")), name_iter.next().unwrap_or_else(||panic!("init")));
 				}
 				// name inserted above
 			}
 			for _ in 0..units {
 				for _ in 0..p.unitsize {
-					raz.push_left(data_iter.next().unwrap());
+					raz.push_left(data_iter.next().unwrap_or_else(||panic!("init")));
 				}
-				raz.archive_left(level_iter.next().unwrap(), None);
+				raz.archive_left(level_iter.next().unwrap_or_else(||panic!("init")), None);
 			}
 			for _ in 0..nounits {
-				raz.push_left(data_iter.next().unwrap());
+				raz.push_left(data_iter.next().unwrap_or_else(||panic!("init")));
 			}
 			eval.raztree = Some(raz.unfocus());
 		});
@@ -90,18 +92,95 @@ for EvalIRaz<E,G> {
 	}
 }
 
-/// Appends to a `RazTree` by focusing to the end, pushing
-/// data, levels, and names, then unfocusing
-// uses (saved) Params::{namesize,unitsize}, EditParams::{batch_size}
+// TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
+impl<E:Eval,G:ItemGen<E>>
+EditInsert for EvalIRaz<E,G> {
+	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
+		let tree = self.raztree.take().unwrap_or_else(||panic!("raz empty"));
+		let loc = rng.gen::<usize>() % tree.len();
+		let mut raz = tree.focus(loc).unwrap_or_else(||panic!("bad edit location"));
+		// pregenerate data
+		let new_levels = batch_size / self.glob.unitsize;
+		let mut lev_vec = Vec::with_capacity(new_levels);
+		for _ in 0..(new_levels + 1) {
+			lev_vec.push(gen_level(rng))
+		}
+		let new_names = batch_size / (self.glob.namesize*self.glob.unitsize);
+		let mut name_vec = Vec::with_capacity(new_names);
+		for _ in 0..(new_names + 1) {
+			name_vec.push(Some(self.next_name()));
+		}
+		let data_iter = self.data.gen_count(batch_size,&self.glob).into_iter();
+		let mut name_iter = name_vec.into_iter();
+		let mut lev_iter = lev_vec.into_iter();
+		// time insertions
+		let time = Duration::span(||{
+			for data in data_iter {
+				raz.push_left(data);
+				self.counter += 1;
+				if self.counter % (self.glob.namesize*self.glob.unitsize) == 0 {
+					raz.archive_left(lev_iter.next().expect("lev_name"),name_iter.next().expect("name"));
+				} else if self.counter % self.glob.unitsize == 0 {
+					raz.archive_left(lev_iter.next().expect("lev"),None);
+				}
+			}
+			self.raztree = Some(raz.unfocus());
+		});
+		(time,self)		
+	}
+}
+
+// TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
 impl<E:Eval,G:ItemGen<E>>
 EditAppend for EvalIRaz<E,G> {
 	fn append(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
+		let tree = self.raztree.take().unwrap_or_else(||panic!("raz empty"));
+		let len = tree.len();
+		let mut raz = tree.focus(len).unwrap_or_else(||panic!("bad length"));
+		// pregenerate data
+		let new_levels = batch_size / self.glob.unitsize;
+		let mut lev_vec = Vec::with_capacity(new_levels);
+		for _ in 0..(new_levels + 1) {
+			lev_vec.push(gen_level(rng))
+		}
+		let new_names = batch_size / (self.glob.namesize*self.glob.unitsize);
+		let mut name_vec = Vec::with_capacity(new_names);
+		for _ in 0..(new_names + 1) {
+			name_vec.push(Some(self.next_name()));
+		}
+		let data_iter = self.data.gen_count(batch_size,&self.glob).into_iter();
+		let mut name_iter = name_vec.into_iter();
+		let mut lev_iter = lev_vec.into_iter();
+		// time insertions
+		let time = Duration::span(||{
+			for data in data_iter {
+				raz.push_left(data);
+				self.counter += 1;
+				if self.counter % (self.glob.namesize*self.glob.unitsize) == 0 {
+					raz.archive_left(lev_iter.next().expect("lev_name"),name_iter.next().expect("name"));
+				} else if self.counter % self.glob.unitsize == 0 {
+					raz.archive_left(lev_iter.next().expect("lev"),None);
+				}
+			}
+			self.raztree = Some(raz.unfocus());
+		});
+		(time,self)		
+	}
+}
+
+/// Appends to a `RazTree` by focusing to the end, pushing
+/// data, levels, and names, then unfocusing
+// uses (saved) Params::{namesize,unitsize}
+// TODO: Buggy
+impl<E:Eval,G:ItemGen<E>>
+EditExtend for EvalIRaz<E,G> {
+	fn extend(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap();
 		let namesize = self.glob.namesize;
 		let unitsize = self.glob.unitsize;
 
 		// measure stuff
-		let mut len = tree.len();
+		let len = tree.len();
 		let mut newelems = batch_size;
 		// fill in the level
 		let levelless = len % unitsize;
@@ -148,39 +227,39 @@ EditAppend for EvalIRaz<E,G> {
 		// time the append
 		let time = Duration::span(||{
 			// finish the last level, name
-			let mut raz = tree.focus(len).unwrap();
+			let mut raz = tree.focus(len).expect("02");
 			for _ in 0..pre_elems {
-				raz.push_left(data_iter.next().unwrap());
+				raz.push_left(data_iter.next().expect("03"));
 			}
 			for _ in 0..pre_levels {
-				raz.archive_left(level_iter.next().unwrap(), None);
+				raz.archive_left(level_iter.next().expect("04"), None);
 				for _ in 0..unitsize {
-					raz.push_left(data_iter.next().unwrap());
+					raz.push_left(data_iter.next().expect("05"));
 				}
 			}
 			if madename == 1 {
-				raz.archive_left(level_iter.next().unwrap(), name_iter.next().unwrap())
+				raz.archive_left(level_iter.next().expect("06"), name_iter.next().expect("07"))
 			} else if madelevel == 1 {
-				raz.archive_left(level_iter.next().unwrap(), None)
+				raz.archive_left(level_iter.next().expect("08"), None)
 			}
 			// add new elms, levels, names, like above
 			for _ in 0..names {
 				for _ in 0..namesize {
 					for _ in 0..unitsize {
-						raz.push_left(data_iter.next().unwrap());
+						raz.push_left(data_iter.next().expect("09"));
 					}
-					raz.archive_left(level_iter.next().unwrap(), name_iter.next().unwrap());
+					raz.archive_left(level_iter.next().expect("10"), name_iter.next().expect("11"));
 				}
 				// name inserted above
 			}
 			for _ in 0..units {
 				for _ in 0..unitsize {
-					raz.push_left(data_iter.next().unwrap());
+					raz.push_left(data_iter.next().expect("12"));
 				}
-				raz.archive_left(level_iter.next().unwrap(), None);
+				raz.archive_left(level_iter.next().expect("13"), None);
 			}
 			for _ in 0..nounits {
-				raz.push_left(data_iter.next().unwrap());
+				raz.push_left(data_iter.next().expect("14"));
 			}
 			self.raztree = Some(raz.unfocus());
 		});
