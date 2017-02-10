@@ -7,21 +7,21 @@ use pmfp_collections::inc_tree_cursor::gen_level;
 use Params;
 use eval::*;
 
-pub struct EvalIRaz<'a, E:Eval,G:ItemGen<E>> {
+pub struct EvalIRaz<E:Eval,G:ItemGen<E>> {
 	// Option for cleaner code, None means uninitialized
 	raztree: Option<IRazTree<E>>,
 	names: usize,
 	data: G,
-	glob: &'a Params
+	glob: Params
 }
 
-impl<'a, E: Eval,G:ItemGen<E>> EvalIRaz<'a, E,G> {
-	pub fn new(p: &'a Params, data:G) -> Self {
+impl<E: Eval,G:ItemGen<E>> EvalIRaz<E,G> {
+	pub fn new(p: &Params, data:G) -> Self {
 		EvalIRaz {
 			raztree: None,
 			names: 0,
 			data: data,
-			glob: p,
+			glob: (*p).clone(),
 		}
 	}
 	pub fn next_name(&mut self) -> Name {
@@ -34,13 +34,13 @@ impl<'a, E: Eval,G:ItemGen<E>> EvalIRaz<'a, E,G> {
 /// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
 // uses Params::{start,namesize,unitsize}
-impl<'a, E:Eval,G:ItemGen<E>>
-DataInit<'a,G>
-for EvalIRaz<'a, E,G> {
+impl<E:Eval,G:ItemGen<E>>
+InitSeq<G>
+for EvalIRaz<E,G> {
 	type Item = E;
-	fn init<'b>(p: &'a Params, data: G, mut rng: &'b mut StdRng) -> (Duration,Self)
+	fn init(p: &Params, data: &G, mut rng: &mut StdRng) -> (Duration,Self)
 	{
-		let mut eval = EvalIRaz::new(p,data);
+		let mut eval = EvalIRaz::new(p,data.clone());
 		let mut raz = IRaz::new();
 		// measure stuff
 		let names = p.start/(p.namesize*p.unitsize); // integer division
@@ -93,16 +93,16 @@ for EvalIRaz<'a, E,G> {
 /// Appends to a `RazTree` by focusing to the end, pushing
 /// data, levels, and names, then unfocusing
 // uses (saved) Params::{namesize,unitsize}, EditParams::{batch_size}
-impl<'a, E:Eval,G:ItemGen<E>>
-EditAppend for EvalIRaz<'a, E,G> {
-	fn edit(mut self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self) {
+impl<E:Eval,G:ItemGen<E>>
+EditAppend for EvalIRaz<E,G> {
+	fn append(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap();
 		let namesize = self.glob.namesize;
 		let unitsize = self.glob.unitsize;
 
 		// measure stuff
 		let mut len = tree.len();
-		let mut newelems = p.batch_size;
+		let mut newelems = batch_size;
 		// fill in the level
 		let levelless = len % unitsize;
 		let pre_elems = min(unitsize - levelless, newelems);
@@ -141,7 +141,7 @@ EditAppend for EvalIRaz<'a, E,G> {
 			}
 			name_vec.push(Some(self.next_name()));
 		}
-		let mut data_iter = self.data.gen_count(p.batch_size,self.glob).into_iter();
+		let mut data_iter = self.data.gen_count(batch_size,&self.glob).into_iter();
 		let mut name_iter = name_vec.into_iter();
 		let mut level_iter = lev_vec.into_iter();
 
@@ -188,10 +188,10 @@ EditAppend for EvalIRaz<'a, E,G> {
 	}
 }
 
-impl<'a, E:Eval+Ord,G:ItemGen<E>>
-CompMax for EvalIRaz<'a, E,G> {
+impl<E:Eval+Ord,G:ItemGen<E>>
+CompMax for EvalIRaz<E,G> {
 	type Target = Option<E>;
-	fn compute(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
+	fn seq_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let clone = self.raztree.clone().unwrap();
 		let mut max_val = None;
 		let time = Duration::span(||{

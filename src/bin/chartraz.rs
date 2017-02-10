@@ -24,7 +24,6 @@ const DEFAULT_START: usize = 0;
 const DEFAULT_UNITSIZE: usize = 10;
 const DEFAULT_NAMESIZE: usize = 0;
 const DEFAULT_EDITS: usize = 1;
-const DEFAULT_BATCHES: usize = 1;
 const DEFAULT_CHANGES: usize = 10;
 const DEFAULT_TRIALS: usize = 10;
 const DEFAULT_VARY: &'static str = "none";
@@ -50,10 +49,9 @@ fn main() {
       -u, --unitsize=[unitsize] 'initial elements per structure unit'
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -e, --edits=[edits]       'edits per batch'
-      -b, --batches=[batches]   'batches per incremental change'
       -c, --changes=[changes]   'number of incremental changes'
       -t, --trials=[trials]     'trials to average over'
-      --vary=[vary]             'parameter to vary (one of sunebc, adjust x2)' ")
+      --vary=[vary]             'parameter to vary (one of sunec, adjust x2)' ")
     .get_matches();
   let nohead = args.is_present("nohead");
   let dataseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_DATASEED);
@@ -64,30 +62,25 @@ fn main() {
 	let unitsize = value_t!(args, "unitsize", usize).unwrap_or(DEFAULT_UNITSIZE);
 	let namesize = value_t!(args, "namesize", usize).unwrap_or(DEFAULT_NAMESIZE);
 	let edits = value_t!(args, "edits", usize).unwrap_or(DEFAULT_EDITS);
-	let batches = value_t!(args, "batches", usize).unwrap_or(DEFAULT_BATCHES);
 	let changes = value_t!(args, "changes", usize).unwrap_or(DEFAULT_CHANGES);
 	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
 	let vary = match args.value_of("vary").unwrap_or(DEFAULT_VARY) {
-		"none"=>Nil,"s"=>S,"u"=>U,"n"=>N,"e"=>E,"b"=>B,"c"=>C,
-		_ => panic!("vary takes on of: s,u,n,e,b,c")
+		"none"=>Nil,"s"=>S,"u"=>U,"n"=>N,"e"=>E,"c"=>C,
+		_ => panic!("vary takes on of: s,u,n,e,c")
 	};
 
 	let print_header = ||{
-	   println!("Timestamp,Seed,SeqType,SeqNum,PriorElements,Insertions,Batches,Time,{}", taghead);
+	   println!("Timestamp,Seed,SeqType,SeqNum,PriorElements,Insertions,Time,{}", taghead);
 	};
 
 	let print_result = |version: &str, number: usize, prior_elms: usize, insertions: usize, time: Duration| {
-		println!("{},{},{},{},{},{},{},{},{}",
-			time::get_time().sec, dataseed, version, number, prior_elms, insertions, batches, time, tag
+		println!("{},{},{},{},{},{},{},{}",
+			time::get_time().sec, dataseed, version, number, prior_elms, insertions, time, tag
 		);
 	};
 
   // print header
   if !nohead { print_header() }
-
-	// initialize with starting elements
-	if start > 0 {
-	}
 
 }
 

@@ -1,3 +1,4 @@
+pub mod actions;
 pub mod eval_iraz;
 pub mod eval_vec;
 pub mod seq_test;
@@ -7,6 +8,7 @@ use std::hash::Hash;
 use rand::{Rand, Rng, StdRng};
 use time::Duration;
 
+#[derive(Clone)]
 pub struct Params {
 	start: usize,
 	unitsize: usize,
@@ -36,20 +38,36 @@ pub trait ItemGen<E:Eval>: Clone {
 	}
 }
 
-trait DataInit<'a,G:ItemGen<Self::Item>> {
+// primitive traits applied to evaluatable data
+trait InitSeq<G:ItemGen<Self::Item>> {
 	type Item: Eval;
 	/// generate an initial sequence, based on Params
-	fn init<'b>(p: &'a Params, data: G, rng: &'b mut StdRng) -> (Duration,Self);
+	fn init(p: &Params, item_gen: &G, rng: &mut StdRng) -> (Duration,Self);
 }
 trait EditAppend {
-	fn edit(self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self);
+	fn append(self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self);
 }
 trait EditInsert {
-	fn edit(self, p: &EditParams, rng: &mut StdRng) -> (Duration,Self);
+	fn insert(self, loc: usize, batch_size: usize, rng: &mut StdRng) -> (Duration,Self);
 }
 trait CompMax {
 	type Target;
-	fn compute(&self, rng: &mut StdRng) -> (Duration,Self::Target);
+	fn seq_max(&self, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
+// General traits for types that perform some of the primitive actions above
+trait Creator<R,D> {
+	fn create(&mut self, rnd: &mut StdRng) -> (R,D);
+}
+trait Editor<R,D> {
+	fn edit(&mut self, data: D, rng: &mut StdRng) -> (R,D);
+}
+trait Computor<R,D> {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> R;
+}
+// combines everything
+trait Testor<R> {
+	fn test(&mut self, rng: &mut StdRng) -> R;
 }
 
 /////////////////////
