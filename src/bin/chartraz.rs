@@ -19,6 +19,7 @@ use eval::actions::*;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 use eval::seq_test::{TestResult,FirstCrossover};
+use adapton::engine::manage::*;
 
 const DEFAULT_DATASEED: usize = 0;
 const DEFAULT_EDITSEED: usize = 0;
@@ -102,9 +103,11 @@ fn main() {
 			item_gen: StdRng::from_seed(&[dataseed]),
 			phantom: PhantomData,
 		},
-		edit: BatchInsert(3),
+		edit: BatchInsert(edits),
 		comp: FindMax,
   };
+
+  let _ = init_dcg(); assert!(engine_is_dcg());
 
   let result_raz: TestResult<EvalIRaz<usize,StdRng>,Option<usize>> = test.test(&mut StdRng::from_seed(&[editseed]));
   let result_vec: TestResult<EvalVec<usize,StdRng>,Option<usize>> = test.test(&mut StdRng::from_seed(&[editseed]));
