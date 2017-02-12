@@ -72,12 +72,12 @@ fn main() {
   let result_vec: TestResult<EvalVec<usize,StdRng>,Option<usize>> = test.test(&mut rng);
 
   //let answers: Vec<(usize,usize)> = result_raz.answers.iter().map(|d|d.unwrap()).zip(result_vec.answers.iter().map(|d|d.unwrap())).collect();
-  let comp_raz: Vec<i64> = result_raz.computes.iter().map(|d|d.num_nanoseconds().unwrap()).collect();
-  let comp_vec: Vec<i64> = result_vec.computes.iter().map(|d|d.num_nanoseconds().unwrap()).collect();
-  let comp_both: Vec<(i64,i64)> = comp_raz.into_iter().zip(comp_vec.into_iter()).collect();
-  let edit_raz: Vec<i64> = result_raz.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect();
-  let edit_vec: Vec<i64> = result_vec.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect();
-  let edit_both: Vec<(i64,i64)> = edit_raz.into_iter().zip(edit_vec.into_iter()).collect();
+  let comp_raz = result_raz.computes.iter().map(|d|d.num_nanoseconds().unwrap());
+  let comp_vec = result_vec.computes.iter().map(|d|d.num_nanoseconds().unwrap());
+  let comp_both: Vec<(i64,i64)> = comp_raz.zip(comp_vec).collect();
+  let edit_raz = result_raz.edits.iter().map(|d|d.num_nanoseconds().unwrap());
+  let edit_vec = result_vec.edits.iter().map(|d|d.num_nanoseconds().unwrap());
+  let edit_both: Vec<(i64,i64)> = edit_raz.zip(edit_vec).collect();
   
   println!("edits: {:?}", edit_both);
   println!("computes: {:?}", comp_both);
