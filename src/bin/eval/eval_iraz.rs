@@ -279,7 +279,7 @@ EditExtend for EvalIRaz<E,G> {
 impl<E:Eval+Ord,G:Rng>
 CompMax for EvalIRaz<E,G> {
 	type Target = Option<E>;
-	fn seq_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
+	fn comp_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let clone = self.raztree.clone().unwrap();
 		let mut max_val = None;
 		let time = Duration::span(||{
@@ -289,3 +289,18 @@ CompMax for EvalIRaz<E,G> {
 	}
 }
 
+impl<E:Eval,O:Eval,F,G:Rng>
+CompMap<E,O,F> for EvalIRaz<E,G> where
+	F:'static + Fn(&E)->O
+{
+	type Target = IRazTree<O>;
+	fn comp_map(&self, f:Rc<F>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let clone = self.raztree.clone().unwrap();
+		let mut mapped = None;
+		let time = Duration::span(||{
+			mapped = Some(clone.map(f));
+		});
+		(time, mapped.unwrap())
+	}
+
+}

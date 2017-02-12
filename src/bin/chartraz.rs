@@ -53,6 +53,7 @@ fn main() {
 	let changes = value_t!(args, "changes", usize).unwrap_or(DEFAULT_CHANGES);
 	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
 
+  //setup test
   let mut test = EditComputeSequence{
     init: IncrementalInit {
       size: start,
@@ -60,18 +61,19 @@ fn main() {
       namegauge: namesize,
       coord: StdRng::from_seed(&[dataseed]),
     },
-    edit: BatchInsert(edits),
-    comp: FindMax,
+    edit: BatchInsert(edits), //BatchAppend(edits),
+    comp: FindMax, //Mapper::new(|&d|d+1),
     changes: changes,
   };
 
   let _ = init_dcg(); assert!(engine_is_dcg());
 
+  // run experiments
   let mut rng = StdRng::from_seed(&[editseed]);
   let result_raz: TestResult<EvalIRaz<usize,StdRng>> = test.test(&mut rng);
   let result_vec: TestResult<EvalVec<usize,StdRng>> = test.test(&mut rng);
 
-  //let answers: Vec<(usize,usize)> = result_raz.answers.iter().map(|d|d.unwrap()).zip(result_vec.answers.iter().map(|d|d.unwrap())).collect();
+  // post-process results
   let comp_raz = result_raz.computes.iter().map(|d|d.num_nanoseconds().unwrap());
   let comp_vec = result_vec.computes.iter().map(|d|d.num_nanoseconds().unwrap());
   let comp_both: Vec<(i64,i64)> = comp_raz.zip(comp_vec).collect();

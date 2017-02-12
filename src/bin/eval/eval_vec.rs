@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use rand::StdRng;
 use eval::*;
 
@@ -78,11 +79,26 @@ EditInsert for EvalVec<E,G> {
 impl<E:Eval+Ord,G:Rng>
 CompMax for EvalVec<E,G> {
 	type Target = Option<E>;
-	fn seq_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
+	fn comp_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let mut max = None;
 		let time = Duration::span(||{
-	    max = Some(self.vec.iter().max());
-	  });
-	  (time, max.unwrap().map(|ref e|(*e).clone()))
+			max = Some(self.vec.iter().max());
+		});
+		(time, max.unwrap().map(|ref e|(*e).clone()))
 	}
+}
+
+impl<E:Eval,O,F,G:Rng>
+CompMap<E,O,F> for EvalVec<E,G> where
+	F:Fn(&E)->O
+{
+	type Target = Vec<O>;
+	fn comp_map(&self, f:Rc<F>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let mut mapped = None;
+		let time = Duration::span(||{
+			mapped = Some(self.vec.iter().map(|e|f(e)).collect())
+		});
+		(time, mapped.unwrap())
+	}
+
 }

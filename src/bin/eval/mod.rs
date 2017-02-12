@@ -5,6 +5,7 @@ pub mod seq_test;
 
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::rc::Rc;
 use rand::{Rand, Rng, StdRng};
 use time::Duration;
 
@@ -36,7 +37,13 @@ pub trait EditInsert {
 /// for computing the max of the collection
 pub trait CompMax {
 	type Target;
-	fn seq_max(&self, rng: &mut StdRng) -> (Duration,Self::Target);
+	fn comp_max(&self, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
+/// changes every value to another based on function
+pub trait CompMap<I,O,F:Fn(&I)->O> {
+	type Target;
+	fn comp_map(&self, f:Rc<F>, rng: &mut StdRng) -> (Duration,Self::Target);
 }
 
 ////////////////////////////////
