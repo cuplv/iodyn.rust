@@ -101,7 +101,11 @@ EditInsert for EvalIRaz<E,G> {
 	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz empty"));
 		let loc = self.coord.gen::<usize>() % tree.len();
-		let mut raz = tree.focus(loc).unwrap_or_else(||panic!("bad edit location"));
+		let mut focus = None;
+		let focus_time = Duration::span(||{
+			focus = tree.focus(loc);
+		});
+		let mut raz = focus.unwrap_or_else(||panic!("bad edit location"));
 		// pregenerate data
 		let new_levels = batch_size / self.unitsize;
 		let mut lev_vec = Vec::with_capacity(new_levels);
@@ -117,7 +121,7 @@ EditInsert for EvalIRaz<E,G> {
 		let mut name_iter = name_vec.into_iter();
 		let mut lev_iter = lev_vec.into_iter();
 		// time insertions
-		let time = Duration::span(||{
+		let insert_time = Duration::span(||{
 			for data in data_iter {
 				raz.push_left(data);
 				self.counter += 1;
@@ -129,7 +133,7 @@ EditInsert for EvalIRaz<E,G> {
 			}
 			self.raztree = Some(raz.unfocus());
 		});
-		(time,self)		
+		(focus_time+insert_time,self)		
 	}
 }
 
@@ -139,7 +143,11 @@ EditAppend for EvalIRaz<E,G> {
 	fn append(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz empty"));
 		let len = tree.len();
-		let mut raz = tree.focus(len).unwrap_or_else(||panic!("bad length"));
+		let mut focus = None;
+		let focus_time = Duration::span(||{
+			focus = tree.focus(len);
+		});
+		let mut raz = focus.unwrap_or_else(||panic!("bad edit location"));
 		// pregenerate data
 		let new_levels = batch_size / self.unitsize;
 		let mut lev_vec = Vec::with_capacity(new_levels);
@@ -167,7 +175,7 @@ EditAppend for EvalIRaz<E,G> {
 			}
 			self.raztree = Some(raz.unfocus());
 		});
-		(time,self)		
+		(focus_time+time,self)		
 	}
 }
 
@@ -275,7 +283,7 @@ CompMax for EvalIRaz<E,G> {
 		let clone = self.raztree.clone().unwrap();
 		let mut max_val = None;
 		let time = Duration::span(||{
-	    max_val = Some(clone.fold_up(Rc::new(|e:&E|e.clone()),Rc::new(|e1:E,e2:E|max(e1,e2))))
+	    	max_val = Some(clone.fold_up(Rc::new(|e:&E|e.clone()),Rc::new(|e1:E,e2:E|max(e1,e2))))
 		});
 		(time,max_val.unwrap())
 	}
