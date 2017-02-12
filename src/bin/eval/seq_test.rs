@@ -1,37 +1,35 @@
+use std::marker::PhantomData;
 use time::{Duration};
 use rand::{StdRng};
 use eval::*;
-use actions::*;
 
-pub struct TestResult<D,A> {
+pub struct TestResult<D> {
 	pub edits: Vec<Duration>,
 	pub full_edits: Vec<Duration>,
 	pub computes: Vec<Duration>,
 	pub full_computes: Vec<Duration>,
-	pub answers: Vec<A>,
-	pub final_data: D,
+	pd: PhantomData<D>,
 }
 
-pub struct FirstCrossover<G:Rng> {
-	pub init: IncrementalInit<G>,
-	pub edit: BatchInsert,
-	pub comp: FindMax,
+pub struct EditComputeSequence<C,E,U> {
+	pub init: C,
+	pub edit: E,
+	pub comp: U,
 	pub changes: usize,
 }
-
-impl<'a,D,G>
-Testor<TestResult<D,D::Target>>
-for FirstCrossover<G> where
-	G:Rng,
-	D:CreateInc<G>+EditInsert+CompMax,
+impl<'a,C,E,U,D>
+Testor<TestResult<D>>
+for EditComputeSequence<C,E,U> where
+	C: Creator<Duration,D>,
+	E: Editor<Duration,D>,
+	U: Computor<Duration,D>,
 {
-	fn test(&mut self, rng: &mut StdRng) -> TestResult<D,D::Target> {
-		let mut testdata;
+	fn test(&mut self, rng: &mut StdRng) -> TestResult<D> {
+		let mut testdata: D;
 		let mut edits = Vec::with_capacity(self.changes);
 		let mut full_edits = Vec::with_capacity(self.changes);
 		let mut computes = Vec::with_capacity(self.changes);
 		let mut full_computes = Vec::with_capacity(self.changes);
-		let mut _answers = Vec::with_capacity(self.changes);
 
 		// step 1: initialize sequence
 		let mut init_result = None;
@@ -48,7 +46,6 @@ for FirstCrossover<G> where
 		});
 		let comp_time = comp_result.unwrap();
 		computes.push(comp_time);
-		//_answers.push(answer);
 		full_computes.push(full_comp_time);
 
 		// step 2: run a bunch of edits	
@@ -67,7 +64,6 @@ for FirstCrossover<G> where
 			});
 			let comp_time = comp_result.unwrap();
 			computes.push(comp_time);
-			//_answers.push(answer);
 			full_computes.push(full_comp_time);
 		}
 
@@ -76,8 +72,7 @@ for FirstCrossover<G> where
 			full_edits: full_edits,
 			computes: computes,
 			full_computes: full_computes,
-			answers: _answers,
-			final_data: testdata,
+			pd: PhantomData,
 		}
 	}
 }

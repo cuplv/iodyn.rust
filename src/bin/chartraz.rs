@@ -16,7 +16,7 @@ use eval::*;
 use eval::actions::*;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
-use eval::seq_test::{TestResult,FirstCrossover};
+use eval::seq_test::{TestResult,EditComputeSequence};
 use adapton::engine::manage::*;
 
 const DEFAULT_DATASEED: usize = 0;
@@ -53,23 +53,23 @@ fn main() {
 	let changes = value_t!(args, "changes", usize).unwrap_or(DEFAULT_CHANGES);
 	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
 
-  let mut test = FirstCrossover{
-		init: IncrementalInit {
-			size: start,
+  let mut test = EditComputeSequence{
+    init: IncrementalInit {
+      size: start,
       unitgauge: unitsize,
       namegauge: namesize,
-			coord: StdRng::from_seed(&[dataseed]),
-		},
-		edit: BatchInsert(edits),
-		comp: FindMax,
+      coord: StdRng::from_seed(&[dataseed]),
+    },
+    edit: BatchInsert(edits),
+    comp: FindMax,
     changes: changes,
   };
 
   let _ = init_dcg(); assert!(engine_is_dcg());
 
   let mut rng = StdRng::from_seed(&[editseed]);
-  let result_raz: TestResult<EvalIRaz<usize,StdRng>,Option<usize>> = test.test(&mut rng);
-  let result_vec: TestResult<EvalVec<usize,StdRng>,Option<usize>> = test.test(&mut rng);
+  let result_raz: TestResult<EvalIRaz<usize,StdRng>> = test.test(&mut rng);
+  let result_vec: TestResult<EvalVec<usize,StdRng>> = test.test(&mut rng);
 
   //let answers: Vec<(usize,usize)> = result_raz.answers.iter().map(|d|d.unwrap()).zip(result_vec.answers.iter().map(|d|d.unwrap())).collect();
   let comp_raz = result_raz.computes.iter().map(|d|d.num_nanoseconds().unwrap());
