@@ -31,7 +31,7 @@ for FirstCrossover<G> where
 		let mut full_edits = Vec::with_capacity(self.changes);
 		let mut computes = Vec::with_capacity(self.changes);
 		let mut full_computes = Vec::with_capacity(self.changes);
-		let mut answers = Vec::with_capacity(self.changes);
+		let mut _answers = Vec::with_capacity(self.changes);
 
 		// step 1: initialize sequence
 		let mut init_result = None;
@@ -48,7 +48,7 @@ for FirstCrossover<G> where
 		});
 		let comp_time = comp_result.unwrap();
 		computes.push(comp_time);
-		//answers.push(answer);
+		//_answers.push(answer);
 		full_computes.push(full_comp_time);
 
 		// step 2: run a bunch of edits	
@@ -67,7 +67,7 @@ for FirstCrossover<G> where
 			});
 			let comp_time = comp_result.unwrap();
 			computes.push(comp_time);
-			//answers.push(answer);
+			//_answers.push(answer);
 			full_computes.push(full_comp_time);
 		}
 
@@ -76,7 +76,7 @@ for FirstCrossover<G> where
 			full_edits: full_edits,
 			computes: computes,
 			full_computes: full_computes,
-			answers: answers,
+			answers: _answers,
 			final_data: testdata,
 		}
 	}
