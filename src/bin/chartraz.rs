@@ -89,20 +89,15 @@ fn main() {
   if !nohead { print_header() }
 
   let mut test = FirstCrossover{
-		init: SizedSeq{
+		init: IncrementalInit {
 			size: start,
-			params: Params{
-				start: start,
-				unitsize: unitsize,
-				namesize: namesize,
-				edits: edits,
-				changes: changes,
-				trials: trials,
-			},
+      unitgauge: unitsize,
+      namegauge: namesize,
 			coord: StdRng::from_seed(&[dataseed]),
 		},
 		edit: BatchInsert(edits),
 		comp: FindMax,
+    changes: changes,
   };
 
   let _ = init_dcg(); assert!(engine_is_dcg());

@@ -8,24 +8,18 @@ use std::hash::Hash;
 use rand::{Rand, Rng, StdRng};
 use time::Duration;
 
-#[derive(Clone)]
-pub struct Params {
-	pub start: usize,
-	pub unitsize: usize,
-	pub namesize: usize,
-	pub edits: usize,
-	pub changes: usize,
-	pub trials: usize,
-}
-
+/// convenience trait for incremental test data
 pub trait Eval: 'static+Eq+Clone+Hash+Debug+Rand {}
 impl<E> Eval for E where E: 'static+Eq+Clone+Hash+Debug+Rand {}
 
-// primitive traits applied to evaluatable data
+////////////////////////////////////
+// primitive traits
+// optional and more can be included
+////////////////////////////////////
 
-/// for building an initial collection
-pub trait InitSeq<G:Rng> {
-	fn init(p: &Params, coord: &G, rng: &mut StdRng) -> (Duration,Self);
+/// for building an incremental collection
+pub trait CreateInc<G:Rng> {
+	fn inc_init(size: usize, unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration,Self);
 }
 /// for adding elements as if initialization was longer
 pub trait EditExtend {
@@ -45,7 +39,11 @@ pub trait CompMax {
 	fn seq_max(&self, rng: &mut StdRng) -> (Duration,Self::Target);
 }
 
-// General traits for types that perform some of the primitive actions above
+////////////////////////////////
+// Types of actions
+// limited number, unlimited use
+////////////////////////////////
+
 pub trait Creator<R,D> {
 	fn create(&mut self, rnd: &mut StdRng) -> (R,D);
 }
@@ -56,7 +54,7 @@ pub trait Computor<R,D> {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> R;
 }
 
-// combines everything
+/// Test framework
 pub trait Testor<R> {
 	fn test(&mut self, rng: &mut StdRng) -> R;
 }

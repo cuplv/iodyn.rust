@@ -1,5 +1,4 @@
 use rand::StdRng;
-use Params;
 use eval::*;
 
 /// Test harness for `Vec`
@@ -20,13 +19,13 @@ EvalVec<E,G> {
 }
 
 /// Creates a `Vec` by pushing individual elements into
-/// an initially unallocated `Vec`.
+/// an initially unallocated `Vec`. Ignores the incremental vars.
 impl<E:Eval,G:Rng+Clone>
-InitSeq<G>
+CreateInc<G>
 for EvalVec<E,G> {
-	fn init(p: &Params, coord: &G, mut _rng: &mut StdRng) -> (Duration,Self) {
+	fn inc_init(size: usize, _unigauge: usize, _namegauge: usize, coord: &G, mut _rng: &mut StdRng) -> (Duration,Self) {
 		let mut eval = EvalVec::new((*coord).clone());
-		let data_iter = eval.coord.gen_iter::<E>().take(p.start).collect::<Vec<_>>().into_iter();
+		let data_iter = eval.coord.gen_iter::<E>().take(size).collect::<Vec<_>>().into_iter();
 		let time = Duration::span(||{
 			for dat in data_iter {
 				eval.vec.push(dat)

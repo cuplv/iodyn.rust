@@ -1,12 +1,15 @@
 use eval::*;
 
 // builds a sequence from scratch, 
-pub struct SizedSeq<G:Rng> {
-	pub size: usize, pub params: Params, pub coord: G,
+pub struct IncrementalInit<G:Rng> {
+	pub size: usize,
+	pub unitgauge: usize,
+	pub namegauge: usize,
+	pub coord: G,
 }
-impl<D:InitSeq<G>,G:Rng> Creator<Duration,D> for SizedSeq<G> {
+impl<D:CreateInc<G>,G:Rng> Creator<Duration,D> for IncrementalInit<G> {
 	fn create(&mut self, rng: &mut StdRng) -> (Duration,D){
-		D::init(&self.params, &self.coord, rng)
+		D::inc_init(self.size, self.unitgauge, self.namegauge, &self.coord, rng)
 	}
 }
 
