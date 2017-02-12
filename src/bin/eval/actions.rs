@@ -1,15 +1,12 @@
-// TODO: Figure out what to do with RNG's to avoid this
-use std::marker::PhantomData;
-
 use eval::*;
 
 // builds a sequence from scratch, 
-pub struct SizedSeq<E: Eval,G:ItemGen<E>> {
-	pub size: usize, pub params: Params, pub item_gen: G, pub phantom: PhantomData<E>,
+pub struct SizedSeq<G:Rng> {
+	pub size: usize, pub params: Params, pub coord: G,
 }
-impl<D:InitSeq<G>,G:ItemGen<D::Item>> Creator<Duration,D> for SizedSeq<D::Item,G> {
+impl<D:InitSeq<G>,G:Rng> Creator<Duration,D> for SizedSeq<G> {
 	fn create(&mut self, rng: &mut StdRng) -> (Duration,D){
-		D::init(&self.params, &self.item_gen, rng)
+		D::init(&self.params, &self.coord, rng)
 	}
 }
 

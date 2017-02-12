@@ -11,7 +11,6 @@ extern crate pmfp_collections;
 
 mod eval;
 
-use std::marker::PhantomData;
 use rand::{StdRng,SeedableRng};
 use time::{Duration};
 use eval::*;
@@ -25,7 +24,7 @@ const DEFAULT_DATASEED: usize = 0;
 const DEFAULT_EDITSEED: usize = 0;
 const DEFAULT_TAG: &'static str = "None";
 const DEFAULT_TAGHEAD: &'static str = "Tag";
-const DEFAULT_START: usize = 0;
+const DEFAULT_START: usize = 10000;
 const DEFAULT_UNITSIZE: usize = 10;
 const DEFAULT_NAMESIZE: usize = 1;
 const DEFAULT_EDITS: usize = 1;
@@ -100,8 +99,7 @@ fn main() {
 				changes: changes,
 				trials: trials,
 			},
-			item_gen: StdRng::from_seed(&[dataseed]),
-			phantom: PhantomData,
+			coord: StdRng::from_seed(&[dataseed]),
 		},
 		edit: BatchInsert(edits),
 		comp: FindMax,

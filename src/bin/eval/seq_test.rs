@@ -12,17 +12,17 @@ pub struct TestResult<D,A> {
 	pub final_data: D,
 }
 
-pub struct FirstCrossover<I:Eval,G:ItemGen<I>> {
-	pub init: SizedSeq<I,G>,
+pub struct FirstCrossover<G:Rng> {
+	pub init: SizedSeq<G>,
 	pub edit: BatchInsert,
 	pub comp: FindMax,
 }
 
 impl<'a,D,G>
 Testor<TestResult<D,D::Target>>
-for FirstCrossover<D::Item,G> where
-	D: InitSeq<G>+EditInsert+CompMax,
-	G:ItemGen<D::Item>,
+for FirstCrossover<G> where
+	G:Rng,
+	D:InitSeq<G>+EditInsert+CompMax,
 {
 	fn test(&mut self, rng: &mut StdRng) -> TestResult<D,D::Target> {
 		let mut testdata;

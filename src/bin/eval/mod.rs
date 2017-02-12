@@ -18,25 +18,14 @@ pub struct Params {
 	pub trials: usize,
 }
 
-pub trait Eval: 'static+Eq+Clone+Hash+Debug {}
-impl<E> Eval for E where E: 'static+Eq+Clone+Hash+Debug {}
-
-pub trait ItemGen<E:Eval>: Clone {
-	fn gen_item(&mut self, p: &Params) -> E;
-	fn gen_count(&mut self, count: usize, p:&Params) -> Vec<E> {
-		let mut data_vec = Vec::with_capacity(count);
-		for _ in 0..count {
-			data_vec.push(self.gen_item(p));
-		}
-		data_vec
-	}
-}
+pub trait Eval: 'static+Eq+Clone+Hash+Debug+Rand {}
+impl<E> Eval for E where E: 'static+Eq+Clone+Hash+Debug+Rand {}
 
 // primitive traits applied to evaluatable data
+
 /// for building an initial collection
-pub trait InitSeq<G:ItemGen<Self::Item>> {
-	type Item: Eval;
-	fn init(p: &Params, item_gen: &G, rng: &mut StdRng) -> (Duration,Self);
+pub trait InitSeq<G:Rng> {
+	fn init(p: &Params, coord: &G, rng: &mut StdRng) -> (Duration,Self);
 }
 /// for adding elements as if initialization was longer
 pub trait EditExtend {
@@ -70,15 +59,4 @@ pub trait Computor<R,D> {
 // combines everything
 pub trait Testor<R> {
 	fn test(&mut self, rng: &mut StdRng) -> R;
-}
-
-/////////////////////
-// Some Blanket Impls
-/////////////////////
-
-impl<E:Eval+Rand>
-ItemGen<E> for StdRng {
-	fn gen_item(&mut self, _p: &Params) -> E {
-		Rng::gen::<E>(self)
-	}
 }

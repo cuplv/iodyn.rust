@@ -7,21 +7,24 @@ use pmfp_collections::inc_tree_cursor::gen_level;
 use Params;
 use eval::*;
 
-pub struct EvalIRaz<E:Eval,G:ItemGen<E>> {
+/// Test harness for the incremental Raz
+///
+/// Coorinates elements and insertion location
+pub struct EvalIRaz<E:Eval,G:Rng> {
 	// Option for cleaner code, None means uninitialized
 	raztree: Option<IRazTree<E>>,
 	names: usize,
-	data: G,
+	coord: G,
 	counter: usize, // for name/levels during edit
 	glob: Params
 }
 
-impl<E: Eval,G:ItemGen<E>> EvalIRaz<E,G> {
-	pub fn new(p: &Params, data:G) -> Self {
+impl<E: Eval,G:Rng> EvalIRaz<E,G> {
+	pub fn new(p: &Params, coord:G) -> Self {
 		EvalIRaz {
 			raztree: None,
 			names: 0,
-			data: data,
+			coord: coord,
 			counter: 0,
 			glob: (*p).clone(),
 		}
@@ -36,13 +39,12 @@ impl<E: Eval,G:ItemGen<E>> EvalIRaz<E,G> {
 /// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
 // uses Params::{start,namesize,unitsize}
-impl<E:Eval,G:ItemGen<E>>
+impl<E:Eval,G:Rng+Clone>
 InitSeq<G>
 for EvalIRaz<E,G> {
-	type Item = E;
-	fn init(p: &Params, data: &G, mut rng: &mut StdRng) -> (Duration,Self)
+	fn init(p: &Params, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)
 	{
-		let mut eval = EvalIRaz::new(p,data.clone());
+		let mut eval = EvalIRaz::new(p,(*coord).clone());
 		let mut raz = IRaz::new();
 		// measure stuff
 		let names = p.start/(p.namesize*p.unitsize); // integer division
@@ -63,7 +65,7 @@ for EvalIRaz<E,G> {
 			}
 			name_vec.push(Some(eval.next_name()));
 		}
-		let mut data_iter = eval.data.gen_count(p.start,p).into_iter();
+		let mut data_iter = eval.coord.gen_iter().take(p.start).collect::<Vec<_>>().into_iter();
 		let mut name_iter = name_vec.into_iter();
 		let mut level_iter = lev_vec.into_iter();
 		// time the creation (insert and unfocus)
@@ -93,11 +95,11 @@ for EvalIRaz<E,G> {
 }
 
 // TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
-impl<E:Eval,G:ItemGen<E>>
+impl<E:Eval,G:Rng>
 EditInsert for EvalIRaz<E,G> {
 	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz empty"));
-		let loc = rng.gen::<usize>() % tree.len();
+		let loc = self.coord.gen::<usize>() % tree.len();
 		let mut raz = tree.focus(loc).unwrap_or_else(||panic!("bad edit location"));
 		// pregenerate data
 		let new_levels = batch_size / self.glob.unitsize;
@@ -110,7 +112,7 @@ EditInsert for EvalIRaz<E,G> {
 		for _ in 0..(new_names + 1) {
 			name_vec.push(Some(self.next_name()));
 		}
-		let data_iter = self.data.gen_count(batch_size,&self.glob).into_iter();
+		let data_iter = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
 		let mut name_iter = name_vec.into_iter();
 		let mut lev_iter = lev_vec.into_iter();
 		// time insertions
@@ -131,7 +133,7 @@ EditInsert for EvalIRaz<E,G> {
 }
 
 // TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
-impl<E:Eval,G:ItemGen<E>>
+impl<E:Eval,G:Rng>
 EditAppend for EvalIRaz<E,G> {
 	fn append(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz empty"));
@@ -148,7 +150,7 @@ EditAppend for EvalIRaz<E,G> {
 		for _ in 0..(new_names + 1) {
 			name_vec.push(Some(self.next_name()));
 		}
-		let data_iter = self.data.gen_count(batch_size,&self.glob).into_iter();
+		let data_iter = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
 		let mut name_iter = name_vec.into_iter();
 		let mut lev_iter = lev_vec.into_iter();
 		// time insertions
@@ -172,7 +174,7 @@ EditAppend for EvalIRaz<E,G> {
 /// data, levels, and names, then unfocusing
 // uses (saved) Params::{namesize,unitsize}
 // TODO: Buggy
-impl<E:Eval,G:ItemGen<E>>
+impl<E:Eval,G:Rng>
 EditExtend for EvalIRaz<E,G> {
 	fn extend(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap();
@@ -220,7 +222,7 @@ EditExtend for EvalIRaz<E,G> {
 			}
 			name_vec.push(Some(self.next_name()));
 		}
-		let mut data_iter = self.data.gen_count(batch_size,&self.glob).into_iter();
+		let mut data_iter = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
 		let mut name_iter = name_vec.into_iter();
 		let mut level_iter = lev_vec.into_iter();
 
@@ -267,7 +269,7 @@ EditExtend for EvalIRaz<E,G> {
 	}
 }
 
-impl<E:Eval+Ord,G:ItemGen<E>>
+impl<E:Eval+Ord,G:Rng>
 CompMax for EvalIRaz<E,G> {
 	type Target = Option<E>;
 	fn seq_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
