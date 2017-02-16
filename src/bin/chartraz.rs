@@ -140,8 +140,12 @@ fn main() {
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:4 t '{}' with lines,\\",filename.to_owned()+".dat","Raz").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with lines,\\",filename.to_owned()+".dat","Vec").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Vec edit").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Raz edit").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","Raz compute").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:4 notitle with lines,\\",filename.to_owned()+".dat").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","Vec compute").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:4 notitle with lines,\\",filename.to_owned()+".dat").unwrap();
 
   ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
 
