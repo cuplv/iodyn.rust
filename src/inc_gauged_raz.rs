@@ -396,17 +396,25 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 }
 
 pub struct IterL<T: Debug+Clone+Eq+Hash+'static>(Raz<T>);
+impl<T: Debug+Clone+Eq+Hash+'static> ExactSizeIterator for IterL<T> {}
 impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterL<T> {
 	type Item = T;
 	fn next(&mut self) -> Option<Self::Item> {
 		self.0.pop_left()
 	}
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		(self.0.l_length, Some(self.0.l_length))
+	}
 }
 pub struct IterR<T: Debug+Clone+Eq+Hash+'static>(Raz<T>);
+impl<T: Debug+Clone+Eq+Hash+'static> ExactSizeIterator for IterR<T> {}
 impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterR<T> {
 	type Item = T;
 	fn next(&mut self) -> Option<Self::Item> {
 		self.0.pop_right()
+	}
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		(self.0.r_length, Some(self.0.r_length))
 	}
 }
 
@@ -909,8 +917,11 @@ mod tests {
   	let (l,mut r) = t.focus(8).unwrap().into_iters();
   	assert_eq!(Some(9), r.next());
   	assert_eq!(Some(10), r.next());
+  	assert_eq!(2, r.len());
   	assert_eq!(Some(11), r.next());
   	assert_eq!(Some(12), r.next());
+  	assert_eq!(None, r.next());
+  	assert_eq!(None, r.next());
   	let mut rev = Vec::new();
   	for i in l {
   		rev.push(i);
