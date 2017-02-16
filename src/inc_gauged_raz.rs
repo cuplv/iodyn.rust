@@ -21,7 +21,8 @@ use adapton::engine::Name;
 /// arbitrary points in the sequence
 #[derive(Clone)]
 pub struct Raz<E: Debug+Clone+Eq+Hash+'static> {
-	length: usize,
+	l_length: usize,
+	r_length: usize,
 	l_forest: tree::Cursor<TreeData<E>>,
 	l_stack: stack::AStack<E,(u32,Option<Name>)>,
 	r_stack: stack::AStack<E,(u32,Option<Name>)>,
@@ -130,7 +131,8 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 		match self { 
 			RazTree{tree:None, ..} => {
 				Some(Raz{
-					length: 0,
+					l_length: 0,
+					r_length: 0,
 					l_forest: tree::Cursor::new(),
 					l_stack: stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY),
 					r_stack: stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY),
@@ -139,6 +141,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 			},
 			RazTree{count, tree: Some(tree)} => {
 				if count < pos { return None };
+				let l_len = pos;
 				// step 1: find location with cursor
 				let mut cursor = tree::Cursor::from(tree);
 				while let TreeData::Branch{l_count, ..} = cursor.peek().unwrap() {
@@ -166,7 +169,8 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 				};
 				// step 3: integrate
 				Some(Raz{
-					length: count,
+					l_length: l_len,
+					r_length: count - l_len,
 					l_forest: l_cursor,
 					l_stack: l_astack,
 					r_stack: r_astack,
@@ -182,7 +186,8 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	/// Create a new RAZ, for an empty sequence
 	pub fn new() -> Raz<E> {
 		Raz{
-			length: 0,
+			l_length: 0,
+			r_length: 0,
 			l_forest: tree::Cursor::new(),
 			l_stack: stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY),
 			r_stack: stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY),
@@ -191,7 +196,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	}
 
 	/// get the total length of the sequence
-	pub fn len(&self) -> usize { self.length }
+	pub fn len(&self) -> usize { self.l_length + self.r_length }
 
 	/// unfocus the RAZ before refocusing on a new location
 	/// in the sequence.
@@ -293,13 +298,13 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	/// add an element to the left of the cursor
 	/// returns number of non-archived elements
 	pub fn push_left(&mut self, elm: E) -> usize {
-		self.length += 1;
+		self.l_length += 1;
 		self.l_stack.push(elm);
 		self.l_stack.active_len()
 	}
 	/// add an element to the right of the cursor
 	pub fn push_right(&mut self, elm: E) -> usize {
-		self.length += 1;
+		self.r_length += 1;
 		self.r_stack.push(elm);
 		self.r_stack.active_len()
 	}
@@ -331,7 +336,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 				}
 			}
 		}
-		self.length -= 1;
+		self.l_length -= 1;
 		self.l_stack.pop()
 	}
 	/// remove and return an element to the right of the cursor
@@ -346,7 +351,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 				}
 			}
 		}
-		self.length -= 1;
+		self.r_length -= 1;
 		self.r_stack.pop()
 	}
 }
