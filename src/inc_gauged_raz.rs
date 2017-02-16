@@ -182,6 +182,15 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 
 }
 
+impl<T: Debug+Clone+Eq+Hash+'static>
+IntoIterator for RazTree<T> {
+	type Item = T;
+	type IntoIter = IterR<T>;
+	fn into_iter(self) -> Self::IntoIter {
+		IterR(self.focus(0).unwrap())
+	}
+}
+
 impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	/// Create a new RAZ, for an empty sequence
 	pub fn new() -> Raz<E> {
@@ -294,6 +303,36 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 		let tree = join_cursor.at_tree();
 		RazTree{count: count_tree_op(&tree), tree: tree}
 	}
+  
+  /// creates two iterators, one for each side of the cursor
+	pub fn into_iters(self) -> (IterL<E>,IterR<E>) {
+		match self {
+			Raz{
+				l_length,
+				r_length,
+				l_forest,
+				l_stack,
+				r_stack,
+				r_forest,
+			} =>
+			(IterL(Raz{
+				l_length: l_length,
+				r_length: 0,
+				l_forest: l_forest,
+				l_stack: l_stack,
+				r_stack: stack::AStack::new(),
+				r_forest: tree::Cursor::new(),
+			}),
+			IterR(Raz{
+				l_length: 0,
+				r_length: r_length,
+				l_forest: tree::Cursor::new(),
+				l_stack: stack::AStack::new(),
+				r_stack: r_stack,
+				r_forest: r_forest,
+			}))
+		} 
+	}
 
 	/// add an element to the left of the cursor
 	/// returns number of non-archived elements
@@ -353,6 +392,21 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 		}
 		self.r_length -= 1;
 		self.r_stack.pop()
+	}
+}
+
+pub struct IterL<T: Debug+Clone+Eq+Hash+'static>(Raz<T>);
+impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterL<T> {
+	type Item = T;
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0.pop_left()
+	}
+}
+pub struct IterR<T: Debug+Clone+Eq+Hash+'static>(Raz<T>);
+impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterR<T> {
+	type Item = T;
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0.pop_right()
 	}
 }
 
@@ -821,4 +875,80 @@ mod tests {
   	}
 
   }
+
+  #[test]
+  fn test_iters() {
+  	let mut r = Raz::new();
+  	let mut t;
+  	// set same tree as focus example
+  	r.push_left(3);
+  	r.push_left(4);
+  	r.archive_left(1, Some(name_of_usize(1)));
+  	r.push_right(8);
+  	r.push_right(7);
+  	r.archive_right(2, Some(name_of_usize(2)));
+  	r.push_left(5);
+  	r.push_right(6);
+  	t = r.unfocus();
+  	r = t.focus(0).expect("focus on 0");
+  	r.push_left(1);
+  	r.push_left(2);
+  	r.archive_left(3, Some(name_of_usize(3)));
+  	t = r.unfocus();
+
+  	r = t.focus(8).expect("focus on 8");
+  	r.archive_left(5, Some(name_of_usize(5)));
+  	r.push_left(9);
+  	r.push_left(10);
+  	r.push_right(12);
+  	r.push_right(11);
+  	r.archive_right(4, Some(name_of_usize(4)));
+  	t = r.unfocus();
+
+  	// iterate
+  	let (l,mut r) = t.focus(8).unwrap().into_iters();
+  	assert_eq!(Some(9), r.next());
+  	assert_eq!(Some(10), r.next());
+  	assert_eq!(Some(11), r.next());
+  	assert_eq!(Some(12), r.next());
+  	let mut rev = Vec::new();
+  	for i in l {
+  		rev.push(i);
+  	}
+  	assert_eq!(vec![8,7,6,5,4,3,2,1], rev);
+
+  	// again for the tree iterator
+  	let mut r = Raz::new();
+  	let mut t;
+  	// set same tree as focus example
+  	r.push_left(3);
+  	r.push_left(4);
+  	r.archive_left(1, Some(name_of_usize(1)));
+  	r.push_right(8);
+  	r.push_right(7);
+  	r.archive_right(2, Some(name_of_usize(2)));
+  	r.push_left(5);
+  	r.push_right(6);
+  	t = r.unfocus();
+  	r = t.focus(0).expect("focus on 0");
+  	r.push_left(1);
+  	r.push_left(2);
+  	r.archive_left(3, Some(name_of_usize(3)));
+  	t = r.unfocus();
+
+  	r = t.focus(8).expect("focus on 8");
+  	r.archive_left(5, Some(name_of_usize(5)));
+  	r.push_left(9);
+  	r.push_left(10);
+  	r.push_right(12);
+  	r.push_right(11);
+  	r.archive_right(4, Some(name_of_usize(4)));
+  	t = r.unfocus();
+
+		assert_eq!(
+			(1..13).collect::<Vec<_>>(),
+			t.into_iter().collect::<Vec<_>>()
+		);  	
+  }
+
 }
