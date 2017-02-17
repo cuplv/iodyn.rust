@@ -435,14 +435,14 @@ impl<T: Debug+Clone+Eq+Hash+'static> IterR<T> {
 			let stack_result = r_stack.into_iter().fold(init, |r,t|{bin(r,&t)});
 			if r_forest.up() == tree::UpResult::Fail { return stack_result }
 			let (_,_,iter) = r_forest.into_iters();
-			iter.fold_out(stack_result,move|r,t|{
+			iter.fold_out(stack_result,Rc::new(move|r,t|{
 				match t {
 					TreeData::Branch{..} => r,
 					TreeData::Leaf(vec) => {
 						vec.iter().fold(r,|r,e|{bin(r,e)})
 					},
 				}
-			})
+			}))
 		}}
 	}
 }

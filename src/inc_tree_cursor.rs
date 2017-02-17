@@ -10,9 +10,12 @@
 
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::rc::Rc;
 use std::mem;
 pub use inc_level_tree::{Tree, gen_branch_level as gen_level};
-use adapton::engine::Name;
+
+use adapton::macros::*;
+use adapton::engine::*;
 
 /// tree cursor, centered on a node of the underlying persistent tree
 ///
@@ -23,7 +26,7 @@ use adapton::engine::Name;
 /// the same structure, regaurdless of order of operations.
 /// 
 /// Many operations allow structural mutation of the underlying tree.
-#[derive(Debug)]
+#[derive(Debug,PartialEq,Eq,Hash)]
 pub struct Cursor<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> {
 	dirty: bool,
 	// dirty flag, containing tree
@@ -378,21 +381,31 @@ impl<'a,E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,PartialEq,Eq,Hash)]
 pub struct IterL<T: TreeUpdate+Debug+Clone+Eq+Hash+'static>(Cursor<T>);
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,Eq,PartialEq,Hash)]
 pub struct IterR<T: TreeUpdate+Debug+Clone+Eq+Hash+'static>(Cursor<T>);
 impl<T: TreeUpdate+Debug+Clone+Eq+Hash+'static> IterR<T> {
 	// TODO: Incrementalize
-	pub fn fold_out<R,B>(self, init: R, bin: B) -> R where
+	pub fn fold_out<R,B>(mut self, init: R, bin: Rc<B>) -> R where
 		R:'static + Eq+Clone+Hash+Debug,
-		B: 'static + Fn(R,T) -> R
-	{
-		let mut accum = init;
-		for e in self {
-			accum = bin(accum,e);
+		B:'static + Fn(R,T) -> R
+	{	
+		let name = self.0.peek_name();
+		// the `Art::force` is hidden in `<IterR as Iterator>::next()`
+		match self.next() {
+			None => return init,
+			Some(e) => {
+				let a = bin(init,e);
+				match name {
+					None => self.fold_out(a,bin),
+					Some(n) => {
+						let i = self;
+						memo!( n =>> Self::fold_out , i:i, a:a ;; f:bin.clone())
+					}
+				}
+			}
 		}
-		accum
 	}
 }
 
@@ -421,7 +434,6 @@ Iterator for IterR<T> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use adapton::engine::*;
 
 	impl DeriveTreeUpdate for usize {}
 
