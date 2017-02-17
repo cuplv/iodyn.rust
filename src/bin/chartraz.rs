@@ -15,6 +15,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use rand::{StdRng,SeedableRng};
 use eval::*;
+use eval::types::*;
 use eval::actions::*;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
@@ -66,7 +67,7 @@ fn main() {
       coord: StdRng::from_seed(&[dataseed]),
     },
     edit: BatchInsert(edits), //BatchAppend(edits),
-    comp: FindMax, //Mapper::new(|&d|d+1),
+    comp: FindMax, //Mapper::new(|&d|d+1), //Folder::new(GenSmall(0),|a,&e|a+e),
     changes: changes,
   };
 
@@ -74,8 +75,8 @@ fn main() {
 
   // run experiments
   let mut rng = StdRng::from_seed(&[editseed]);
-  let result_raz: TestResult<EvalIRaz<usize,StdRng>> = test.test(&mut rng);
-  let result_vec: TestResult<EvalVec<usize,StdRng>> = test.test(&mut rng);
+  let result_raz: TestResult<EvalIRaz<GenSmall,StdRng>> = test.test(&mut rng);
+  let result_vec: TestResult<EvalVec<GenSmall,StdRng>> = test.test(&mut rng);
 
   // post-process results
   let comp_raz = result_raz.computes.iter().map(|d|d.num_nanoseconds().unwrap());

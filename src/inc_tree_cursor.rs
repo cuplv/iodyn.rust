@@ -392,7 +392,7 @@ impl<T: TreeUpdate+Debug+Clone+Eq+Hash+'static> IterR<T> {
 		B:'static + Fn(R,T) -> R
 	{	
 		let name = self.0.peek_name();
-		// the `Art::force` is hidden in `<IterR as Iterator>::next()`
+		// the `Art::force` is hidden in `<Self as Iterator>::next()`
 		match self.next() {
 			None => return init,
 			Some(e) => {

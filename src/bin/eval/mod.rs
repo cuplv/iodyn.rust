@@ -2,6 +2,7 @@ pub mod actions;
 pub mod eval_iraz;
 pub mod eval_vec;
 pub mod seq_test;
+pub mod types;
 
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -44,6 +45,12 @@ pub trait CompMax {
 pub trait CompMap<I,O,F:Fn(&I)->O> {
 	type Target;
 	fn comp_map(&self, f:Rc<F>, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
+/// folds every element into the binary function, starting with the given one
+pub trait CompFold<I,O,F:Fn(O,&I)->O> {
+	type Target;
+	fn comp_fold(&self, accum: O, f:Rc<F>, rng: &mut StdRng) -> (Duration,Self::Target);
 }
 
 ////////////////////////////////

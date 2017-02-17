@@ -304,3 +304,18 @@ CompMap<E,O,F> for EvalIRaz<E,G> where
 	}
 
 }
+
+impl<E: Eval,O:Eval,F,G:Rng>
+CompFold<E,O,F> for EvalIRaz<E,G> where
+	F:'static + Fn(O,&E)->O,
+{
+	type Target = O;
+	fn comp_fold(&self, accum: O, f:Rc<F>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let clone = self.raztree.clone().unwrap();
+		let mut res = None;
+		let time = Duration::span(||{
+			res = Some(clone.fold_lr(accum,f));
+		});
+		(time, res.unwrap())
+	}
+}

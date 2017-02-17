@@ -100,5 +100,19 @@ CompMap<E,O,F> for EvalVec<E,G> where
 		});
 		(time, mapped.unwrap())
 	}
-
 }
+
+impl<E: Eval,O,F,G:Rng>
+CompFold<E,O,F> for EvalVec<E,G> where
+	F:Fn(O,&E)->O,
+{
+	type Target = O;
+	fn comp_fold(&self, accum: O, f:Rc<F>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let mut res = None;
+		let time = Duration::span(||{
+			res = Some(self.vec.iter().fold(accum,|o,e|f(o,e)));
+		});
+		(time, res.unwrap())
+	}
+}
+
