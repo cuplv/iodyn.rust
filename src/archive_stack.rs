@@ -153,6 +153,22 @@ impl<E: Clone, M: Clone> AStack<E,M> {
 	}
 }
 
+impl<E: Clone,M: Clone> IntoIterator for AStack<E,M> {
+	type Item = E;
+	type IntoIter = Iter<E,M>;
+	fn into_iter(self) -> Self::IntoIter {
+		Iter(self)
+	}
+}
+
+pub struct Iter<E: Clone,M: Clone>(AStack<E,M>);
+impl<E: Clone,M: Clone> Iterator for Iter<E,M> {
+	type Item = E;
+	fn next(&mut self) -> Option<Self::Item> {
+		self.0.pop()
+	}
+}
+
 /// standard conversion, but no metadata will be included
 impl<E: Clone> From<Vec<E>> for AStack<E,()> {
 	fn from(v: Vec<E>) -> Self {
@@ -245,4 +261,24 @@ mod tests {
   	stack.pop();
   	assert!(stack.is_empty());  	
   }
+
+    #[test]
+  fn test_iter() {
+  	let mut stack = AStack::new();
+  	stack.push(4);
+  	stack.push(2);
+  	stack.push(4);
+  	stack.archive(());
+  	stack.push(9);
+  	stack.push(3);
+  	stack.push(7);
+  	stack.archive(());
+  	stack.push(6);
+  	stack.push(1);
+  	stack.push(3);
+
+  	let as_vec = stack.into_iter().collect::<Vec<_>>();
+  	assert_eq!(vec![3,1,6,7,3,9,4,2,4], as_vec);
+  }
+
 }

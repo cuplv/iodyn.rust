@@ -52,7 +52,10 @@ fn count_tree_op<E: Debug+Clone+Eq+Hash+'static>(tree: &Option<tree::Tree<TreeDa
 impl<E: Debug+Clone+Eq+Hash+'static> tree::TreeUpdate for TreeData<E> {
 	#[allow(unused_variables)]
 	fn rebuild(l_branch: Option<Self>, old_data: &Self, r_branch: Option<Self>) -> Self {
-		TreeData::Branch{l_count: count(&l_branch), r_count: count(&r_branch)}
+		match *old_data {
+			TreeData::Leaf(ref vec) => TreeData::Leaf(vec.clone()),
+			_ => TreeData::Branch{l_count: count(&l_branch), r_count: count(&r_branch)}
+		}
 	}
 }
 
@@ -71,11 +74,10 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 	/// This is calculated from data in leaves of a tree structure,
 	/// so the operation must be associative. Returns None if there
 	/// are no elements.
-	pub fn fold_up<I,R,B>(self, init: Rc<I>, bin: Rc<B>) -> Option<R>
-		where
-			R: 'static + Eq+Clone+Hash+Debug,
-			I: 'static + Fn(&E) -> R,
-			B: 'static + Fn(R,R) -> R
+	pub fn fold_up<I,R,B>(self, init: Rc<I>, bin: Rc<B>) -> Option<R> where
+		R: 'static + Eq+Clone+Hash+Debug,
+		I: 'static + Fn(&E) -> R,
+		B: 'static + Fn(R,R) -> R
 	{
 		// TODO: memo! fold_up (only first rec call is not)
 		self.tree.map(|tree| {
@@ -98,11 +100,18 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 		})
 	}
 
+	/// left-to-right memoized fold
+	pub fn fold_lr<A,B>(self, init: A, bin: Rc<B>) -> A where
+		A: 'static + Eq+Clone+Hash+Debug,
+		B: 'static + Fn(A,&E) -> A,
+	{
+		self.into_iter().inc_fold_out(init,bin)
+	}
+
 	/// returns a new tree with data mapped from the old tree
-	pub fn map<R,F>(self, f: Rc<F>) -> RazTree<R>
-		where
-			R: 'static + Eq+Clone+Hash+Debug,
-			F: 'static + Fn(&E) -> R,
+	pub fn map<R,F>(self, f: Rc<F>) -> RazTree<R> where
+		R: 'static + Eq+Clone+Hash+Debug,
+		F: 'static + Fn(&E) -> R,
 	{
 		// TODO: memo! map (only the first rec call is not)
 		RazTree{count: self.count, tree:
@@ -269,11 +278,11 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 				r_lev = lev;
 				r_nm = nm;
 			}
-			while cursor.up() {}
+			while cursor.up() != tree::UpResult::Fail {}
 			cursor.at_tree().unwrap()
 		} else {
-			if !self.l_forest.up() {
-				if !self.r_forest.up() {
+			if self.l_forest.up() == tree::UpResult::Fail {
+				if self.r_forest.up() == tree::UpResult::Fail {
 					return RazTree{ count: 0, tree: None };
 				} else {
 					self.r_forest.right_tree().unwrap()
@@ -284,14 +293,14 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 		};
 		// step 3: join with forests
 		let mut join_cursor = tree::Cursor::from(tree);
-		if self.l_forest.up() {
+		if self.l_forest.up() != tree::UpResult::Fail {
 			let lev = self.l_forest.peek_level().unwrap();
 			let nm = self.r_forest.peek_name();
 			self.l_forest.down_left_force(tree::Force::Discard);
 			let dummy = TreeData::Branch{l_count: 0, r_count: 0};
 			join_cursor = tree::Cursor::join(self.l_forest,lev,nm,dummy,join_cursor);
 		}
-		if self.r_forest.up() {
+		if self.r_forest.up() != tree::UpResult::Fail {
 			let lev = self.r_forest.peek_level().unwrap();
 			let nm = self.r_forest.peek_name();
 			self.r_forest.down_right_force(tree::Force::Discard);
@@ -299,7 +308,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 			join_cursor = tree::Cursor::join(join_cursor,lev,nm,dummy,self.r_forest);
 		}
 		// step 4: convert to final tree
-		while join_cursor.up() {}
+		while join_cursor.up() != tree::UpResult::Fail {}
 		let tree = join_cursor.at_tree();
 		RazTree{count: count_tree_op(&tree), tree: tree}
 	}
@@ -366,7 +375,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	/// remove and return an element to the left of the cursor
 	pub fn pop_left(&mut self) -> Option<E> {
 		if self.l_stack.len() == 0 {
-			if !self.l_forest.up() { return None } else {
+			if self.l_forest.up() == tree::UpResult::Fail { return None } else {
 				self.l_forest.down_left_force(tree::Force::Discard);
 				while self.l_forest.down_right() {}
 				match self.l_forest.peek() {
@@ -381,7 +390,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	/// remove and return an element to the right of the cursor
 	pub fn pop_right(&mut self) -> Option<E> {
 		if self.r_stack.len() == 0 {
-			if !self.r_forest.up() { return None } else {
+			if self.r_forest.up() == tree::UpResult::Fail { return None } else {
 				self.r_forest.down_right_force(tree::Force::Discard);
 				while self.r_forest.down_left() {}
 				match self.r_forest.peek() {
@@ -417,6 +426,27 @@ impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterR<T> {
 		(self.0.r_length, Some(self.0.r_length))
 	}
 }
+impl<T: Debug+Clone+Eq+Hash+'static> IterR<T> {
+	pub fn inc_fold_out<R,B>(self, init:R, bin:Rc<B>) -> R where
+		R: 'static + Eq+Clone+Hash+Debug,
+		B: 'static + Fn(R,&T) -> R
+	{
+		match self.0 {Raz{r_stack,mut r_forest, ..}=>{
+			let stack_result = r_stack.into_iter().fold(init, |r,t|{bin(r,&t)});
+			if r_forest.up() == tree::UpResult::Fail { return stack_result }
+			let (_,_,iter) = r_forest.into_iters();
+			iter.fold_out(stack_result,move|r,t|{
+				match t {
+					TreeData::Branch{..} => r,
+					TreeData::Leaf(vec) => {
+						vec.iter().fold(r,|r,e|{bin(r,e)})
+					},
+				}
+			})
+		}}
+	}
+}
+	
 
 /////////////////////////////
 // Traits for Raz and RazTree
@@ -708,7 +738,7 @@ mod tests {
   }
 
   #[test]
-  fn test_fold() {
+  fn test_fold_up() {
   	let tree = RazTree{
   		count: 12,
   		tree: tree::Tree::new(5, Some(name_of_usize(5)),TreeData::Branch{l_count:8, r_count: 4},
@@ -784,7 +814,7 @@ mod tests {
   		},
   		_ => panic!("Wrong data")
   	}
-  	assert!(cursor.up());
+  	assert!(cursor.up() != tree::UpResult::Fail);
   	assert!(cursor.down_right());
   	assert!(cursor.down_left());
   	assert!(cursor.down_left());
@@ -835,7 +865,7 @@ mod tests {
   		},
   		_ => panic!("Wrong data")
   	}
-  	assert!(cursor.up());
+  	assert!(cursor.up() != tree::UpResult::Fail);
   	assert!(cursor.down_right());
   	assert!(cursor.down_left());
   	assert!(cursor.down_left());
@@ -845,7 +875,7 @@ mod tests {
   		},
   		_ => panic!("Wrong data")
   	}
-  	assert!(cursor.up());
+  	assert!(cursor.up() != tree::UpResult::Fail);
   	assert!(cursor.down_right());
   	match cursor.peek() {
   		Some(TreeData::Leaf(ref v)) => {
@@ -853,8 +883,8 @@ mod tests {
   		},
   		_ => panic!("Wrong data")
   	}
-  	assert!(cursor.up());
-  	assert!(cursor.up());
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.up() != tree::UpResult::Fail);
   	assert!(cursor.down_right());
   	match cursor.peek() {
   		Some(TreeData::Leaf(ref v)) => {
@@ -862,9 +892,9 @@ mod tests {
   		},
   		_ => panic!("Wrong data")
   	}
-  	assert!(cursor.up());
-  	assert!(cursor.up());
-  	assert!(cursor.up());
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.up() != tree::UpResult::Fail);
   	assert!(cursor.down_right());
   	assert!(cursor.down_right());
   	match cursor.peek() {
@@ -873,7 +903,7 @@ mod tests {
   		},
   		_ => panic!("Wrong data")
   	}
-  	assert!(cursor.up());
+  	assert!(cursor.up() != tree::UpResult::Fail);
   	assert!(cursor.down_left());
   	match cursor.peek() {
   		Some(TreeData::Leaf(ref v)) => {
@@ -960,6 +990,43 @@ mod tests {
 			(1..13).collect::<Vec<_>>(),
 			t.into_iter().collect::<Vec<_>>()
 		);  	
+  }
+
+  #[test]
+  fn test_fold_lr() {
+  	let mut r = Raz::new();
+  	let mut t;
+  	// set same tree as focus example
+  	r.push_left(3);
+  	r.push_left(4);
+  	r.archive_left(1, Some(name_of_usize(1)));
+  	r.push_right(8);
+  	r.push_right(7);
+  	r.archive_right(2, Some(name_of_usize(2)));
+  	r.push_left(5);
+  	r.push_right(6);
+  	t = r.unfocus();
+  	r = t.focus(0).expect("focus on 0");
+  	r.push_left(1);
+  	r.push_left(2);
+  	r.archive_left(3, Some(name_of_usize(3)));
+  	t = r.unfocus();
+  	r = t.focus(8).expect("focus on 8");
+  	r.archive_left(5, Some(name_of_usize(5)));
+  	r.push_left(9);
+  	r.push_left(10);
+  	r.push_right(12);
+  	r.push_right(11);
+  	r.archive_right(4, Some(name_of_usize(4)));
+  	t = r.unfocus();
+
+  	let sum = t.clone().fold_lr(0,Rc::new(|l,r:&usize|{l+*r}));
+  	let iter_sum: usize = (1..13).sum();
+  	assert_eq!(iter_sum, sum);
+
+  	let raz_string = t.clone().fold_lr("0".to_string(),Rc::new(|l,r:&usize|{format!("{},{}",l,r)}));
+  	let iter_string = (1..13).collect::<Vec<_>>().iter().fold("0".to_string(),|l,r:&usize|{format!("{},{}",l,r)});
+  	assert_eq!(iter_string, raz_string);
   }
 
 }

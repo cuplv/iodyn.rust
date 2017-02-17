@@ -23,6 +23,7 @@ use adapton::engine::Name;
 /// the same structure, regaurdless of order of operations.
 /// 
 /// Many operations allow structural mutation of the underlying tree.
+#[derive(Debug)]
 pub struct Cursor<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> {
 	dirty: bool,
 	// dirty flag, containing tree
@@ -77,6 +78,20 @@ pub enum Force {
 	Discard,
 }
 
+/// Result for `Cursor::up()`
+///
+/// This represents the direction the cursor moved
+/// to reach the higher tree node, e.g., if `Left`, then
+/// calling `Cursor::down_right()` will return to the
+/// previous node. `Fail` means that there is not upper
+/// node and the cursor didn't move. 
+#[derive(Clone,Copy,PartialEq,Eq)]
+pub enum UpResult {
+	Fail,
+	Left,
+	Right,
+}
+
 fn peek_op<E: Debug+Clone+Eq+Hash+'static>(op: &Option<Tree<E>>) -> Option<E> {
 	match *op {
 		None => None,
@@ -86,7 +101,8 @@ fn peek_op<E: Debug+Clone+Eq+Hash+'static>(op: &Option<Tree<E>>) -> Option<E> {
 
 const DEFAULT_DEPTH: usize = 30;
 
-impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> From<Tree<E>> for Cursor<E> {
+impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static>
+From<Tree<E>> for Cursor<E> {
 	fn from(tree: Tree<E>) -> Self {
 		Cursor{
 			dirty: false,
@@ -97,7 +113,7 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> From<Tree<E>> for Cursor<E> {
 	}
 }
 
-impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
+impl<'a,E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 
 	/// creates a new cursor, to an empty underlying tree
 	pub fn new() -> Self {
@@ -143,18 +159,59 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 		)
 	}
 
+	/// A specialized split that returns iterators
+	///
+	/// Converts the cursor into two iterators, over
+	/// elements to the left and right of the cursor.
+	/// The tree at the cursor is returned
+	/// as well. The iterators include data it its branches,
+	/// but not the tree's data. Data in a tree is considered to be
+	/// between the data of the left and right branches.
+	pub fn into_iters(self) -> (IterL<E>,Option<Tree<E>>,IterR<E>) {
+		let (l_tree,r_tree) = match self.tree {
+			None => (None, None),
+			Some(ref t) => (t.l_tree(), t.r_tree())
+		};
+		let mut l_cursor = Cursor{
+			dirty: true,
+			l_forest: self.l_forest,
+			tree: l_tree,
+			r_forest: Vec::new(),
+		};
+		let mut r_cursor = Cursor{
+			dirty: true,
+			l_forest: Vec::new(),
+			tree: r_tree,
+			r_forest: self.r_forest,
+		};
+		// iterator can't start at None if there's data, so we move up
+		// if there's no upper tree, then there's no data, so it's fine.
+		// otherwise, we need to seek to the starting point
+		if l_cursor.tree.is_none() { l_cursor.up(); } else {
+			while l_cursor.down_right() {}
+		}
+		if r_cursor.tree.is_none() { r_cursor.up(); } else {
+			while r_cursor.down_left() {}
+		}
+		(
+			IterL(l_cursor),
+			self.tree,
+			IterR(r_cursor),
+		)
+	}
+
 	/// makes a new cursor at the given data, between the trees of the other cursors
 	///
 	/// The `rebuild()` method of the data type will be called, with the `data`
 	/// parameter passed here as the `old_data` to that method (along with joined branches).
 	pub fn join(mut l_cursor: Self, level: u32, name: Option<Name>, data: E, mut r_cursor: Self) -> Self {
 		// step 1: remove center forests
-		while !l_cursor.r_forest.is_empty() { assert!(l_cursor.up()); }
-		while !r_cursor.l_forest.is_empty() { assert!(r_cursor.up()); }
+		while !l_cursor.r_forest.is_empty() { assert!(l_cursor.up() != UpResult::Fail); }
+		while !r_cursor.l_forest.is_empty() { assert!(r_cursor.up() != UpResult::Fail); }
 		// step 2: find insertion point
 		while let Some(h) = l_cursor.up_left_level() {
 			if h >= level { break; }
-			else { assert!(l_cursor.up()); }
+			else { assert!(l_cursor.up() != UpResult::Fail); }
 		}
 		while let Some(h) = l_cursor.peek_level() {
 			if h < level { break; }
@@ -162,7 +219,7 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 		}
 		while let Some(h) = r_cursor.up_right_level() {
 			if h > level { break; }
-			else { assert!(r_cursor.up()); }
+			else { assert!(r_cursor.up() != UpResult::Fail); }
 		}
 		while let Some(h) = r_cursor.peek_level() {
 			if h <= level { break; }
@@ -282,10 +339,11 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 	/// move the cursor up towards the root of the underlying persistent tree
 	///
 	/// If the tree has been changed, the `rebuild()` method of the tree's data
-	/// type will be called as a new persistent node is created.
-	pub fn up(&mut self) -> bool {
+	/// type will be called as a new persistent node is created. The return 
+	/// value represents the direction the cursor moved
+	pub fn up(&mut self) -> UpResult {
 		let to_left = match (self.l_forest.last(), self.r_forest.last()) {
-			(None, None) => { return false },
+			(None, None) => { return UpResult::Fail },
 			(Some(_), None) => true,
 			(Some(&(_,ref lt)), Some(&(_,ref rt))) if rt.level() > lt.level() => true,
 			_ => false,
@@ -315,9 +373,49 @@ impl<E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 				} else { self.dirty = dirty; self.tree = Some(upper_tree) }
 			} else { panic!("up: empty right forest item"); }
 		}
-		return true;
+		return if to_left { UpResult::Left } else { UpResult::Right };
 	}
 
+}
+
+#[derive(Debug,Clone)]
+pub struct IterL<T: TreeUpdate+Debug+Clone+Eq+Hash+'static>(Cursor<T>);
+#[derive(Debug,Clone)]
+pub struct IterR<T: TreeUpdate+Debug+Clone+Eq+Hash+'static>(Cursor<T>);
+impl<T: TreeUpdate+Debug+Clone+Eq+Hash+'static> IterR<T> {
+	// TODO: Incrementalize
+	pub fn fold_out<R,B>(self, init: R, bin: B) -> R where
+		R:'static + Eq+Clone+Hash+Debug,
+		B: 'static + Fn(R,T) -> R
+	{
+		let mut accum = init;
+		for e in self {
+			accum = bin(accum,e);
+		}
+		accum
+	}
+}
+
+impl<T: TreeUpdate+Debug+Clone+Eq+Hash+'static>
+Iterator for IterR<T> {
+	type Item = T;
+	fn next(&mut self) -> Option<Self::Item> {
+		let result = self.0.peek();
+		// choose next tree node
+		if self.0.down_right() {
+			while self.0.down_left() {};
+		} else { loop {
+			match self.0.up() {
+				UpResult::Left => {},
+				UpResult::Right => { break },
+				UpResult::Fail => {
+					self.0 = Cursor::new();
+					break;					
+				}
+			}
+		}}
+		return result;
+	}
 }
 
 #[cfg(test)]
@@ -356,15 +454,15 @@ mod tests {
 		assert!(c.down_right());
 		assert_eq!(Some(11), c.peek());
 
-		assert!(c.up());
-		assert!(c.up());
-		assert!(c.up());
+		assert!(c.up() != UpResult::Fail);
+		assert!(c.up() != UpResult::Fail);
+		assert!(c.up() != UpResult::Fail);
 		assert_eq!(Some(2), c.peek());
 
 		assert!(c.down_left_force(Force::Discard));
 		assert_eq!(Some(4), c.peek());
 
-		assert!(c.up());
+		assert!(c.up() != UpResult::Fail);
 		assert!(c.down_right());
 		assert!(c.down_right());
 		assert_eq!(Some(7), c.peek());
@@ -400,8 +498,8 @@ mod tests {
 		assert_eq!(Some(4), lc.peek());
 		assert_eq!(Some(5), rc.peek());
 
-		assert!(!lc.up());
-		assert!(rc.up());
+		assert!(lc.up() == UpResult::Fail);
+		assert!(rc.up() != UpResult::Fail);
 		assert_eq!(Some(1), rc.peek());
 
 		let t = t.unwrap();
@@ -411,10 +509,44 @@ mod tests {
 		assert!(j.down_left());
 		assert_eq!(Some(7), j.peek());
 
-		assert!(j.up());
-		assert!(j.up());
+		assert!(j.up() != UpResult::Fail);
+		assert!(j.up() != UpResult::Fail);
 		assert_eq!(Some(3), j.peek());
 	}
+
+	#[test]
+	fn test_iter_r() {
+		let t = 
+		Tree::new(5, Some(name_of_usize(5)),1,
+			Tree::new(3, Some(name_of_usize(3)),2,
+				Tree::new(0,None,4,None,None),
+				Tree::new(2, Some(name_of_usize(2)),5,
+					Tree::new(1, Some(name_of_usize(1)),8,
+						Tree::new(0,None,10,None,None),
+						Tree::new(0,None,11,None,None),
+					),
+					Tree::new(0,None,9,None,None),
+				)
+			),
+			Tree::new(4, Some(name_of_usize(4)),3,
+				Tree::new(0,None,6,None,None),
+				Tree::new(0,None,7,None,None),
+			)
+		).unwrap();
+		let mut c: Cursor<usize> = t.into();
+
+		assert!(c.down_left());
+		assert!(c.down_right());
+		assert!(c.down_left());
+		assert!(c.down_right());
+		let (_,t,iter) = c.into_iters();
+
+		assert_eq!(Some(11),t.map(|e|e.peek()));
+		let right = iter.collect::<Vec<_>>();
+		assert_eq!(vec![5,9,1,6,3,7], right);
+
+	}
+
 }
 
 
