@@ -41,6 +41,11 @@ pub trait CompMax {
 	fn comp_max(&self, rng: &mut StdRng) -> (Duration,Self::Target);
 }
 
+pub trait CompTreeFold<R,O,I:Fn(&R)->O,B:Fn(O,O)->O> {
+	type Target;
+	fn comp_tfold(&self, init:Rc<I>, bin:Rc<B>, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
 /// changes every value to another based on function
 pub trait CompMap<I,O,F:Fn(&I)->O> {
 	type Target;

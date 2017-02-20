@@ -88,6 +88,8 @@ CompMax for EvalVec<E,G> {
 	}
 }
 
+// TODO: implement tree fold as multiple pairwise passes?
+
 impl<E:Eval,O,F,G:Rng>
 CompMap<E,O,F> for EvalVec<E,G> where
 	F:Fn(&E)->O

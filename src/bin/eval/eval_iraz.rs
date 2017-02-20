@@ -289,6 +289,22 @@ CompMax for EvalIRaz<E,G> {
 	}
 }
 
+impl<E:Eval,O:Eval,I,B,G:Rng>
+CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
+	I:'static + Fn(&E)->O,
+	B:'static + Fn(O,O)->O,
+{
+	type Target = Option<O>;
+	fn comp_tfold(&self, init:Rc<I>, bin:Rc<B>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let clone = self.raztree.clone().unwrap();
+		let mut res = None;
+		let time = Duration::span(||{
+	    	res = Some(clone.fold_up(init,bin))
+		});
+		(time,res.unwrap())
+	}
+}
+
 impl<E:Eval,O:Eval,F,G:Rng>
 CompMap<E,O,F> for EvalIRaz<E,G> where
 	F:'static + Fn(&E)->O

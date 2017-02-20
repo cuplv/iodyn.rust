@@ -57,6 +57,7 @@ Editor<Duration,D> for BatchExtend {
 	}
 }
 
+// TODO: rewrite these using treefold
 #[allow(unused)]
 pub struct FindMax;
 impl<D: CompMax>
@@ -72,6 +73,18 @@ impl<D: CompMax>
 Computor<(Duration,D::Target),D> for FindMax {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Duration,D::Target) {
 		data.comp_max(rng)
+	}
+}
+
+#[allow(unused)]
+pub struct TreeFold<E,O:Eval,I:Fn(&E)->O,B:Fn(O,O)->O>(Rc<I>,Rc<B>,PhantomData<E>,PhantomData<O>);
+#[allow(unused)] impl<E,O:Eval,I:Fn(&E)->O,B:Fn(O,O)->O,D: CompTreeFold<E,O,I,B>>
+Computor<Duration,D> for TreeFold<E,O,I,B> {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time, answer) = data.comp_tfold(self.0.clone(),self.1.clone(),rng);
+		#[allow(unused)]
+		let saver = Vec::new().push(answer); // don't let rust compile this away
+		time
 	}
 }
 
