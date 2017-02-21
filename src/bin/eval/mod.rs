@@ -10,9 +10,11 @@ use std::rc::Rc;
 use rand::{Rand, Rng, StdRng};
 use time::Duration;
 
-/// convenience trait for incremental test data
-pub trait Eval: 'static+Eq+Clone+Hash+Debug+Rand {}
-impl<E> Eval for E where E: 'static+Eq+Clone+Hash+Debug+Rand {}
+/// convenience traits for incremental test data
+pub trait Adapt: 'static+Eq+Clone+Hash+Debug {}
+impl<E> Adapt for E where E: 'static+Eq+Clone+Hash+Debug {}
+pub trait Eval: Adapt+Rand {}
+impl<E> Eval for E where E: Adapt+Rand {}
 
 ////////////////////////////////////
 // primitive traits

@@ -289,7 +289,7 @@ CompMax for EvalIRaz<E,G> {
 	}
 }
 
-impl<E:Eval,O:Eval,I,B,G:Rng>
+impl<E:Eval,O:Adapt,I,B,G:Rng>
 CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
 	I:'static + Fn(&E)->O,
 	B:'static + Fn(O,O)->O,
@@ -305,7 +305,7 @@ CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
 	}
 }
 
-impl<E:Eval,O:Eval,F,G:Rng>
+impl<E:Eval,O:Adapt,F,G:Rng>
 CompMap<E,O,F> for EvalIRaz<E,G> where
 	F:'static + Fn(&E)->O
 {
@@ -321,7 +321,7 @@ CompMap<E,O,F> for EvalIRaz<E,G> where
 
 }
 
-impl<E: Eval,O:Eval,F,G:Rng>
+impl<E: Eval,O:Adapt,F,G:Rng>
 CompFold<E,O,F> for EvalIRaz<E,G> where
 	F:'static + Fn(O,&E)->O,
 {

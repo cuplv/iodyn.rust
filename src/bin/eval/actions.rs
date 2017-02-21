@@ -77,9 +77,9 @@ Computor<(Duration,D::Target),D> for FindMax {
 }
 
 #[allow(unused)]
-pub struct TreeFold<E,O:Eval,I:Fn(&E)->O,B:Fn(O,O)->O>(Rc<I>,Rc<B>,PhantomData<E>,PhantomData<O>);
-#[allow(unused)] impl<E,O:Eval,I:Fn(&E)->O,B:Fn(O,O)->O> TreeFold<E,O,I,B> { pub fn new(init:I,bin:B) -> Self {TreeFold(Rc::new(init),Rc::new(bin),PhantomData,PhantomData)}}
-impl<E,O:Eval,I:Fn(&E)->O,B:Fn(O,O)->O,D: CompTreeFold<E,O,I,B>>
+pub struct TreeFold<E,O,I:Fn(&E)->O,B:Fn(O,O)->O>(Rc<I>,Rc<B>,PhantomData<E>,PhantomData<O>);
+#[allow(unused)] impl<E,O,I:Fn(&E)->O,B:Fn(O,O)->O> TreeFold<E,O,I,B> { pub fn new(init:I,bin:B) -> Self {TreeFold(Rc::new(init),Rc::new(bin),PhantomData,PhantomData)}}
+impl<E,O,I:Fn(&E)->O,B:Fn(O,O)->O,D: CompTreeFold<E,O,I,B>>
 Computor<Duration,D> for TreeFold<E,O,I,B> {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
 		let (time, answer) = data.comp_tfold(self.0.clone(),self.1.clone(),rng);
@@ -103,9 +103,9 @@ Computor<Duration,D> for Mapper<I,O,F> {
 }
 
 #[allow(unused)]
-pub struct Folder<I,O:Eval,F:Fn(O,&I)->O>(O,Rc<F>,PhantomData<I>,PhantomData<O>);
-#[allow(unused)] impl<I,O:Eval,F:Fn(O,&I)->O> Folder<I,O,F> { pub fn new(a:O,f:F) -> Self {Folder(a,Rc::new(f),PhantomData,PhantomData)}}
-impl<I,O:Eval,F:Fn(O,&I)->O,D:CompFold<I,O,F>>
+pub struct Folder<I,O:Clone,F:Fn(O,&I)->O>(O,Rc<F>,PhantomData<I>,PhantomData<O>);
+#[allow(unused)] impl<I,O:Clone,F:Fn(O,&I)->O> Folder<I,O,F> { pub fn new(a:O,f:F) -> Self {Folder(a,Rc::new(f),PhantomData,PhantomData)}}
+impl<I,O:Clone,F:Fn(O,&I)->O,D:CompFold<I,O,F>>
 Computor<Duration,D> for Folder<I,O,F> {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
 		let (time,answer) = data.comp_fold(self.0.clone(),self.1.clone(),rng);
