@@ -3,6 +3,7 @@ use std::rc::Rc;
 use eval::*;
 
 // builds a sequence from scratch, 
+#[derive(Clone)]
 pub struct IncrementalInit<G:Rng> {
 	pub size: usize,
 	pub unitgauge: usize,

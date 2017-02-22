@@ -1,7 +1,9 @@
 pub mod actions;
+pub mod eval_nraz;
 pub mod eval_iraz;
 pub mod eval_vec;
 pub mod seq_test;
+pub mod build_test;
 pub mod types;
 
 use std::fmt::Debug;
