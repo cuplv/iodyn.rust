@@ -378,6 +378,29 @@ impl<'a,E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 		}
 		return if to_left { UpResult::Left } else { UpResult::Right };
 	}
+	/// move the cursor up, discarding any changes
+	///
+	/// The return value represents the direction the cursor moved
+	pub fn up_discard(&mut self) -> UpResult {
+		let to_left = match (self.l_forest.last(), self.r_forest.last()) {
+			(None, None) => { return UpResult::Fail },
+			(Some(_), None) => true,
+			(Some(&(_,ref lt)), Some(&(_,ref rt))) if rt.level() > lt.level() => true,
+			_ => false,
+		};
+		if to_left {
+			if let Some((dirty, upper_tree)) = self.l_forest.pop() {
+				self.dirty = dirty;
+				self.tree = Some(upper_tree);
+			} else { panic!("up: empty left forest item"); }
+		} else { // right side
+			if let Some((dirty, upper_tree)) = self.r_forest.pop() {
+				self.dirty = dirty;
+				self.tree = Some(upper_tree);
+			} else { panic!("up: empty right forest item"); }
+		}
+		return if to_left { UpResult::Left } else { UpResult::Right };
+	}
 
 }
 

@@ -433,7 +433,7 @@ impl<T: Debug+Clone+Eq+Hash+'static> IterR<T> {
 	{
 		match self.0 {Raz{r_stack,mut r_forest, ..}=>{
 			let stack_result = r_stack.into_iter().fold(init, |r,t|{bin(r,&t)});
-			if r_forest.up() == tree::UpResult::Fail { return stack_result }
+			if r_forest.up_discard() == tree::UpResult::Fail { return stack_result }
 			let (_,_,iter) = r_forest.into_iters();
 			iter.fold_out(stack_result,Rc::new(move|r,t|{
 				match t {
