@@ -32,7 +32,15 @@ const DEFAULT_EDITS: usize = 1;
 const DEFAULT_CHANGES: usize = 30;
 const DEFAULT_TRIALS: usize = 10;
 
-fn main() {
+fn main () {
+  use std::thread;
+  let child =
+    thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { 
+      main2()
+    });
+  let _ = child.unwrap().join();
+}
+fn main2() {
   //command-line
   let args = clap::App::new("chartraz")
     .version("0.1")

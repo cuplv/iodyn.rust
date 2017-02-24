@@ -190,10 +190,10 @@ impl<'a,E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 		// iterator can't start at None if there's data, so we move up
 		// if there's no upper tree, then there's no data, so it's fine.
 		// otherwise, we need to seek to the starting point
-		if l_cursor.tree.is_none() { l_cursor.up(); } else {
+		if l_cursor.tree.is_none() { l_cursor.up_discard(); } else {
 			while l_cursor.down_right() {}
 		}
-		if r_cursor.tree.is_none() { r_cursor.up(); } else {
+		if r_cursor.tree.is_none() { r_cursor.up_discard(); } else {
 			while r_cursor.down_left() {}
 		}
 		(
@@ -423,6 +423,7 @@ impl<T: TreeUpdate+Debug+Clone+Eq+Hash+'static> IterR<T> {
 				match name {
 					None => self.fold_out(a,bin),
 					Some(n) => {
+						let (n,_) = name_fork(n);
 						let i = self;
 						memo!( n =>> Self::fold_out , i:i, a:a ;; f:bin.clone())
 					}
@@ -441,7 +442,7 @@ Iterator for IterR<T> {
 		if self.0.down_right() {
 			while self.0.down_left() {};
 		} else { loop {
-			match self.0.up() {
+			match self.0.up_discard() {
 				UpResult::Left => {},
 				UpResult::Right => { break },
 				UpResult::Fail => {
