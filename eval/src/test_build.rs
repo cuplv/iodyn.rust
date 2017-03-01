@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 use time::{Duration};
-use rand::{StdRng};
-use eval::*;
-use actions::IncrementalInit;
+use rand::{Rng,StdRng};
+use primitives::*;
+use actions::{Creator,Testor,IncrementalInit};
 
 pub struct TestResult<D> {
 	pub build: Vec<Duration>,

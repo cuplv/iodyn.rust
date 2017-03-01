@@ -1,10 +1,11 @@
 use std::cmp::{min,max};
 use std::rc::Rc;
-use rand::StdRng;
+use rand::{Rng,StdRng};
+use time::Duration;
 use adapton::engine::*;
 use pmfp_collections::{IRaz, IRazTree};
 use pmfp_collections::inc_tree_cursor::gen_level;
-use eval::*;
+use primitives::*;
 
 /// Test harness for the incremental Raz
 ///

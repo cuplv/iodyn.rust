@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use time::{Duration};
 use rand::{StdRng};
-use eval::*;
+use actions::{Creator,Editor,Computor,Testor};
 
 pub struct TestResult<D> {
 	pub edits: Vec<Duration>,

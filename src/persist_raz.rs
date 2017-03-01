@@ -8,7 +8,6 @@
 //! every edit sharing all other data. Cloning
 //! is fast and expected
 
-use std::intrinsics;
 use std::rc::Rc;
 //use std::fmt::Debug;
 
@@ -59,7 +58,7 @@ fn gen_level() -> Level {
 	// options[index] + 1 // level 0 is for empty trees and leaves
 
 	let num = rand::random::<usize>();
-	let bits = unsafe{ intrinsics::ctlz(num)};
+	let bits = num.leading_zeros() as usize;
 	bits+1
 }
 

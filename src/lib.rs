@@ -1,9 +1,5 @@
-#![feature(core_intrinsics)]
-
 extern crate rand;
-//extern crate pat; // pattern match trait for deconstruction
-#[macro_use]
-extern crate adapton;
+#[macro_use] extern crate adapton;
 
 /// Early work on traits for zippers
 ///

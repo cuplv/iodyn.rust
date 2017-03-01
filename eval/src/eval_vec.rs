@@ -1,6 +1,7 @@
 use std::rc::Rc;
-use rand::StdRng;
-use eval::*;
+use rand::{StdRng,Rng};
+use time::Duration;
+use primitives::*;
 
 /// Test harness for `Vec`
 ///

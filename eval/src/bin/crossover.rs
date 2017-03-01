@@ -8,19 +8,17 @@ extern crate time;
 extern crate stats;
 extern crate adapton;
 extern crate pmfp_collections;
-
-mod eval;
+extern crate eval;
 
 use std::fs::OpenOptions;
 use std::io::Write;
 use rand::{StdRng,SeedableRng};
-use eval::*;
 use eval::actions::*;
 #[allow(unused)] use eval::types::*;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
-use eval::seq_test::{TestResult,EditComputeSequence};
+#[allow(unused)] use eval::test_seq::{TestResult,EditComputeSequence};
 use adapton::engine::manage::*;
 
 const DEFAULT_DATASEED: usize = 0;
@@ -33,9 +31,8 @@ const DEFAULT_CHANGES: usize = 30;
 const DEFAULT_TRIALS: usize = 10;
 
 fn main () {
-  use std::thread;
   let child =
-    thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { 
+    std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { 
       main2()
     });
   let _ = child.unwrap().join();

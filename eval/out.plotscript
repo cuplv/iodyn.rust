@@ -1,0 +1,13 @@
+set terminal pdf
+set output 'out.pdf'
+set title "Accumulating time to insert element(s) and compute max\n(s)ize: 1000000, (u)nit-gauge: 100, (n)ame-gauge: 1, (e)dit-batch: 1"
+set xlabel '(c)hanges'
+set ylabel 'Time(ms)'
+set key left top box
+plot \
+'out.dat' i 0 u 1:3:4 t 'Raz edit' with filledcu fs solid 0.1,\
+'out.dat' i 0 u 1:3 t 'Raz compute' with lines,\
+'out.dat' i 0 u 1:4 t 'Raz total' with lines,\
+'out.dat' i 1 u 1:3:4 t 'Vec edit' with filledcu fs solid 0.1,\
+'out.dat' i 1 u 1:3 t 'Vec compute' with lines,\
+'out.dat' i 1 u 1:4 t 'Vec total' with lines,\
