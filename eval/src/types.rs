@@ -14,3 +14,18 @@ impl Add for GenSmall{
     GenSmall(self.0 + rhs.0)
   }
 }
+
+#[derive(Clone,Copy,Debug,PartialEq,Eq,Hash,PartialOrd,Ord)]
+pub struct Gen10k(pub usize);
+impl Rand for Gen10k{
+  fn rand<R: Rng>(rng: &mut R) -> Self {
+    Gen10k(rng.gen::<usize>() % 10_000)
+  }
+}
+impl Add for Gen10k{
+  type Output = Gen10k;
+  fn add(self, rhs: Self) -> Self::Output {
+    Gen10k(self.0 + rhs.0)
+  }
+}
+

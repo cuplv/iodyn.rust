@@ -11,7 +11,6 @@ pub struct TestResult<D> {
 	pd: PhantomData<D>,
 }
 
-#[allow(unused)]
 pub struct BuildTest<G:Rng> {
 	pub init: IncrementalInit<G>,
 	pub multiplier: f32,
