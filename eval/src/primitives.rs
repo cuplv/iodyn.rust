@@ -11,6 +11,10 @@ impl<E> Adapt for E where E: 'static+Eq+Clone+Hash+Debug {}
 pub trait Eval: Adapt+Rand {}
 impl<E> Eval for E where E: Adapt+Rand {}
 
+/// empty initialization of an incremental collection
+pub trait CreateEmpty<G:Rng> {
+	fn inc_empty(unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration, Self);
+}
 /// for building an incremental collection
 pub trait CreateInc<G:Rng> {
 	fn inc_init(size: usize, unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration,Self);
@@ -26,6 +30,11 @@ pub trait EditAppend {
 /// for inserting elements at random location
 pub trait EditInsert {
 	fn insert(self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self);
+}
+/// common operations on sequences
+pub trait EditSeq<T> {
+	fn push(self, val:T, rng: &mut StdRng) -> (Duration, Self);
+	fn pop(self, rng: &mut StdRng) -> (Duration, Option<T>, Self);
 }
 /// for computing the max of the collection
 pub trait CompMax {

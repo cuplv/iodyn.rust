@@ -10,7 +10,7 @@ use primitives::*;
 /// Test harness for the incremental Raz
 ///
 /// Coorinates elements and insertion location
-pub struct EvalIRaz<E:Eval,G:Rng> {
+pub struct EvalIRaz<E:Adapt,G:Rng> {
 	// Option for cleaner code, None means uninitialized
 	raztree: Option<IRazTree<E>>,
 	names: usize,
@@ -20,7 +20,7 @@ pub struct EvalIRaz<E:Eval,G:Rng> {
 	namesize: usize,
 }
 
-impl<E: Eval,G:Rng> EvalIRaz<E,G> {
+impl<E:Adapt,G:Rng> EvalIRaz<E,G> {
 	pub fn new(us: usize, ns: usize, coord:G) -> Self {
 		EvalIRaz {
 			raztree: None,
@@ -38,16 +38,24 @@ impl<E: Eval,G:Rng> EvalIRaz<E,G> {
 	}
 }
 
+impl<E:Adapt,G:Rng+Clone>
+CreateEmpty<G> for EvalIRaz<E,G>{
+	fn inc_empty(unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+		let time = Duration::span(||{
+			eval.raztree = Some(IRaz::new().unfocus());
+		});
+		(time,eval)
+	}
+}
 /// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
 // uses Params::{start,namesize,unitsize}
 impl<E:Eval,G:Rng+Clone>
-CreateInc<G>
-for EvalIRaz<E,G> {
+CreateInc<G> for EvalIRaz<E,G> {
 	fn inc_init(size: usize, unitgauge: usize, namegauge: usize, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)
 	{
 		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
-		let mut raz = IRaz::new();
 		// measure stuff
 		let names = size/(eval.namesize*eval.unitsize); // integer division
 		let levels = size / eval.unitsize; 
@@ -72,6 +80,7 @@ for EvalIRaz<E,G> {
 		let mut level_iter = lev_vec.into_iter();
 		// time the creation (insert and unfocus)
 		let time = Duration::span(||{
+			let mut raz = IRaz::new();
 			for _ in 0..names {
 				for _ in 0..eval.namesize {
 					for _ in 0..eval.unitsize {
@@ -100,7 +109,7 @@ for EvalIRaz<E,G> {
 impl<E:Eval,G:Rng>
 EditInsert for EvalIRaz<E,G> {
 	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
-		let tree = self.raztree.take().unwrap_or_else(||panic!("raz empty"));
+		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
 		let loc = self.coord.gen::<usize>() % tree.len();
 		let mut focus = None;
 		let focus_time = Duration::span(||{
@@ -142,7 +151,7 @@ EditInsert for EvalIRaz<E,G> {
 impl<E:Eval,G:Rng>
 EditAppend for EvalIRaz<E,G> {
 	fn append(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
-		let tree = self.raztree.take().unwrap_or_else(||panic!("raz empty"));
+		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
 		let len = tree.len();
 		let mut focus = None;
 		let focus_time = Duration::span(||{
@@ -276,6 +285,52 @@ EditExtend for EvalIRaz<E,G> {
 		(time,self)
 	}
 }
+
+// impl<E:Adapt,G:Rng>
+// EditSeq<E> for EvalIRaz<E,G> {
+// 	fn push(self, val:E, rng: &mut StdRng) -> (Duration, Self) {
+// 		// focus to end
+// 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
+// 		let mut focus = None;
+// 		let focus_time = Duration::span(||{
+// 			focus = tree.focus(tree.len());
+// 		});
+// 		let mut raz = focus.unwrap();
+// 		// determine if we need names/levels
+// 		let lev = if self.counter % self.unitsize == 0 {
+// 			Some(gen_level(rng))
+// 		} else { None };
+// 		let nm = if self.counter % (self.namesize*self.unitsize) == 0 {
+// 			Some(self.next_name())
+// 		} else { None };
+// 		self.counter += 1;
+// 		// do insertion/unfocus
+// 		let insert_time = Duration::span(||{
+// 			if let Some(lev) = lev {
+// 				raz.archive_left(lev,nm);
+// 			}
+// 			raz.push_left(val);
+// 			self.raztree = Some(raz.unfocus());
+// 		});
+// 		(focus_time+insert_time,self)		
+// 	}
+// 	fn pop(self, rng: &mut StdRng) -> (Duration, Option<E>, Self) {
+// 		// focus to end
+// 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
+// 		let mut focus = None;
+// 		let focus_time = Duration::span(||{
+// 			focus = tree.focus(tree.len());
+// 		});
+// 		let mut raz = focus.unwrap();
+// 		// do removal/unfocus
+// 		let result = None;
+// 		let remove_time = Duration::span(||{
+// 			result = raz.pop_left();
+// 			self.raztree = Some(raz.unfocus());
+// 		});
+// 		(focus_time+remove_time,result,self)		
+// 	}
+// }
 
 impl<E:Eval+Ord,G:Rng>
 CompMax for EvalIRaz<E,G> {

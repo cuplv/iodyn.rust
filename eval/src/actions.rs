@@ -19,6 +19,19 @@ pub trait Testor<R> {
 	fn test(&mut self, rng: &mut StdRng) -> R;
 }
 
+#[derive(Clone)]
+pub struct IncrementalEmpty<G:Rng> {
+	pub unitgauge: usize,
+	pub namegauge: usize,
+	pub coord: G,
+}
+impl<D:CreateEmpty<G>,G:Rng>
+Creator<Duration,D> for IncrementalEmpty<G> {
+	fn create(&mut self, rng: &mut StdRng) -> (Duration,D){
+		D::inc_empty(self.unitgauge, self.namegauge, &self.coord, rng)
+	}
+}
+
 // builds a sequence from scratch, 
 #[derive(Clone)]
 pub struct IncrementalInit<G:Rng> {
@@ -52,7 +65,7 @@ Editor<Duration,D> for BatchAppend {
 	}
 }
 
-/// Add multiple elements to the end of a collection
+/// Insert multiple elements into the collection at random places
 pub struct BatchInsert(pub usize);
 impl<D: EditInsert>
 Editor<Duration,D> for BatchInsert {
@@ -116,11 +129,19 @@ Computor<Duration,D> for Mapper<I,O,F> {
 pub struct Folder<I,O:Clone,F:Fn(O,&I)->O>(O,Rc<F>,PhantomData<I>,PhantomData<O>);
 impl<I,O:Clone,F:Fn(O,&I)->O> Folder<I,O,F> { pub fn new(a:O,f:F) -> Self {Folder(a,Rc::new(f),PhantomData,PhantomData)}}
 impl<I,O:Clone,F:Fn(O,&I)->O,D:CompFold<I,O,F>>
-Computor<Duration,D> for Folder<I,O,F> {
+Computor<Duration,D>
+for Folder<I,O,F> {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
 		let (time,answer) = data.comp_fold(self.0.clone(),self.1.clone(),rng);
 		#[allow(unused)]
 		let saver = Vec::new().push(answer); // don't let rust compile this away
 		time
+	}
+}
+impl<I,O:Clone,F:Fn(O,&I)->O,D:CompFold<I,O,F>>
+Computor<(Duration,D::Target),D>
+for Folder<I,O,F> {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Duration,D::Target) {
+		data.comp_fold(self.0.clone(),self.1.clone(),rng)
 	}
 }

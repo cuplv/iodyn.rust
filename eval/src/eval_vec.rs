@@ -6,11 +6,12 @@ use primitives::*;
 /// Test harness for `Vec`
 ///
 /// Coordinates elements and insertion position
-pub struct EvalVec<E:Eval,G:Rng> {
+#[derive(Clone)]
+pub struct EvalVec<E:Adapt,G:Rng> {
 	vec: Vec<E>,
 	coord: G,
 }
-impl<E:Eval,G:Rng>
+impl<E:Adapt,G:Rng>
 EvalVec<E,G> {
 	fn new(coord:G) -> Self {
 		EvalVec {
@@ -20,6 +21,16 @@ EvalVec<E,G> {
 	}
 }
 
+impl<E:Adapt,G:Rng+Clone>
+CreateEmpty<G> for EvalVec<E,G>{
+	fn inc_empty(_unitgauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = None;
+		let time = Duration::span(||{
+			eval = Some(EvalVec::new((*coord).clone()));
+		});
+		(time,eval.unwrap())
+	}
+}
 /// Creates a `Vec` by pushing individual elements into
 /// an initially unallocated `Vec`. Ignores the incremental vars.
 impl<E:Eval,G:Rng+Clone>
@@ -74,6 +85,23 @@ EditInsert for EvalVec<E,G> {
 			}
 		});
 		(time,self)
+	}
+}
+
+impl<E:Adapt,G:Rng>
+EditSeq<E> for EvalVec<E,G> {
+	fn push(mut self, val:E, _rng: &mut StdRng) -> (Duration, Self) {
+		let time = Duration::span(||{
+			self.vec.push(val);
+		});
+		(time,self)
+	}
+	fn pop(mut self, _rng: &mut StdRng) -> (Duration, Option<E>, Self) {
+		let mut result = None;
+		let time = Duration::span(||{
+			result = self.vec.pop();
+		});
+		(time,result,self)		
 	}
 }
 
