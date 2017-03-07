@@ -5,11 +5,17 @@ extern crate time;
 extern crate rand;
 
 use std::marker::PhantomData;
+// use std::fs::OpenOptions;
+// use std::io::Write;
 use time::Duration;
 use rand::{Rng,StdRng,SeedableRng};
-use eval::actions::{Creator,Computor,Testor,IncrementalEmpty,Folder};
+use eval::actions::*;
 use eval::primitives::{CreateEmpty,EditSeq,CompFold};
-use eval::eval_vec::EvalVec;
+#[allow(unused)] use eval::eval_nraz::EvalNRaz;
+#[allow(unused)] use eval::eval_iraz::EvalIRaz;
+#[allow(unused)] use eval::eval_vec::EvalVec;
+use eval::test_seq::{TestMResult,EditComputeSequence};
+use adapton::engine::manage::*;
 
 #[derive(Debug,Clone,Copy,Hash,Eq,PartialEq)]
 enum Token {
@@ -56,6 +62,77 @@ fn parse(toks: Vec<Token>) -> Vec<u32> {
 	})
 }
 
+//////////////////////////////
+// Test of incremental version
+//////////////////////////////
+
+fn main() {
+	let unitgauge = 1000;
+	let namegauge = 1;
+	let coord = StdRng::from_seed(&[0]);
+	let accum = IncrementalEmpty{
+		unitgauge: unitgauge,
+		namegauge: namegauge,
+		coord: coord.clone(),
+	};
+	let tokenize = Compute2::new(
+		Folder::new((accum.create(rng).1,None),|(mut ts,part),c:&char|{
+			if let Some(num) = c.to_digit(10) {
+				let bigger = part.map_or(num,|p|p*10+num);
+				(ts,Some(bigger))
+			} else {
+				if let Some(num) = part {
+					ts = ts.push(Token::Num(num),rng).1;
+				}
+				match *c {
+					'+' => {ts = ts.push(Token::OpPlus,rng).1;},
+					',' => {},
+					c => panic!("invalid char '{}'",c),
+				}
+				(ts,None)
+			}
+		}),
+		Proj0,
+	);
+	let parse = Folder::new(accum.create(rng).1,|mut n,t|{
+		match *t {
+			Token::Num(a) => n.push(a,rng).1,
+			Token::OpPlus => {
+				let (_,b,n) = n.pop(rng);
+				if let Some(b) = b {
+					let (_,a,n) = n.pop(rng);
+					if let Some(a) = a {
+						n.push(a+b,rng).1
+					} else {
+						n.push(b,rng).1
+					}
+				} else { n }
+			}
+		}
+	});
+  let mut test = EditComputeSequence{
+    init: IncrementalInit {
+      size: 100_000,
+      unitgauge: unitgauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(1),
+    comp: Compute2::new(tokenize,parse),
+    changes: 30,
+  };
+
+  let _ = init_dcg(); assert!(engine_is_dcg());
+
+  // run experiments
+  let mut rng = StdRng::from_seed(&[0]);
+  let result_raz: TestMResult<EvalIRaz<char,StdRng>> = test.test(&mut rng);
+  let result_vec: TestMResult<EvalVec<char,StdRng>> = test.test(&mut rng);
+
+  print!("first inc parse time: {:?}", result_raz.computes[1][1]);
+
+}
+
 struct Initializer<G:Rng>(IncrementalEmpty<G>);
 struct Tokenizer<G:Rng>(IncrementalEmpty<G>);
 struct Parser<G:Rng>(IncrementalEmpty<G>);
@@ -74,109 +151,109 @@ struct ParseResult<C,T,N> {
 	tstruct: PhantomData<T>,
 	nstruct: PhantomData<N>,
 }
-impl<T,C,G>
-Computor<T,C>
-for Tokenizer<G> where
-	T:CreateEmpty<G>+EditSeq<Token>+Clone,
-	C:CompFold<char,Option<u32>,Fn((T,Option<u32>),&char)>,
-	G:Rng
-{
-	fn compute(&mut self, data: &C, rng: &mut StdRng) -> T {
-		let tokens:T = (self.0).create(rng).1;
-		let tokenize = Folder::new((tokens,None),|(mut ts,part),c:&char|{
-			if let Some(num) = c.to_digit(10) {
-				let bigger = part.map_or(num,|p|p*10+num);
-				(ts,Some(bigger))
-			} else {
-				if let Some(num) = part {
-					ts = ts.push(Token::Num(num),rng).1;
-				}
-				match *c {
-					'+' => {ts = ts.push(Token::OpPlus,rng).1;},
-					',' => {},
-					c => panic!("invalid char '{}'",c),
-				}
-				(ts,None)
-			}
-		});
-		let (_duration,result) = tokenize.compute(data,rng);
-		result
-	}
-}
-impl<T,N:CreateEmpty<G>+EditSeq<u32>+Clone,G:Rng> Computor<N,T>
-for Parser<G> {
-	fn compute(&mut self, data: &T, rng: &mut StdRng) -> N {
-		let nums:N = (self.0).create(rng).1;
-		let parse = Folder::new(nums,|mut n,t|{
-			match *t {
-				Token::Num(a) => n.push(a,rng).1,
-				Token::OpPlus => {
-					let (_,b,n) = n.pop(rng);
-					if let Some(b) = b {
-						let (_,a,n) = n.pop(rng);
-						if let Some(a) = a {
-							n.push(a+b,rng).1
-						} else {
-							n.push(b,rng).1
-						}
-					} else { n }
-				}
-			}
-		});
-		let (_duration,result) = parse.compute(data,rng);
-		result
-	}
-}
+// impl<T,C,G>
+// Computor<T,C>
+// for Tokenizer<G> where
+// 	T:CreateEmpty<G>+EditSeq<Token>+Clone,
+// 	C:CompFold<char,Option<u32>,Fn((T,Option<u32>),&char)>,
+// 	G:Rng
+// {
+// 	fn compute(&mut self, data: &C, rng: &mut StdRng) -> T {
+// 		let tokens:T = (self.0).create(rng).1;
+// 		let tokenize = Folder::new((tokens,None),|(mut ts,part),c:&char|{
+// 			if let Some(num) = c.to_digit(10) {
+// 				let bigger = part.map_or(num,|p|p*10+num);
+// 				(ts,Some(bigger))
+// 			} else {
+// 				if let Some(num) = part {
+// 					ts = ts.push(Token::Num(num),rng).1;
+// 				}
+// 				match *c {
+// 					'+' => {ts = ts.push(Token::OpPlus,rng).1;},
+// 					',' => {},
+// 					c => panic!("invalid char '{}'",c),
+// 				}
+// 				(ts,None)
+// 			}
+// 		});
+// 		let (_duration,result) = tokenize.compute(data,rng);
+// 		result
+// 	}
+// }
+// impl<T,N:CreateEmpty<G>+EditSeq<u32>+Clone,G:Rng> Computor<N,T>
+// for Parser<G> {
+// 	fn compute(&mut self, data: &T, rng: &mut StdRng) -> N {
+// 		let nums:N = (self.0).create(rng).1;
+// 		let parse = Folder::new(nums,|mut n,t|{
+// 			match *t {
+// 				Token::Num(a) => n.push(a,rng).1,
+// 				Token::OpPlus => {
+// 					let (_,b,n) = n.pop(rng);
+// 					if let Some(b) = b {
+// 						let (_,a,n) = n.pop(rng);
+// 						if let Some(a) = a {
+// 							n.push(a+b,rng).1
+// 						} else {
+// 							n.push(b,rng).1
+// 						}
+// 					} else { n }
+// 				}
+// 			}
+// 		});
+// 		let (_duration,result) = parse.compute(data,rng);
+// 		result
+// 	}
+// }
 
-impl<C:CreateEmpty<G>+EditSeq<char>+Clone,T,N,G:Rng>
-Testor<ParseResult<C,T,N>>
-for ParseTest<G> {
-	fn test(&mut self, rng: &mut StdRng) -> ParseResult<C,T,N> {
-		let (_dur,cs):(Duration,C) = self.initializer.0.create(rng);
-		for c in self.to_parse.chars() {
-			cs = cs.push(c,rng).1
-		}
-		let ts = self.tokenizer.compute(&cs,rng);
-		let ns = self.parser.compute(&ts,rng);
-		ParseResult {
-			build_time: Duration::zero(),
-			tokenize_time: Duration::zero(),
-			parse_time: Duration::zero(),
-			result: ns.into_iter().collect(),
-			cstruct: PhantomData,
-			tstruct: PhantomData,
-			nstruct: PhantomData,
-		}
-	}
-}
+// impl<C:CreateEmpty<G>+EditSeq<char>+Clone,T,N,G:Rng>
+// Testor<ParseResult<C,T,N>>
+// for ParseTest<G> {
+// 	fn test(&mut self, rng: &mut StdRng) -> ParseResult<C,T,N> {
+// 		let (_dur,cs):(Duration,C) = self.initializer.0.create(rng);
+// 		for c in self.to_parse.chars() {
+// 			cs = cs.push(c,rng).1
+// 		}
+// 		let ts = self.tokenizer.compute(&cs,rng);
+// 		let ns = self.parser.compute(&ts,rng);
+// 		ParseResult {
+// 			build_time: Duration::zero(),
+// 			tokenize_time: Duration::zero(),
+// 			parse_time: Duration::zero(),
+// 			result: ns.into_iter().collect(),
+// 			cstruct: PhantomData,
+// 			tstruct: PhantomData,
+// 			nstruct: PhantomData,
+// 		}
+// 	}
+// }
 
-fn main() {
-	let mut parse = ParseTest {
-		to_parse: String::from("4,5+8,7"),
-		initializer: Initializer(IncrementalEmpty{
-			unitgauge: 100,
-			namegauge: 1,
-			coord: StdRng::from_seed(&[0]),
-		}),
-		tokenizer: Tokenizer(IncrementalEmpty{
-			unitgauge: 100,
-			namegauge: 1,
-			coord: StdRng::from_seed(&[0]),
-		}),
-		parser: Parser(IncrementalEmpty{
-			unitgauge: 100,
-			namegauge: 1,
-			coord: StdRng::from_seed(&[0]),
-		}),
-	};
+// fn main() {
+// 	let mut parse = ParseTest {
+// 		to_parse: String::from("4,5+8,7"),
+// 		initializer: Initializer(IncrementalEmpty{
+// 			unitgauge: 100,
+// 			namegauge: 1,
+// 			coord: StdRng::from_seed(&[0]),
+// 		}),
+// 		tokenizer: Tokenizer(IncrementalEmpty{
+// 			unitgauge: 100,
+// 			namegauge: 1,
+// 			coord: StdRng::from_seed(&[0]),
+// 		}),
+// 		parser: Parser(IncrementalEmpty{
+// 			unitgauge: 100,
+// 			namegauge: 1,
+// 			coord: StdRng::from_seed(&[0]),
+// 		}),
+// 	};
 
-	let rng = StdRng::from_seed(&[0]);
-	let result: ParseResult<EvalVec<char,StdRng>,EvalVec<Token,StdRng>,EvalVec<u32,StdRng>>
-	= parse.test(&mut rng);
+// 	let rng = StdRng::from_seed(&[0]);
+// 	let result: ParseResult<EvalVec<char,StdRng>,EvalVec<Token,StdRng>,EvalVec<u32,StdRng>>
+// 	= parse.test(&mut rng);
 
-	println!("{:?}", result.result);
+// 	println!("{:?}", result.result);
 
-}
+// }
 
 
 #[cfg(test)]

@@ -84,6 +84,39 @@ Editor<Duration,D> for BatchExtend {
 	}
 }
 
+pub struct Compute2<A,B,I,J,K>(A,B,PhantomData<I>,PhantomData<J>,PhantomData<K>) where
+	A: Computor<(Vec<Duration>,J),I>,
+	B: Computor<(Vec<Duration>,K),J>
+;
+impl<A,B,I,J,K> Compute2<A,B,I,J,K> where
+	A: Computor<(Vec<Duration>,J),I>,
+	B: Computor<(Vec<Duration>,K),J>
+{
+	pub fn new(a:A,b:B)->Self{Compute2(a,b,PhantomData,PhantomData,PhantomData)}
+}
+impl<A,B,I,J,K>
+Computor<(Vec<Duration>,K),I>
+for Compute2<A,B,I,J,K> where
+	A: Computor<(Vec<Duration>,J),I>,
+	B: Computor<(Vec<Duration>,K),J>
+{
+	fn compute(&mut self, data: &I, rng: &mut StdRng) -> (Vec<Duration>,K) {
+		let mut times = Vec::new();
+		let (duration,data) = (self.0).compute(data,rng);
+		times.extend(duration);
+		let (duration,data) = (self.1).compute(&data,rng);
+		times.extend(duration);
+		(times,data)
+	}
+}
+
+pub struct Proj0;
+impl<R:Clone,E> Computor<(Vec<Duration>,R),(R,E)> for Proj0 {
+	fn compute(&mut self, data: &(R,E), _rng: &mut StdRng) -> (Vec<Duration>,R) {
+		(Vec::new(),data.0.clone())
+	}
+}
+
 // TODO: rewrite these using treefold
 pub struct FindMax;
 impl<D: CompMax>
@@ -143,5 +176,15 @@ Computor<(Duration,D::Target),D>
 for Folder<I,O,F> {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Duration,D::Target) {
 		data.comp_fold(self.0.clone(),self.1.clone(),rng)
+	}
+}
+impl<I,O:Clone,F:Fn(O,&I)->O,D:CompFold<I,O,F>>
+Computor<(Vec<Duration>,D::Target),D>
+for Folder<I,O,F> {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Vec<Duration>,D::Target) {
+		let (time,answer) = data.comp_fold(self.0.clone(),self.1.clone(),rng);
+		let mut v = Vec::new();
+		v.push(time);
+		(v,answer)
 	}
 }
