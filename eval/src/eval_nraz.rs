@@ -1,17 +1,18 @@
 //use std::cmp::{min,max};
 //use std::rc::Rc;
-use rand::{Rng,StdRng};
+use rand::{Rng,StdRng,Rand};
 //use adapton::engine::*;
 use time::Duration;
 use pmfp_collections::{Raz, RazTree};
 use pmfp_collections::trees::NegBin;
 use primitives::*;
+use interface::{Adapt};
 
 /// Test harness for the incremental Raz
 ///
 /// Coorinates elements and insertion location
 #[allow(unused)]
-pub struct EvalNRaz<E:Eval,G:Rng> {
+pub struct EvalNRaz<E:Adapt,G:Rng> {
 	// Option for cleaner code, None means uninitialized
 	raztree: Option<RazTree<E>>,
 	coord: G,
@@ -19,7 +20,7 @@ pub struct EvalNRaz<E:Eval,G:Rng> {
 	unitsize: usize,
 }
 
-impl<E: Eval,G:Rng> EvalNRaz<E,G> {
+impl<E: Adapt,G:Rng> EvalNRaz<E,G> {
 	pub fn new(us: usize, coord:G) -> Self {
 		EvalNRaz {
 			raztree: None,
@@ -32,7 +33,7 @@ impl<E: Eval,G:Rng> EvalNRaz<E,G> {
 
 /// Creates a `RazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `Raz`, and then unfocusing
-impl<E:Eval,G:Rng+Clone>
+impl<E:Adapt+Rand,G:Rng+Clone>
 CreateInc<G>
 for EvalNRaz<E,G> {
 	fn inc_init(size: usize, unitgauge: usize, _namegauge: usize, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)

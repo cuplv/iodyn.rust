@@ -1,5 +1,6 @@
+use std::fmt::{self,Debug};
 use std::rc::Rc;
-use rand::{StdRng,Rng};
+use rand::{StdRng,Rng,Rand};
 use time::Duration;
 use primitives::*;
 
@@ -7,11 +8,16 @@ use primitives::*;
 ///
 /// Coordinates elements and insertion position
 #[derive(Clone)]
-pub struct EvalVec<E:Adapt,G:Rng> {
+pub struct EvalVec<E,G:Rng> {
 	vec: Vec<E>,
 	coord: G,
 }
-impl<E:Adapt,G:Rng>
+impl<E:Debug,G:Rng> Debug for EvalVec<E,G> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f,"{:?}",self.vec)
+	}
+}
+impl<E,G:Rng>
 EvalVec<E,G> {
 	fn new(coord:G) -> Self {
 		EvalVec {
@@ -21,7 +27,7 @@ EvalVec<E,G> {
 	}
 }
 
-impl<E:Adapt,G:Rng+Clone>
+impl<E,G:Rng+Clone>
 CreateEmpty<G> for EvalVec<E,G>{
 	fn inc_empty(_unitgauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
 		let mut eval = None;
@@ -33,7 +39,7 @@ CreateEmpty<G> for EvalVec<E,G>{
 }
 /// Creates a `Vec` by pushing individual elements into
 /// an initially unallocated `Vec`. Ignores the incremental vars.
-impl<E:Eval,G:Rng+Clone>
+impl<E:Rand,G:Rng+Clone>
 CreateInc<G>
 for EvalVec<E,G> {
 	fn inc_init(size: usize, _unigauge: usize, _namegauge: usize, coord: &G, mut _rng: &mut StdRng) -> (Duration,Self) {
@@ -49,7 +55,7 @@ for EvalVec<E,G> {
 }
 
 /// Appends to a `Vec` "batch-at-once" by `Vec::append`
-impl<E:Eval,G:Rng>
+impl<E:Rand,G:Rng>
 EditExtend for EvalVec<E,G> {
 	fn extend(mut self, batch_size: usize, _rng: &mut StdRng) -> (Duration,Self) {
 		let mut data_vec = self.coord.gen_iter::<E>().take(batch_size).collect();
@@ -61,7 +67,7 @@ EditExtend for EvalVec<E,G> {
 }
 
 /// Appends to a `Vec` one item at a time
-impl<E:Eval,G:Rng>
+impl<E:Rand,G:Rng>
 EditAppend for EvalVec<E,G> {
 	fn append(mut self, batch_size: usize, _rng: &mut StdRng) -> (Duration,Self) {
 		let data_vec = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
@@ -74,7 +80,7 @@ EditAppend for EvalVec<E,G> {
 	}
 }
 
-impl<E:Eval,G:Rng>
+impl<E:Rand,G:Rng>
 EditInsert for EvalVec<E,G> {
 	fn insert(mut self, batch_size: usize, _rng: &mut StdRng) -> (Duration,Self) {
 		let data_vec = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
@@ -88,24 +94,7 @@ EditInsert for EvalVec<E,G> {
 	}
 }
 
-impl<E:Adapt,G:Rng>
-EditSeq<E> for EvalVec<E,G> {
-	fn push(mut self, val:E, _rng: &mut StdRng) -> (Duration, Self) {
-		let time = Duration::span(||{
-			self.vec.push(val);
-		});
-		(time,self)
-	}
-	fn pop(mut self, _rng: &mut StdRng) -> (Duration, Option<E>, Self) {
-		let mut result = None;
-		let time = Duration::span(||{
-			result = self.vec.pop();
-		});
-		(time,result,self)		
-	}
-}
-
-impl<E:Eval+Ord,G:Rng>
+impl<E:Clone+Ord,G:Rng>
 CompMax for EvalVec<E,G> {
 	type Target = Option<E>;
 	fn comp_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
@@ -113,13 +102,13 @@ CompMax for EvalVec<E,G> {
 		let time = Duration::span(||{
 			max = Some(self.vec.iter().max());
 		});
-		(time, max.unwrap().map(|ref e|(*e).clone()))
+		(time, max.unwrap().map(|e|(*e).clone()))
 	}
 }
 
 // TODO: implement tree fold as multiple pairwise passes?
 
-impl<E:Eval,O,F,G:Rng>
+impl<E,O,F,G:Rng>
 CompMap<E,O,F> for EvalVec<E,G> where
 	F:Fn(&E)->O
 {
@@ -133,7 +122,7 @@ CompMap<E,O,F> for EvalVec<E,G> where
 	}
 }
 
-impl<E: Eval,O,F,G:Rng>
+impl<E,O,F,G:Rng>
 CompFold<E,O,F> for EvalVec<E,G> where
 	F:Fn(O,&E)->O,
 {

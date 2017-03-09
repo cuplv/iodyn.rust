@@ -1,15 +1,6 @@
-use std::fmt::Debug;
-use std::hash::Hash;
 use std::rc::Rc;
-use rand::Rand;
 use rand::{Rng,StdRng};
 use time::Duration;
-
-/// convenience traits for incremental test data
-pub trait Adapt: 'static+Eq+Clone+Hash+Debug {}
-impl<E> Adapt for E where E: 'static+Eq+Clone+Hash+Debug {}
-pub trait Eval: Adapt+Rand {}
-impl<E> Eval for E where E: Adapt+Rand {}
 
 /// empty initialization of an incremental collection
 pub trait CreateEmpty<G:Rng> {
@@ -30,11 +21,6 @@ pub trait EditAppend {
 /// for inserting elements at random location
 pub trait EditInsert {
 	fn insert(self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self);
-}
-/// common operations on sequences
-pub trait EditSeq<T> {
-	fn push(self, val:T, rng: &mut StdRng) -> (Duration, Self);
-	fn pop(self, rng: &mut StdRng) -> (Duration, Option<T>, Self);
 }
 /// for computing the max of the collection
 pub trait CompMax {

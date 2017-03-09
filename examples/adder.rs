@@ -4,19 +4,35 @@ extern crate eval;
 extern crate time;
 extern crate rand;
 
-use std::marker::PhantomData;
 // use std::fs::OpenOptions;
 // use std::io::Write;
-use time::Duration;
-use rand::{Rng,StdRng,SeedableRng};
+// use time::Duration;
+use rand::{Rand,Rng,StdRng,SeedableRng};
 use eval::actions::*;
-use eval::primitives::{CreateEmpty,EditSeq,CompFold};
+use eval::primitives::{EditSeq};
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 
+/// Input Lang
+///
+/// Unchecked, but should only contain [0123456789,+]
+/// This is mainly used to randomly generate a sequence
+#[derive(Debug,Clone,Copy,Hash,Eq,PartialEq)]
+struct Lang(pub char);
+impl Rand for Lang{
+  fn rand<R: Rng>(rng: &mut R) -> Self {
+  	Lang(match rng.gen::<usize>() % 7 {
+  		0 => '+',
+  		1...3 => ',',
+  		_ => *rng.choose(&['0','1','2','3','4','5','6','7','8','9']).unwrap(),
+  	})
+  }
+}
+
+/// Intermediate Lang
 #[derive(Debug,Clone,Copy,Hash,Eq,PartialEq)]
 enum Token {
 	Num(u32),
@@ -24,6 +40,7 @@ enum Token {
 }
 
 // reference tokenizer
+#[allow(unused)]
 fn tokenize(p: String) -> Vec<Token> {
 	p.chars().fold((Vec::new(),None),|(mut ts,part),c|{
 		if let Some(num) = c.to_digit(10) {
@@ -44,6 +61,7 @@ fn tokenize(p: String) -> Vec<Token> {
 }
 
 // reference parser
+#[allow(unused)]
 fn parse(toks: Vec<Token>) -> Vec<u32> {
 	toks.iter().fold(Vec::new(),|mut n,t|{
 		match *t {
@@ -70,55 +88,63 @@ fn main() {
 	let unitgauge = 1000;
 	let namegauge = 1;
 	let coord = StdRng::from_seed(&[0]);
-	let accum = IncrementalEmpty{
+	let mut accum = IncrementalEmpty{
 		unitgauge: unitgauge,
 		namegauge: namegauge,
 		coord: coord.clone(),
 	};
-	let tokenize = Compute2::new(
-		Folder::new((accum.create(rng).1,None),|(mut ts,part),c:&char|{
-			if let Some(num) = c.to_digit(10) {
-				let bigger = part.map_or(num,|p|p*10+num);
-				(ts,Some(bigger))
-			} else {
-				if let Some(num) = part {
-					ts = ts.push(Token::Num(num),rng).1;
-				}
-				match *c {
-					'+' => {ts = ts.push(Token::OpPlus,rng).1;},
-					',' => {},
-					c => panic!("invalid char '{}'",c),
-				}
-				(ts,None)
-			}
-		}),
-		Proj0,
-	);
-	let parse = Folder::new(accum.create(rng).1,|mut n,t|{
+	let unused_rng = &mut StdRng::from_seed(&[0]);
+	fn tokenize_step<A: EditSeq<Token>>(ts:A,part:Option<u32>,l:&Lang) -> (A,Option<u32>) {
+		let Lang(ref c) = *l;
+		if let Some(num) = c.to_digit(10) {
+			let bigger = part.map_or(num,|p|p*10+num);
+			(ts,Some(bigger))
+		} else {
+			let ts = if let Some(num) = part {
+				ts.push(Token::Num(num)).1
+			} else { ts };
+			let ts = match *c {
+				'+' => {ts.push(Token::OpPlus).1},
+				',' => {ts},
+				c => panic!("invalid char '{}'",c),
+			};
+			(ts,None)
+		}
+	}
+	fn parse_step<A: EditSeq<u32>>(n: A, t: &Token) -> A {
 		match *t {
-			Token::Num(a) => n.push(a,rng).1,
+			Token::Num(a) => n.push(a).1,
 			Token::OpPlus => {
-				let (_,b,n) = n.pop(rng);
+				let (_,b,n) = n.pop();
 				if let Some(b) = b {
-					let (_,a,n) = n.pop(rng);
+					let (_,a,n) = n.pop();
 					if let Some(a) = a {
-						n.push(a+b,rng).1
+						n.push(a+b).1
 					} else {
-						n.push(b,rng).1
+						n.push(b).1
 					}
 				} else { n }
 			}
 		}
-	});
+	}
   let mut test = EditComputeSequence{
     init: IncrementalInit {
-      size: 100_000,
+      size: 1_000,
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
     edit: BatchInsert(1),
-    comp: Compute2::new(tokenize,parse),
+    comp: Compute2::<_,_,_,EvalVec<Token,StdRng>,_>::new(
+    	Compute2::new(Folder::new(
+				(accum.create(unused_rng).1,None),
+				|(ts,part),l:&Lang|{tokenize_step(ts,part,l)},
+			), Proj0),
+    	Folder::new(
+				accum.create(unused_rng).1,
+				|n,t|{parse_step(n,t)},
+			)
+		),
     changes: 30,
   };
 
@@ -126,135 +152,18 @@ fn main() {
 
   // run experiments
   let mut rng = StdRng::from_seed(&[0]);
-  let result_raz: TestMResult<EvalIRaz<char,StdRng>> = test.test(&mut rng);
-  let result_vec: TestMResult<EvalVec<char,StdRng>> = test.test(&mut rng);
+  // let result: TestMResult<
+  // 	EvalIRaz<Lang,StdRng>, // in type
+  // 	EvalIRaz<u32,StdRng>,  // out type
+  // > = test.test(&mut rng);
+  let result: TestMResult<
+  	EvalVec<Lang,StdRng>,
+  	EvalVec<u32,StdRng>,
+  > = test.test(&mut rng);
 
-  print!("first inc parse time: {:?}", result_raz.computes[1][1]);
+  println!("first inc parse time: {:?}", result.computes[1][1]);
 
 }
-
-struct Initializer<G:Rng>(IncrementalEmpty<G>);
-struct Tokenizer<G:Rng>(IncrementalEmpty<G>);
-struct Parser<G:Rng>(IncrementalEmpty<G>);
-struct ParseTest<G:Rng> {
-	to_parse: String,
-	initializer: Initializer<G>,
-	tokenizer: Tokenizer<G>,
-	parser: Parser<G>,
-}
-struct ParseResult<C,T,N> {
-	build_time: Duration,
-	tokenize_time: Duration,
-	parse_time: Duration,
-	result: Vec<u32>,
-	cstruct: PhantomData<C>,
-	tstruct: PhantomData<T>,
-	nstruct: PhantomData<N>,
-}
-// impl<T,C,G>
-// Computor<T,C>
-// for Tokenizer<G> where
-// 	T:CreateEmpty<G>+EditSeq<Token>+Clone,
-// 	C:CompFold<char,Option<u32>,Fn((T,Option<u32>),&char)>,
-// 	G:Rng
-// {
-// 	fn compute(&mut self, data: &C, rng: &mut StdRng) -> T {
-// 		let tokens:T = (self.0).create(rng).1;
-// 		let tokenize = Folder::new((tokens,None),|(mut ts,part),c:&char|{
-// 			if let Some(num) = c.to_digit(10) {
-// 				let bigger = part.map_or(num,|p|p*10+num);
-// 				(ts,Some(bigger))
-// 			} else {
-// 				if let Some(num) = part {
-// 					ts = ts.push(Token::Num(num),rng).1;
-// 				}
-// 				match *c {
-// 					'+' => {ts = ts.push(Token::OpPlus,rng).1;},
-// 					',' => {},
-// 					c => panic!("invalid char '{}'",c),
-// 				}
-// 				(ts,None)
-// 			}
-// 		});
-// 		let (_duration,result) = tokenize.compute(data,rng);
-// 		result
-// 	}
-// }
-// impl<T,N:CreateEmpty<G>+EditSeq<u32>+Clone,G:Rng> Computor<N,T>
-// for Parser<G> {
-// 	fn compute(&mut self, data: &T, rng: &mut StdRng) -> N {
-// 		let nums:N = (self.0).create(rng).1;
-// 		let parse = Folder::new(nums,|mut n,t|{
-// 			match *t {
-// 				Token::Num(a) => n.push(a,rng).1,
-// 				Token::OpPlus => {
-// 					let (_,b,n) = n.pop(rng);
-// 					if let Some(b) = b {
-// 						let (_,a,n) = n.pop(rng);
-// 						if let Some(a) = a {
-// 							n.push(a+b,rng).1
-// 						} else {
-// 							n.push(b,rng).1
-// 						}
-// 					} else { n }
-// 				}
-// 			}
-// 		});
-// 		let (_duration,result) = parse.compute(data,rng);
-// 		result
-// 	}
-// }
-
-// impl<C:CreateEmpty<G>+EditSeq<char>+Clone,T,N,G:Rng>
-// Testor<ParseResult<C,T,N>>
-// for ParseTest<G> {
-// 	fn test(&mut self, rng: &mut StdRng) -> ParseResult<C,T,N> {
-// 		let (_dur,cs):(Duration,C) = self.initializer.0.create(rng);
-// 		for c in self.to_parse.chars() {
-// 			cs = cs.push(c,rng).1
-// 		}
-// 		let ts = self.tokenizer.compute(&cs,rng);
-// 		let ns = self.parser.compute(&ts,rng);
-// 		ParseResult {
-// 			build_time: Duration::zero(),
-// 			tokenize_time: Duration::zero(),
-// 			parse_time: Duration::zero(),
-// 			result: ns.into_iter().collect(),
-// 			cstruct: PhantomData,
-// 			tstruct: PhantomData,
-// 			nstruct: PhantomData,
-// 		}
-// 	}
-// }
-
-// fn main() {
-// 	let mut parse = ParseTest {
-// 		to_parse: String::from("4,5+8,7"),
-// 		initializer: Initializer(IncrementalEmpty{
-// 			unitgauge: 100,
-// 			namegauge: 1,
-// 			coord: StdRng::from_seed(&[0]),
-// 		}),
-// 		tokenizer: Tokenizer(IncrementalEmpty{
-// 			unitgauge: 100,
-// 			namegauge: 1,
-// 			coord: StdRng::from_seed(&[0]),
-// 		}),
-// 		parser: Parser(IncrementalEmpty{
-// 			unitgauge: 100,
-// 			namegauge: 1,
-// 			coord: StdRng::from_seed(&[0]),
-// 		}),
-// 	};
-
-// 	let rng = StdRng::from_seed(&[0]);
-// 	let result: ParseResult<EvalVec<char,StdRng>,EvalVec<Token,StdRng>,EvalVec<u32,StdRng>>
-// 	= parse.test(&mut rng);
-
-// 	println!("{:?}", result.result);
-
-// }
-
 
 #[cfg(test)]
 mod tests {

@@ -1,15 +1,17 @@
 use std::cmp::{min,max};
 use std::rc::Rc;
-use rand::{Rng,StdRng};
+use rand::{Rng,StdRng,Rand};
 use time::Duration;
 use adapton::engine::*;
 use pmfp_collections::{IRaz, IRazTree};
 use pmfp_collections::inc_tree_cursor::gen_level;
 use primitives::*;
+use interface::{Adapt};
 
 /// Test harness for the incremental Raz
 ///
-/// Coorinates elements and insertion location
+/// Coorinates elements, insertion location, gen'ed levels
+#[derive(Clone)]
 pub struct EvalIRaz<E:Adapt,G:Rng> {
 	// Option for cleaner code, None means uninitialized
 	raztree: Option<IRazTree<E>>,
@@ -51,7 +53,7 @@ CreateEmpty<G> for EvalIRaz<E,G>{
 /// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
 // uses Params::{start,namesize,unitsize}
-impl<E:Eval,G:Rng+Clone>
+impl<E:Adapt+Rand,G:Rng+Clone>
 CreateInc<G> for EvalIRaz<E,G> {
 	fn inc_init(size: usize, unitgauge: usize, namegauge: usize, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)
 	{
@@ -106,7 +108,7 @@ CreateInc<G> for EvalIRaz<E,G> {
 }
 
 // TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
-impl<E:Eval,G:Rng>
+impl<E:Adapt+Rand,G:Rng>
 EditInsert for EvalIRaz<E,G> {
 	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
@@ -148,7 +150,7 @@ EditInsert for EvalIRaz<E,G> {
 }
 
 // TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
-impl<E:Eval,G:Rng>
+impl<E:Adapt+Rand,G:Rng>
 EditAppend for EvalIRaz<E,G> {
 	fn append(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
@@ -193,7 +195,7 @@ EditAppend for EvalIRaz<E,G> {
 /// data, levels, and names, then unfocusing
 // uses (saved) Params::{namesize,unitsize}
 // TODO: Buggy
-impl<E:Eval,G:Rng>
+impl<E:Adapt+Rand,G:Rng>
 EditExtend for EvalIRaz<E,G> {
 	fn extend(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap();
@@ -288,7 +290,7 @@ EditExtend for EvalIRaz<E,G> {
 
 // impl<E:Adapt,G:Rng>
 // EditSeq<E> for EvalIRaz<E,G> {
-// 	fn push(self, val:E, rng: &mut StdRng) -> (Duration, Self) {
+// 	fn push(self, val:E) -> (Duration, Self) {
 // 		// focus to end
 // 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
 // 		let mut focus = None;
@@ -298,7 +300,7 @@ EditExtend for EvalIRaz<E,G> {
 // 		let mut raz = focus.unwrap();
 // 		// determine if we need names/levels
 // 		let lev = if self.counter % self.unitsize == 0 {
-// 			Some(gen_level(rng))
+// 			Some(gen_level(self.coord))
 // 		} else { None };
 // 		let nm = if self.counter % (self.namesize*self.unitsize) == 0 {
 // 			Some(self.next_name())
@@ -314,7 +316,7 @@ EditExtend for EvalIRaz<E,G> {
 // 		});
 // 		(focus_time+insert_time,self)		
 // 	}
-// 	fn pop(self, rng: &mut StdRng) -> (Duration, Option<E>, Self) {
+// 	fn pop(self) -> (Duration, Option<E>, Self) {
 // 		// focus to end
 // 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
 // 		let mut focus = None;
@@ -332,7 +334,7 @@ EditExtend for EvalIRaz<E,G> {
 // 	}
 // }
 
-impl<E:Eval+Ord,G:Rng>
+impl<E:Adapt+Ord,G:Rng>
 CompMax for EvalIRaz<E,G> {
 	type Target = Option<E>;
 	fn comp_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
@@ -345,7 +347,7 @@ CompMax for EvalIRaz<E,G> {
 	}
 }
 
-impl<E:Eval,O:Adapt,I,B,G:Rng>
+impl<E:Adapt,O:Adapt,I,B,G:Rng>
 CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
 	I:'static + Fn(&E)->O,
 	B:'static + Fn(O,O)->O,
@@ -361,7 +363,7 @@ CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
 	}
 }
 
-impl<E:Eval,O:Adapt,F,G:Rng>
+impl<E:Adapt,O:Adapt,F,G:Rng>
 CompMap<E,O,F> for EvalIRaz<E,G> where
 	F:'static + Fn(&E)->O
 {
@@ -377,7 +379,7 @@ CompMap<E,O,F> for EvalIRaz<E,G> where
 
 }
 
-impl<E: Eval,O:Adapt,F,G:Rng>
+impl<E:Adapt,O:Adapt,F,G:Rng>
 CompFold<E,O,F> for EvalIRaz<E,G> where
 	F:'static + Fn(O,&E)->O,
 {
@@ -392,7 +394,7 @@ CompFold<E,O,F> for EvalIRaz<E,G> where
 	}
 }
 
-// impl<E: Eval,O:Adapt,F,G:Rng>
+// impl<E: Adapt,O:Adapt,F,G:Rng>
 // CompFold<E,O,F> for EvalIRaz<E,G> where
 // 	F:'static + Fn(O,&E,&mut StdRng)->O,
 // {

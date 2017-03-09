@@ -5,6 +5,7 @@ extern crate pmfp_collections;
 
 pub mod actions;
 pub mod primitives;
+pub mod interface;
 pub mod types;
 pub mod test_seq;
 pub mod test_build;
