@@ -9,7 +9,7 @@ extern crate rand;
 // use time::Duration;
 use rand::{Rand,Rng,StdRng,SeedableRng};
 use eval::actions::*;
-use eval::primitives::{EditSeq};
+use eval::interface::{IntrfSeq,IntrfNew};
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
@@ -39,45 +39,60 @@ enum Token {
 	OpPlus,
 }
 
-// reference tokenizer
-#[allow(unused)]
-fn tokenize(p: String) -> Vec<Token> {
-	p.chars().fold((Vec::new(),None),|(mut ts,part),c|{
-		if let Some(num) = c.to_digit(10) {
-			let bigger = part.map_or(num,|p|p*10+num);
-			(ts,Some(bigger))
-		} else {
-			if let Some(num) = part {
-				ts.push(Token::Num(num));
-			}
-			match c {
-				'+' => ts.push(Token::OpPlus),
-				',' => {},
-				c => panic!("invalid char '{}'",c),
-			}
-			(ts,None)
-		}
-	}).0
-}
+/// Reference parser and tokenizer for later work
+mod reference {
+	use super::{Token};
 
-// reference parser
-#[allow(unused)]
-fn parse(toks: Vec<Token>) -> Vec<u32> {
-	toks.iter().fold(Vec::new(),|mut n,t|{
-		match *t {
-			Token::Num(a) => n.push(a),
-			Token::OpPlus => {
-				if let Some(b) = n.pop() {
-					if let Some(a) = n.pop() {
-						n.push(a+b);
-					} else {
-						n.push(b);
+	fn tokenize(p: String) -> Vec<Token> {
+		p.chars().fold((Vec::new(),None),|(mut ts,part),c|{
+			if let Some(num) = c.to_digit(10) {
+				let bigger = part.map_or(num,|p|p*10+num);
+				(ts,Some(bigger))
+			} else {
+				if let Some(num) = part {
+					ts.push(Token::Num(num));
+				}
+				match c {
+					'+' => ts.push(Token::OpPlus),
+					',' => {},
+					c => panic!("invalid char '{}'",c),
+				}
+				(ts,None)
+			}
+		}).0
+	}
+
+	fn parse(toks: Vec<Token>) -> Vec<u32> {
+		toks.iter().fold(Vec::new(),|mut n,t|{
+			match *t {
+				Token::Num(a) => n.push(a),
+				Token::OpPlus => {
+					if let Some(b) = n.pop() {
+						if let Some(a) = n.pop() {
+							n.push(a+b);
+						} else {
+							n.push(b);
+						}
 					}
 				}
 			}
+			n
+		})
+	}
+
+	#[cfg(test)]
+	mod tests {
+		use super::*;
+
+		#[test]
+		fn test_ref_impl() {
+			let prog = "23+4+4,23,54,123,5++".to_string();
+			let toks = tokenize(prog);
+			let vals = parse(toks);
+
+			assert_eq!(vec![27, 4, 23, 182], vals);
 		}
-		n
-	})
+	}
 }
 
 //////////////////////////////
@@ -88,40 +103,34 @@ fn main() {
 	let unitgauge = 1000;
 	let namegauge = 1;
 	let coord = StdRng::from_seed(&[0]);
-	let mut accum = IncrementalEmpty{
-		unitgauge: unitgauge,
-		namegauge: namegauge,
-		coord: coord.clone(),
-	};
-	let unused_rng = &mut StdRng::from_seed(&[0]);
-	fn tokenize_step<A: EditSeq<Token>>(ts:A,part:Option<u32>,l:&Lang) -> (A,Option<u32>) {
+	fn tokenize_step<A: IntrfSeq<Token>>(ts:A,part:Option<u32>,l:&Lang) -> (A,Option<u32>) {
 		let Lang(ref c) = *l;
 		if let Some(num) = c.to_digit(10) {
 			let bigger = part.map_or(num,|p|p*10+num);
 			(ts,Some(bigger))
 		} else {
 			let ts = if let Some(num) = part {
-				ts.push(Token::Num(num)).1
+				ts.seq_push(Token::Num(num))
 			} else { ts };
 			let ts = match *c {
-				'+' => {ts.push(Token::OpPlus).1},
+				'+' => {ts.seq_push(Token::OpPlus)},
 				',' => {ts},
 				c => panic!("invalid char '{}'",c),
 			};
 			(ts,None)
 		}
 	}
-	fn parse_step<A: EditSeq<u32>>(n: A, t: &Token) -> A {
+	fn parse_step<A: IntrfSeq<u32>>(n: A, t: &Token) -> A {
 		match *t {
-			Token::Num(a) => n.push(a).1,
+			Token::Num(a) => n.seq_push(a),
 			Token::OpPlus => {
-				let (_,b,n) = n.pop();
+				let (b,n) = n.seq_pop();
 				if let Some(b) = b {
-					let (_,a,n) = n.pop();
+					let (a,n) = n.seq_pop();
 					if let Some(a) = a {
-						n.push(a+b).1
+						n.seq_push(a+b)
 					} else {
-						n.push(b).1
+						n.seq_push(b)
 					}
 				} else { n }
 			}
@@ -135,13 +144,13 @@ fn main() {
       coord: coord.clone(),
     },
     edit: BatchInsert(1),
-    comp: Compute2::<_,_,_,EvalVec<Token,StdRng>,_>::new(
+    comp: Compute2::<_,_,_,Vec<Token>,_>::new(
     	Compute2::new(Folder::new(
-				(accum.create(unused_rng).1,None),
+				(IntrfNew::new(),None),
 				|(ts,part),l:&Lang|{tokenize_step(ts,part,l)},
 			), Proj0),
     	Folder::new(
-				accum.create(unused_rng).1,
+				IntrfNew::new(),
 				|n,t|{parse_step(n,t)},
 			)
 		),
@@ -154,27 +163,13 @@ fn main() {
   let mut rng = StdRng::from_seed(&[0]);
   // let result: TestMResult<
   // 	EvalIRaz<Lang,StdRng>, // in type
-  // 	EvalIRaz<u32,StdRng>,  // out type
+  // 	IRaz<u32>,  // out type
   // > = test.test(&mut rng);
   let result: TestMResult<
   	EvalVec<Lang,StdRng>,
-  	EvalVec<u32,StdRng>,
+  	Vec<u32>,
   > = test.test(&mut rng);
 
   println!("first inc parse time: {:?}", result.computes[1][1]);
 
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_ref_impl() {
-		let prog = "23+4+4,23,54,123,5++".to_string();
-		let toks = tokenize(prog);
-		let vals = parse(toks);
-
-		assert_eq!(vec![27, 4, 23, 182], vals);
-	}
 }
