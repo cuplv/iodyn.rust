@@ -22,6 +22,7 @@ use stack::Stack;
 /// available if the archive is accessed with [`next_archive()`]
 ///
 /// [`next_archive()`]: struct.AStack.html#method.next_archive
+#[derive(Eq,PartialEq,Hash,Debug)]
 pub struct AStack<E: Clone,M: Clone> {
 	size: usize,
 	current: Vec<E>,

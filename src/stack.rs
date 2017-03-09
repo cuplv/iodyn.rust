@@ -6,14 +6,14 @@ use std::rc::Rc;
 // this layout is explained here: http://cglab.ca/~abeinges/blah/too-many-lists/book/first-layout.html
 // keeps data in heap; uses `Option`s null pointer optimization
 
-#[derive(Debug)]
+#[derive(Debug,Hash,Eq,PartialEq)]
 pub struct Stack<T> {
     head: Link<T>,
 }
 
 type Link<T> = Option<Rc<Node<T>>>;
 
-#[derive(Debug)]
+#[derive(Debug,Eq,PartialEq,Hash)]
 struct Node<T> {
     elem: T,
     next: Link<T>,

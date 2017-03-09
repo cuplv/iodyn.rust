@@ -19,7 +19,7 @@ use adapton::engine::Name;
 ///
 /// A cursor into a sequence, optimised for moving to 
 /// arbitrary points in the sequence
-#[derive(Clone)]
+#[derive(Clone,Eq,PartialEq,Hash,Debug)]
 pub struct Raz<E: Debug+Clone+Eq+Hash+'static> {
 	l_length: usize,
 	r_length: usize,
