@@ -202,3 +202,52 @@ for Folder<I,O,F> {
 		(v,answer)
 	}
 }
+
+pub struct FFolder<
+	A:Clone, E, T, O, R:Fn(A,&E)->A, F:Fn(T)->O
+>{
+	init:A,
+	run: Rc<R>,
+	finish: Rc<F>,
+	accum: PhantomData<A>,
+	elm: PhantomData<E>,
+	target: PhantomData<T>,
+	out: PhantomData<O>,
+}
+
+impl<A:Clone, E, T, O, R:Fn(A,&E)->A, F:Fn(T)->O> FFolder<A,E,T,O,R,F> {
+	pub fn new(a:A,r:R,f:F) -> Self {
+		FFolder{
+			init: a,
+			run: Rc::new(r),
+			finish: Rc::new(f),
+			accum: PhantomData,
+			elm: PhantomData,
+			target: PhantomData,
+			out: PhantomData,
+		}
+	}
+}
+impl<A:Clone, E, O, R:Fn(A,&E)->A, F:Fn(D::Target)->O, D:CompFold<E,A,R>>
+Computor<Duration,D>
+for FFolder<A,E,D::Target,O,R,F> {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time,run) = data.comp_fold(self.init.clone(),self.run.clone(),rng);
+		let finish = (self.finish)(run);
+		#[allow(unused)]
+		let saver = Vec::new().push(finish); // don't let rust compile this away
+		time
+	}
+}
+impl<A:Clone, E, O, R:Fn(A,&E)->A, F:Fn(D::Target)->O, D:CompFold<E,A,R>>
+Computor<(Vec<Duration>,O),D>
+for FFolder<A,E,D::Target,O,R,F> {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Vec<Duration>,O) {
+		let (time,run) = data.comp_fold(self.init.clone(),self.run.clone(),rng);
+		let finish = (self.finish)(run);
+		let mut v = Vec::new();
+		v.push(time);
+		(v,finish)
+	}
+}
+

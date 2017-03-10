@@ -10,6 +10,7 @@ extern crate rand;
 use rand::{Rand,Rng,StdRng,SeedableRng};
 use eval::actions::*;
 use eval::interface::{IntrfSeq,IntrfNew};
+#[allow(unused)] use pmfp_collections::IRaz;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
@@ -40,6 +41,7 @@ enum Token {
 }
 
 /// Reference parser and tokenizer for later work
+#[allow(unused)]
 mod reference {
 	use super::{Token};
 
@@ -89,7 +91,7 @@ mod reference {
 			let prog = "23+4+4,23,54,123,5++".to_string();
 			let toks = tokenize(prog);
 			let vals = parse(toks);
-
+			println!("{:?}", vals);
 			assert_eq!(vec![27, 4, 23, 182], vals);
 		}
 	}
@@ -103,7 +105,7 @@ fn main() {
 	let unitgauge = 1000;
 	let namegauge = 1;
 	let coord = StdRng::from_seed(&[0]);
-	fn tokenize_step<A: IntrfSeq<Token>>(ts:A,part:Option<u32>,l:&Lang) -> (A,Option<u32>) {
+	fn tokenize_step<A: IntrfSeq<Token>>((ts,part):(A,Option<u32>),l:&Lang) -> (A,Option<u32>) {
 		let Lang(ref c) = *l;
 		if let Some(num) = c.to_digit(10) {
 			let bigger = part.map_or(num,|p|p*10+num);
@@ -119,6 +121,11 @@ fn main() {
 			};
 			(ts,None)
 		}
+	}
+	fn tokenize_final<A: IntrfSeq<Token>>((ts,part):(A,Option<u32>)) -> A {
+		if let Some(num) = part {
+			ts.seq_push(Token::Num(num))
+		} else { ts }
 	}
 	fn parse_step<A: IntrfSeq<u32>>(n: A, t: &Token) -> A {
 		match *t {
@@ -144,15 +151,21 @@ fn main() {
       coord: coord.clone(),
     },
     edit: BatchInsert(1),
-    comp: Compute2::<_,_,_,Vec<Token>,_>::new(
-    	Compute2::new(Folder::new(
+    comp: Compute2::<_,_,_,EvalIRaz<Token,StdRng>,_>::new(
+    	FFolder::new(
 				(IntrfNew::new(),None),
-				|(ts,part),l:&Lang|{tokenize_step(ts,part,l)},
-			), Proj0),
-    	Folder::new(
-				IntrfNew::new(),
-				|n,t|{parse_step(n,t)},
-			)
+				tokenize_step,
+				|a|{
+					let ts = tokenize_final(a);
+					IncrementalFrom{
+						data: ts,
+			      unitgauge: unitgauge,
+			      namegauge: namegauge,
+			      coord: coord.clone(),
+					}.create(&mut StdRng::new().unwrap()).1
+				},
+			),
+    	Folder::new(IntrfNew::new(),parse_step)
 		),
     changes: 30,
   };
@@ -161,14 +174,14 @@ fn main() {
 
   // run experiments
   let mut rng = StdRng::from_seed(&[0]);
-  // let result: TestMResult<
-  // 	EvalIRaz<Lang,StdRng>, // in type
-  // 	IRaz<u32>,  // out type
-  // > = test.test(&mut rng);
   let result: TestMResult<
-  	EvalVec<Lang,StdRng>,
-  	Vec<u32>,
+  	EvalIRaz<Lang,StdRng>, // in type
+  	IRaz<u32>,  // out type
   > = test.test(&mut rng);
+  // let result: TestMResult<
+  // 	EvalVec<Lang,StdRng>,
+  // 	Vec<u32>,
+  // > = test.test(&mut rng);
 
   println!("first inc parse time: {:?}", result.computes[1][1]);
 

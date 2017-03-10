@@ -1,3 +1,4 @@
+use std::fmt::{self,Debug};
 use std::cmp::{min,max};
 use std::rc::Rc;
 use rand::{Rng,StdRng,Rand};
@@ -20,6 +21,13 @@ pub struct EvalIRaz<E:Adapt,G:Rng> {
 	counter: usize, // for name/levels during edit
 	unitsize: usize,
 	namesize: usize,
+}
+impl<E:Adapt,G:Rng> Debug for EvalIRaz<E,G> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let tree = self.raztree.clone();
+		let content = tree.unwrap().into_iter().collect::<Vec<_>>();
+		write!(f,"EvalIRaz({:?})",content)
+	}
 }
 
 impl<E:Adapt,G:Rng> EvalIRaz<E,G> {
@@ -300,52 +308,6 @@ EditExtend for EvalIRaz<E,G> {
 		(time,self)
 	}
 }
-
-// impl<E:Adapt,G:Rng>
-// EditSeq<E> for EvalIRaz<E,G> {
-// 	fn push(self, val:E) -> (Duration, Self) {
-// 		// focus to end
-// 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
-// 		let mut focus = None;
-// 		let focus_time = Duration::span(||{
-// 			focus = tree.focus(tree.len());
-// 		});
-// 		let mut raz = focus.unwrap();
-// 		// determine if we need names/levels
-// 		let lev = if self.counter % self.unitsize == 0 {
-// 			Some(gen_level(self.coord))
-// 		} else { None };
-// 		let nm = if self.counter % (self.namesize*self.unitsize) == 0 {
-// 			Some(self.next_name())
-// 		} else { None };
-// 		self.counter += 1;
-// 		// do insertion/unfocus
-// 		let insert_time = Duration::span(||{
-// 			if let Some(lev) = lev {
-// 				raz.archive_left(lev,nm);
-// 			}
-// 			raz.push_left(val);
-// 			self.raztree = Some(raz.unfocus());
-// 		});
-// 		(focus_time+insert_time,self)		
-// 	}
-// 	fn pop(self) -> (Duration, Option<E>, Self) {
-// 		// focus to end
-// 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
-// 		let mut focus = None;
-// 		let focus_time = Duration::span(||{
-// 			focus = tree.focus(tree.len());
-// 		});
-// 		let mut raz = focus.unwrap();
-// 		// do removal/unfocus
-// 		let result = None;
-// 		let remove_time = Duration::span(||{
-// 			result = raz.pop_left();
-// 			self.raztree = Some(raz.unfocus());
-// 		});
-// 		(focus_time+remove_time,result,self)		
-// 	}
-// }
 
 impl<E:Adapt+Ord,G:Rng>
 CompMax for EvalIRaz<E,G> {
