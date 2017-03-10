@@ -32,6 +32,20 @@ Creator<Duration,D> for IncrementalEmpty<G> {
 	}
 }
 
+#[derive(Clone)]
+pub struct IncrementalFrom<T,G:Rng> {
+	pub data: T,
+	pub unitgauge: usize,
+	pub namegauge: usize,
+	pub coord: G,
+}
+impl<D:CreateFrom<T,G>,T:Clone,G:Rng>
+Creator<Duration,D> for IncrementalFrom<T,G> {
+	fn create(&mut self, rng: &mut StdRng) -> (Duration,D){
+		D::inc_from(self.data.clone(), self.unitgauge, self.namegauge, &self.coord, rng)
+	}
+}
+
 // builds a sequence from scratch, 
 #[derive(Clone)]
 pub struct IncrementalInit<G:Rng> {

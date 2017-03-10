@@ -40,6 +40,7 @@ impl<E:Adapt,G:Rng> EvalIRaz<E,G> {
 	}
 }
 
+
 impl<E:Adapt,G:Rng+Clone>
 CreateEmpty<G> for EvalIRaz<E,G>{
 	fn inc_empty(unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
@@ -50,6 +51,18 @@ CreateEmpty<G> for EvalIRaz<E,G>{
 		(time,eval)
 	}
 }
+
+impl<E:Adapt,G:Rng+Clone>
+CreateFrom<IRaz<E>,G> for EvalIRaz<E,G>{
+	fn inc_from(data: IRaz<E>, unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+		let time = Duration::span(||{
+			eval.raztree = Some(data.unfocus());
+		});
+		(time,eval)
+	}
+}
+
 /// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
 // uses Params::{start,namesize,unitsize}

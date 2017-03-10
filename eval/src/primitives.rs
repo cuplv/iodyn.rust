@@ -2,11 +2,15 @@ use std::rc::Rc;
 use rand::{Rng,StdRng};
 use time::Duration;
 
-/// empty initialization of an incremental collection
+/// empty initialization of an incremental collection test harness
 pub trait CreateEmpty<G:Rng> {
 	fn inc_empty(unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration, Self);
 }
-/// for building an incremental collection
+/// initialization of test harness from provided data
+pub trait CreateFrom<T,G:Rng> {
+	fn inc_from(data: T, unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration, Self);
+}
+/// for building a test harness from randomized data
 pub trait CreateInc<G:Rng> {
 	fn inc_init(size: usize, unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration,Self);
 }

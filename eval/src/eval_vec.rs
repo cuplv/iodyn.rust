@@ -37,6 +37,18 @@ CreateEmpty<G> for EvalVec<E,G>{
 		(time,eval.unwrap())
 	}
 }
+
+impl<E,G:Rng+Clone>
+CreateFrom<Vec<E>,G> for EvalVec<E,G>{
+	fn inc_from(data: Vec<E>, _unitgauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = None;
+		let time = Duration::span(||{
+			eval = Some(EvalVec{vec:data,coord:(*coord).clone()});
+		});
+		(time,eval.unwrap())
+	}
+}
+
 /// Creates a `Vec` by pushing individual elements into
 /// an initially unallocated `Vec`. Ignores the incremental vars.
 impl<E:Rand,G:Rng+Clone>
