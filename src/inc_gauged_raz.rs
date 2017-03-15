@@ -65,12 +65,6 @@ impl<E: Debug+Clone+Eq+Hash+'static> tree::TreeUpdate for TreeData<E> {
 #[derive(Clone,PartialEq,Eq,Debug)]
 pub struct RazTree<E: 'static+Debug+Clone+Eq+Hash>{count: usize, tree: Option<tree::Tree<TreeData<E>>>}
 
-/// Type for iterators that make use of metadata
-pub enum MaybeMeta<E> {
-	Data(E),
-	Meta(u32,Option<Name>),
-}
-
 impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 	/// the number if items in the sequence
 	pub fn len(&self) -> usize {self.count}
@@ -115,9 +109,10 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 	}
 
 	/// left-to-right memoized fold with levels and names
-	pub fn fold_lr_meta<A,B>(self, id: Name, init: A, bin: Rc<B>) -> A where
+	pub fn fold_lr_meta<A,B,M>(self, id: Name, init: A, bin: Rc<B>, meta: Rc<M>) -> A where
 		A: 'static + Eq+Clone+Hash+Debug,
-		B: 'static + Fn(A,MaybeMeta<&E>) -> A,
+		B: 'static + Fn(A,&E) -> A,
+		M: 'static + Fn(A,(u32,Option<Name>)) -> A,
 	{
 		match self.tree {
 			None => init,
@@ -125,10 +120,10 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 				tree.fold_lr_meta(id,init,Rc::new(move|a,e,l,n|{
 					match e {
 						TreeData::Leaf(ref vec) => {
-							vec.iter().fold(a,|a,e|{bin(a,MaybeMeta::Data(e))})
+							vec.iter().fold(a,|a,e|{bin(a,e)})
 						},
 						TreeData::Branch{..} => {
-							bin(a,MaybeMeta::Meta(l,n))
+							meta(a,(l,n))
 						},
 					}
 				}))

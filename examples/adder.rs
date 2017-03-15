@@ -9,12 +9,13 @@ extern crate rand;
 // use time::Duration;
 use rand::{Rand,Rng,StdRng,SeedableRng};
 use eval::actions::*;
-use eval::interface::{IntrfSeq,IntrfNew};
+use eval::interface::{IntrfSeq,IntrfNew,IntrfArchive};
 #[allow(unused)] use pmfp_collections::IRaz;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 use eval::test_seq::{TestMResult,EditComputeSequence};
+use adapton::engine::*;
 use adapton::engine::manage::*;
 
 /// Input Lang
@@ -48,6 +49,7 @@ mod reference {
 	fn tokenize(p: String) -> Vec<Token> {
 		p.chars().fold((Vec::new(),None),|(mut ts,part),c|{
 			if let Some(num) = c.to_digit(10) {
+  			// this multiplication might overflow!
 				let bigger = part.map_or(num,|p|p*10+num);
 				(ts,Some(bigger))
 			} else {
@@ -109,6 +111,10 @@ fn main() {
 		let Lang(ref c) = *l;
 		if let Some(num) = c.to_digit(10) {
 			let bigger = part.map_or(num,|p|p*10+num);
+			// we need to split up big nums, so use max 6 digits
+			let (ts,bigger) = if bigger > 99999 {
+				(ts.seq_push(Token::Num(bigger)),num)
+			} else {(ts,bigger)};
 			(ts,Some(bigger))
 		} else {
 			let ts = if let Some(num) = part {
@@ -121,6 +127,11 @@ fn main() {
 			};
 			(ts,None)
 		}
+	}
+	fn tokenize_meta<A: IntrfArchive<(u32,Option<Name>)>>((ts,part):(A,Option<u32>),(l,n):(u32,Option<Name>)) -> (A,Option<u32>) {
+		(ts.archive((l,n.map(|n|{
+			name_pair(n,name_of_string(String::from("tok_accum")))
+		}))),part)
 	}
 	fn tokenize_final<A: IntrfSeq<Token>>((ts,part):(A,Option<u32>)) -> A {
 		if let Some(num) = part {
@@ -143,18 +154,25 @@ fn main() {
 			}
 		}
 	}
+	fn parse_meta<A: IntrfArchive<(u32,Option<Name>)>>(num: A, (l,n): (u32,Option<Name>)) -> A {
+		num.archive((l,n.map(|n|{
+			name_pair(n,name_of_string(String::from("par_accum")))
+		})))
+	}
   let mut test = EditComputeSequence{
     init: IncrementalInit {
-      size: 1_000,
+      size: 10_000,
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
     edit: BatchInsert(1),
     comp: Compute2::<_,_,_,EvalIRaz<Token,StdRng>,_>::new(
-    	FFolder::new(
+    	MFolder::new(
+    		name_of_string(String::from("tokenize")),
 				(IntrfNew::new(),None),
 				tokenize_step,
+				tokenize_meta,
 				|a|{
 					let ts = tokenize_final(a);
 					IncrementalFrom{
@@ -165,7 +183,13 @@ fn main() {
 					}.create(&mut StdRng::new().unwrap()).1
 				},
 			),
-    	Folder::new(IntrfNew::new(),parse_step)
+    	MFolder::new(
+    		name_of_string(String::from("parse")),
+    		IntrfNew::new(),
+    		parse_step,
+    		parse_meta,
+    		|a|{a},
+    	)
 		),
     changes: 30,
   };
@@ -183,6 +207,8 @@ fn main() {
   // 	Vec<u32>,
   // > = test.test(&mut rng);
 
-  println!("first inc parse time: {:?}", result.computes[1][1]);
+  println!("inc times(ns) (tokenize,parse): {:?}", result.computes.iter().map(|c|{
+  	(c[0].num_nanoseconds().unwrap(),c[1].num_nanoseconds().unwrap())
+  }).collect::<Vec<_>>());
 
 }

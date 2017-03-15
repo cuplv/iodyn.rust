@@ -3,6 +3,7 @@ use std::rc::Rc;
 use rand::{Rng,StdRng};
 use time::Duration;
 use primitives::*;
+use adapton::engine::Name;
 
 pub trait Creator<R,D> {
 	fn create(&mut self, rnd: &mut StdRng) -> (R,D);
@@ -244,6 +245,80 @@ Computor<(Vec<Duration>,O),D>
 for FFolder<A,E,D::Target,O,R,F> {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Vec<Duration>,O) {
 		let (time,run) = data.comp_fold(self.init.clone(),self.run.clone(),rng);
+		let finish = (self.finish)(run);
+		let mut v = Vec::new();
+		v.push(time);
+		(v,finish)
+	}
+}
+
+pub struct MFolder<
+	A:Clone, E, M, T, O, R:Fn(A,&E)->A, N:Fn(A,M)->A, F:Fn(T)->O
+>{
+	name: Name,
+	init:A,
+	run: Rc<R>,
+	run_meta: Rc<N>,
+	finish: Rc<F>,
+	accum: PhantomData<A>,
+	elm: PhantomData<E>,
+	meta: PhantomData<M>,
+	target: PhantomData<T>,
+	out: PhantomData<O>,
+}
+
+impl<
+	A:Clone, E, M, T, O, R:Fn(A,&E)->A, N:Fn(A,M)->A, F:Fn(T)->O
+> MFolder<A,E,M,T,O,R,N,F> {
+	pub fn new(name:Name,a:A,r:R,m:N,f:F) -> Self {
+		MFolder{
+			name: name,
+			init: a,
+			run: Rc::new(r),
+			run_meta: Rc::new(m),
+			finish: Rc::new(f),
+			accum: PhantomData,
+			elm: PhantomData,
+			meta: PhantomData,
+			target: PhantomData,
+			out: PhantomData,
+		}
+	}
+}
+impl<A,E,M,O,R,N,F,D>
+Computor<Duration,D>
+for MFolder<A,E,M,D::Target,O,R,N,F> 
+where
+	A:Clone,
+	R:Fn(A,&E)->A,
+	N:Fn(A,M)->A,
+	F:Fn(D::Target)->O,
+	D:CompFoldMeta<E,A,M,R,N>,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time,run) = data.comp_fold_meta(
+			self.name.clone(), self.init.clone(), self.run.clone(), self.run_meta.clone(), rng
+		);
+		let finish = (self.finish)(run);
+		#[allow(unused)]
+		let saver = Vec::new().push(finish); // don't let rust compile this away
+		time
+	}
+}
+impl<A,E,M,O,R,N,F,D>
+Computor<(Vec<Duration>,O),D>
+for MFolder<A,E,M,D::Target,O,R,N,F> 
+where
+	A:Clone,
+	R:Fn(A,&E)->A,
+	N:Fn(A,M)->A,
+	F:Fn(D::Target)->O,
+	D:CompFoldMeta<E,A,M,R,N>,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Vec<Duration>,O) {
+		let (time,run) = data.comp_fold_meta(
+			self.name.clone(), self.init.clone(), self.run.clone(), self.run_meta.clone(), rng
+		);
 		let finish = (self.finish)(run);
 		let mut v = Vec::new();
 		v.push(time);

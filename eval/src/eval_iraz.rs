@@ -369,18 +369,19 @@ CompFold<E,O,F> for EvalIRaz<E,G> where
 	}
 }
 
-// impl<E: Adapt,O:Adapt,F,G:Rng>
-// CompFold<E,O,F> for EvalIRaz<E,G> where
-// 	F:'static + Fn(O,&E,&mut StdRng)->O,
-// {
-// 	type Target = O;
-// 	fn comp_fold(&self, accum: O, f:Rc<F>, rng: &mut StdRng) -> (Duration,Self::Target) {
-// 		let clone = self.raztree.clone().unwrap();
-// 		let mut res = None;
-// 		let time = Duration::span(||{
-// 			res = Some(clone.fold_lr(accum,Rc::new(|a:O,e:&E|{f(a,e,rng)})));
-// 		});
-// 		(time, res.unwrap())
-// 	}
-// }
+impl<E:Adapt,O:Adapt,F,N,G:Rng>
+CompFoldMeta<E,O,(u32,Option<Name>),F,N> for EvalIRaz<E,G> where
+	F:'static + Fn(O,&E)->O,
+	N:'static + Fn(O,(u32,Option<Name>))->O,
+{
+	type Target = O;
+	fn comp_fold_meta(&self, name: Name, accum: O, f:Rc<F>, n:Rc<N>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let clone = self.raztree.clone().unwrap();
+		let mut res = None;
+		let time = Duration::span(||{
+			res = Some(clone.fold_lr_meta(name,accum,f,n));
+		});
+		(time, res.unwrap())
+	}
+}
 
