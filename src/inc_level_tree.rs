@@ -85,34 +85,72 @@ impl<E: Debug+Clone+Eq+Hash+'static> Tree<E> {
 	/// this functionality is _not_ available through Deref
 	pub fn peek(&self) -> E { force(&self.link).data }
 
-	/// memoized fold operation
-	pub fn fold_up<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R
-  where
-    F: 'static + Fn(Option<R>,E,Option<R>) -> R
-  {
-    match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
-      let (l,r) = match self.name {
-      	None => {(
-      		l_branch.map(|t| t.fold_up(node_calc.clone())),
-      		r_branch.map(|t| t.fold_up(node_calc.clone())),
-      	)},
-      	Some(name) => {
-		      let (n1, n2) = name_fork(name);
-      		(
-			      l_branch.map(|t| memo!( n1 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
-			      r_branch.map(|t| memo!( n2 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
-      		)
-      	}
-      };
-      node_calc(l, data, r)
-    }}
-  }
+	/// memoized fold operation, from leaves to root
+	pub fn fold_up<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R where
+		F: 'static + Fn(Option<R>,E,Option<R>) -> R
+	{
+		match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
+			let (l,r) = match self.name {
+				None => {(
+					l_branch.map(|t| t.fold_up(node_calc.clone())),
+					r_branch.map(|t| t.fold_up(node_calc.clone())),
+				)},
+				Some(name) => {
+					let (n1, n2) = name_fork(name);
+					(
+						l_branch.map(|t| memo!( n1 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
+						r_branch.map(|t| memo!( n2 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
+					)
+				}
+			};
+			node_calc(l, data, r)
+		}}
+	}
+
+	/// memoized fold operation, left to right
+	///
+	/// id is never used as is, instead serving to scope this operation
+	pub fn fold_lr<A,F>(self, id: Name, accum: A, node_calc: Rc<F>) -> A where
+		A: 'static + Eq + Clone + Hash + Debug,
+		F: 'static + Fn(A,E) -> A,
+	{
+		self.fold_lr_meta(id,accum,Rc::new(move|a,e,_l,_n|{node_calc(a,e)}))
+	}
+
+	/// memoized fold operation, left to right, with levels and names
+	///
+	/// id is never used as is, instead serving to scope this operation
+	pub fn fold_lr_meta<A,F>(self, id: Name, accum: A, node_calc: Rc<F>) -> A where
+		A: 'static + Eq + Clone + Hash + Debug,
+		F: 'static + Fn(A,E,u32,Option<Name>) -> A,
+	{
+		let fold_memo = |accum,tree:Option<Tree<_>>|{
+			match tree { None => accum, Some(t) => {
+				let nm = t.name.as_ref().map(|n|{name_pair(n.clone(),id.clone())});
+				match nm {
+					None => t.fold_lr_meta(id.clone(),accum,node_calc.clone()),
+					Some(n) => {
+						memo!(n =>>
+							Self::fold_lr_meta, t:t, id:id.clone(), a:accum ;; f:node_calc.clone()
+						)
+					}
+				}
+			}}
+		};
+		match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
+			let accum = fold_memo(accum,l_branch);
+			let accum = node_calc(accum,data,self.level,self.name);
+			let accum = fold_memo(accum,r_branch);
+			accum
+		}}
+	}
 
   /// memoized map operation
   pub fn map<R:Eq+Clone+Hash+Debug+'static,F>(self, map_val: Rc<F>) -> Tree<R>
   where
   	F: 'static + Fn(E) -> R
   {
+		// TODO: use the branch's name to memoize its mapping
     match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
       let (l,r) = match self.name {
       	None => {(

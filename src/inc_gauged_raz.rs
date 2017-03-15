@@ -65,6 +65,12 @@ impl<E: Debug+Clone+Eq+Hash+'static> tree::TreeUpdate for TreeData<E> {
 #[derive(Clone,PartialEq,Eq,Debug)]
 pub struct RazTree<E: 'static+Debug+Clone+Eq+Hash>{count: usize, tree: Option<tree::Tree<TreeData<E>>>}
 
+/// Type for iterators that make use of metadata
+pub enum MaybeMeta<E> {
+	Data(E),
+	Meta(u32,Option<Name>),
+}
+
 impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 	/// the number if items in the sequence
 	pub fn len(&self) -> usize {self.count}
@@ -100,12 +106,34 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 		})
 	}
 
-	/// left-to-right memoized fold
+	/// left-to-right memoized fold (Old version, poor incremental performance)
 	pub fn fold_lr<A,B>(self, init: A, bin: Rc<B>) -> A where
 		A: 'static + Eq+Clone+Hash+Debug,
 		B: 'static + Fn(A,&E) -> A,
 	{
 		self.into_iter().inc_fold_out(init,bin)
+	}
+
+	/// left-to-right memoized fold with levels and names
+	pub fn fold_lr_meta<A,B>(self, id: Name, init: A, bin: Rc<B>) -> A where
+		A: 'static + Eq+Clone+Hash+Debug,
+		B: 'static + Fn(A,MaybeMeta<&E>) -> A,
+	{
+		match self.tree {
+			None => init,
+			Some(tree) => {
+				tree.fold_lr_meta(id,init,Rc::new(move|a,e,l,n|{
+					match e {
+						TreeData::Leaf(ref vec) => {
+							vec.iter().fold(a,|a,e|{bin(a,MaybeMeta::Data(e))})
+						},
+						TreeData::Branch{..} => {
+							bin(a,MaybeMeta::Meta(l,n))
+						},
+					}
+				}))
+			},
+		}
 	}
 
 	/// returns a new tree with data mapped from the old tree
@@ -1027,6 +1055,56 @@ mod tests {
   	let raz_string = t.clone().fold_lr("0".to_string(),Rc::new(|l,r:&usize|{format!("{},{}",l,r)}));
   	let iter_string = (1..13).collect::<Vec<_>>().iter().fold("0".to_string(),|l,r:&usize|{format!("{},{}",l,r)});
   	assert_eq!(iter_string, raz_string);
+  }
+
+  #[test]
+  fn test_fold_lr_meta() {
+  	let mut r = Raz::new();
+  	let mut t;
+  	// set same tree as focus example
+  	r.push_left(3);
+  	r.push_left(4);
+  	r.archive_left(1, Some(name_of_usize(1)));
+  	r.push_right(8);
+  	r.push_right(7);
+  	r.archive_right(2, Some(name_of_usize(2)));
+  	r.push_left(5);
+  	r.push_right(6);
+  	t = r.unfocus();
+  	r = t.focus(0).expect("focus on 0");
+  	r.push_left(1);
+  	r.push_left(2);
+  	r.archive_left(3, Some(name_of_usize(3)));
+  	t = r.unfocus();
+  	r = t.focus(8).expect("focus on 8");
+  	r.archive_left(5, Some(name_of_usize(5)));
+  	r.push_left(9);
+  	r.push_left(10);
+  	r.push_right(12);
+  	r.push_right(11);
+  	r.archive_right(4, Some(name_of_usize(4)));
+  	t = r.unfocus();
+
+  	let sums = t.clone().fold_lr_meta(name_of_string(String::from("sum")),(0,0),Rc::new(
+  		|(lev,dat),e:MaybeMeta<&u32>|{ match e {
+  			MaybeMeta::Data(&d)=>(lev,dat+d),
+  			MaybeMeta::Meta(l,_)=>(lev+l,dat),
+  		}}
+  	));
+  	let iter_levs: u32 = (1..6).sum();
+  	let iter_sum: u32 = (1..13).sum();
+  	assert_eq!((iter_levs,iter_sum), sums);
+
+  	let raz_string = t.clone().fold_lr_meta(name_of_string(String::from("vals")),"s".to_string(),Rc::new(
+  		|l,r:MaybeMeta<&u32>|{
+  			match r{
+  				MaybeMeta::Data(&r)=>format!("{},{}",l,r),
+  				MaybeMeta::Meta(..)=>format!("{},n",l),
+  			}
+  		}
+  	));
+  	let string = String::from("s,1,2,n,3,4,n,5,6,n,7,8,n,9,10,n,11,12");
+  	assert_eq!(string, raz_string);
   }
 
 }
