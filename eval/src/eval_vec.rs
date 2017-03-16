@@ -3,6 +3,7 @@ use std::rc::Rc;
 use rand::{StdRng,Rng,Rand};
 use time::Duration;
 use primitives::*;
+use adapton::engine::Name;
 
 /// Test harness for `Vec`
 ///
@@ -140,6 +141,22 @@ CompFold<E,O,F> for EvalVec<E,G> where
 {
 	type Target = O;
 	fn comp_fold(&self, accum: O, f:Rc<F>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let mut res = None;
+		let time = Duration::span(||{
+			res = Some(self.vec.iter().fold(accum,|o,e|f(o,e)));
+		});
+		(time, res.unwrap())
+	}
+}
+
+impl<E,O,M,F,N,G:Rng>
+CompFoldMeta<E,O,M,F,N> for EvalVec<E,G> where
+	F:Fn(O,&E)->O,
+	N:Fn(O,M)->O,
+{
+	type Target = O;
+	/// Vecs don't take or use metadata, so just fold
+	fn comp_fold_meta(&self, _name: Name, accum: O, f:Rc<F>, _n:Rc<N>, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let mut res = None;
 		let time = Duration::span(||{
 			res = Some(self.vec.iter().fold(accum,|o,e|f(o,e)));

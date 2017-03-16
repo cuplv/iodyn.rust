@@ -103,10 +103,24 @@ mod reference {
 // Test of incremental version
 //////////////////////////////
 
-fn main() {
+fn main () {
+
+  let child =
+    std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { 
+      main2()
+    });
+  let _ = child.unwrap().join();
+}
+fn main2() {
+
+	// Params
+	// TODO: make command-line interface
+	let start_size = 10_000;
+	let changes = 30;
 	let unitgauge = 1000;
 	let namegauge = 1;
 	let coord = StdRng::from_seed(&[0]);
+
 	fn tokenize_step<A: IntrfSeq<Token>>((ts,part):(A,Option<u32>),l:&Lang) -> (A,Option<u32>) {
 		let Lang(ref c) = *l;
 		if let Some(num) = c.to_digit(10) {
@@ -161,12 +175,14 @@ fn main() {
 	}
   let mut test = EditComputeSequence{
     init: IncrementalInit {
-      size: 10_000,
+      size: start_size,
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
     edit: BatchInsert(1),
+    // The type here determins the type of the accumulator
+    // TODO: Move this parameter elsewhere
     comp: Compute2::<_,_,_,EvalIRaz<Token,StdRng>,_>::new(
     	MFolder::new(
     		name_of_string(String::from("tokenize")),
@@ -191,7 +207,7 @@ fn main() {
     		|a|{a},
     	)
 		),
-    changes: 30,
+    changes: changes,
   };
 
   let _ = init_dcg(); assert!(engine_is_dcg());
@@ -210,5 +226,7 @@ fn main() {
   println!("inc times(ns) (tokenize,parse): {:?}", result.computes.iter().map(|c|{
   	(c[0].num_nanoseconds().unwrap(),c[1].num_nanoseconds().unwrap())
   }).collect::<Vec<_>>());
+
+  // TODO: chart results
 
 }

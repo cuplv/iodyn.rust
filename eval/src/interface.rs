@@ -58,6 +58,11 @@ impl<T> IntrfSeq<T> for Vec<T> {
 	}
 }
 
+impl<T,M> IntrfArchive<M> for Vec<T> {
+	/// Vec isn't an archival struct, so do nothing
+	fn archive(self, _m:M) -> Self { self }
+}
+
 impl<T> IntrfNew for Vec<T> {
 	fn new() -> Self {
 		Vec::new()
