@@ -360,7 +360,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	pub fn peek_left(&self) -> Option<&E> {
 		self.l_stack.peek()
 	}
-	/// peek at the element to the left of the cursor
+	/// peek at the element to the right of the cursor
 	pub fn peek_right(&self) -> Option<&E> {
 		self.r_stack.peek()
 	}

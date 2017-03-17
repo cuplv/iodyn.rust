@@ -20,6 +20,7 @@ pub mod gauged_raz;         // raz of vectors using tree_cursor (uses archive_st
 pub mod inc_level_tree;
 pub mod inc_tree_cursor;
 pub mod inc_gauged_raz;
+pub mod finite_map;
 
 /// Persistent Raz - original design, simple but works
 pub type PRaz<E> = persist_raz::Raz<E>;
