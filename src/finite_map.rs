@@ -48,3 +48,22 @@ impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Ha
 		Raz::unfocus(seq_view)
 	}
 }
+
+//undirected graph
+trait Graph<NdId, NdData> {
+	//usize params are for size/granularity pass to maps: should be exposed or no?
+	fn new(usize, usize) -> Self;
+	
+	fn add_node(Self, NdId, NdData) -> Self;
+	
+	//should return tuple (Self, Option<NdId>)?
+	fn del_node(Self, NdId) -> Self;
+	
+	//semantics for add/del_edge on not existing node?
+	fn add_edge(Self, NdId, NdId) -> Self;
+	
+	//tuple return?
+	fn del_edge(Self, NdId, NdId) -> Self;
+	
+	fn adjacents(Self, NdId) -> Option<Vec<NdId>>;
+}
