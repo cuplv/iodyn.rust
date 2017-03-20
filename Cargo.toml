@@ -7,10 +7,15 @@ authors = ["kyleheadley <kyle.headley@colorado.edu>"]
 rand = "0.3"
 
 [dependencies.adapton]
-git = "https://github.com/cuplv/adapton.rust.git"
+git = "https://github.com/cuplv/adapton.rust"
 branch = "dev"
 
 [dev-dependencies]
 eval = { path = "eval" }
 time = "0.1"
 clap = "2"
+
+[dev-dependencies.adapton-lab]
+git = "https://github.com/cuplv/adapton-lab.rust"
+branch = "wo-raz"
+

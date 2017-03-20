@@ -3,6 +3,9 @@ extern crate adapton;
 extern crate eval;
 extern crate time;
 extern crate rand;
+#[macro_use] extern crate clap;
+
+extern crate adapton_lab;
 
 // use std::fs::OpenOptions;
 // use std::io::Write;
@@ -17,6 +20,10 @@ use eval::interface::{IntrfSeq,IntrfNew,IntrfArchive};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::*;
 use adapton::engine::manage::*;
+use adapton_lab::labviz::*;
+use std::io::prelude::*;
+use std::io::BufWriter;
+use std::fs::File;
 
 /// Input Lang
 ///
@@ -113,13 +120,31 @@ fn main () {
 }
 fn main2() {
 
-	// Params
-	// TODO: make command-line interface
-	let start_size = 10_000;
-	let changes = 30;
-	let unitgauge = 1000;
-	let namegauge = 1;
-	let coord = StdRng::from_seed(&[0]);
+  //command-line
+  let args = clap::App::new("adder")
+    .version("0.1")
+    .author("Kyle Headley <kyle.headley@colorado.edu>")
+    .about("Parsing Example")
+    .args_from_usage("\
+      --dataseed=[dataseed]			'seed for random data'
+      --editseed=[edit_seed]    'seed for random edits (and misc.)'
+      -s, --start=[start]       'starting sequence length'
+      -u, --unitsize=[unitsize] 'initial elements per structure unit'
+      -n, --namesize=[namesize] 'initial tree nodes between each art'
+      -e, --edits=[edits]       'edits per batch'
+      -c, --changes=[changes]   'number of incremental changes'
+      -o, --outfile=[outfile]   'name for output files (of different extensions)' ")
+    .get_matches();
+  let dataseed = value_t!(args, "data_seed", usize).unwrap_or(0);
+  let editseed = value_t!(args, "edit_seed", usize).unwrap_or(0);
+	let start_size = value_t!(args, "start", usize).unwrap_or(10_000);
+	let unitgauge = value_t!(args, "unitsize", usize).unwrap_or(100);
+	let namegauge = value_t!(args, "namesize", usize).unwrap_or(1);
+	let edits = value_t!(args, "edits", usize).unwrap_or(1);
+	let changes = value_t!(args, "changes", usize).unwrap_or(30);
+  let outfile = args.value_of("outfile");
+
+	let coord = StdRng::from_seed(&[dataseed]);
 
 	fn tokenize_step<A: IntrfSeq<Token>>((ts,part):(A,Option<u32>),l:&Lang) -> (A,Option<u32>) {
 		let Lang(ref c) = *l;
@@ -180,7 +205,7 @@ fn main2() {
       namegauge: namegauge,
       coord: coord.clone(),
     },
-    edit: BatchInsert(1),
+    edit: BatchInsert(edits),
     // The type here determins the type of the accumulator
     // TODO: Move this parameter elsewhere
     comp: Compute2::<_,_,_,EvalIRaz<Token,StdRng>,_>::new(
@@ -210,10 +235,12 @@ fn main2() {
     changes: changes,
   };
 
-  let _ = init_dcg(); assert!(engine_is_dcg());
+  init_dcg(); assert!(engine_is_dcg());
+  // for visual debugging
+  reflect::dcg_reflect_begin();
 
   // run experiments
-  let mut rng = StdRng::from_seed(&[0]);
+  let mut rng = StdRng::from_seed(&[editseed]);
   let result: TestMResult<
   	EvalIRaz<Lang,StdRng>, // in type
   	IRaz<u32>,  // out type
@@ -222,6 +249,18 @@ fn main2() {
   // 	EvalVec<Lang,StdRng>,
   // 	Vec<u32>,
   // > = test.test(&mut rng);
+
+  // for visual debugging
+  let traces = reflect::dcg_reflect_end();
+  let f = File::create("trace.html").unwrap();
+  let mut writer = BufWriter::new(f);
+  writeln!(writer, "{}", style_string()).unwrap();
+  writeln!(writer, "<div class=\"label\">Editor trace({}):</div>", traces.len()).unwrap();
+  writeln!(writer, "<div class=\"traces\">").unwrap();
+  for tr in traces {
+  	div_of_trace(&tr).write_html(&mut writer);
+  }
+
 
   println!("inc times(ns) (tokenize,parse): {:?}", result.computes.iter().map(|c|{
   	(c[0].num_nanoseconds().unwrap(),c[1].num_nanoseconds().unwrap())
