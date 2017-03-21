@@ -1,11 +1,29 @@
+//! Incremental Linked List (Cons-list)
+//! 
+//! This list is augmented with Adapton articulations
+//! to be of use in memoized functions. As development
+//! continues, it will also be enhanced with internal
+//! memoization of common list operations.
+//! 
+//! There are two data types, `Stack` for optionally empty 
+//! lists and `Head` for lists with at least one element.
+//! Conversion is through the public type `Stack<T>(Option<Head<T>>)`
+//! All element types must be compatible with Adapton,
+//! meaning they must implement `T:'static+Debug+Clone+Eq+Hash`.
+//!
+//! The API is still in development, one of these interfaces may
+//! change to mimic the `Vec` interface.
+
 use std::fmt::Debug;
 use std::hash::Hash;
 
 use adapton::engine::*;
 
+/// Common linked-list
 #[derive(Debug,PartialEq,Eq,Clone,Hash)]
 pub struct Stack<T:'static+Debug+Clone+Eq+Hash>(pub Option<Head<T>>);
 
+/// Linked list with at least one element
 #[derive(Debug,PartialEq,Eq,Clone,Hash)]
 pub struct Head<T:'static+Debug+Clone+Eq+Hash> {
 	name: Option<Name>,
@@ -19,6 +37,8 @@ struct Body<T:'static+Debug+Clone+Eq+Hash> {
 
 impl<T:'static+Debug+Clone+Eq+Hash>
 Stack<T> {
+
+	/// this is identical to `Stack(None)`
 	pub fn new() -> Self {
 		Stack(None)
 	}
@@ -27,18 +47,22 @@ Stack<T> {
 		self.0.is_none()
 	}
 
-	pub fn push(self, name: Option<Name>, elem: T) -> Self {
-		Stack(Some(push_onto(self.0, name, elem)))
+	/// return a stack with the new item as head
+	pub fn push(&self, name: Option<Name>, elem: T) -> Self {
+		Stack(Some(push_onto(self.0.clone(), name, elem)))
 	}
 
+	/// return the top item, if there is one
 	pub fn peek(&self) -> Option<T> {
 		self.0.as_ref().map(|s|{s.peek()})
 	}
 
+	/// return the stack without the top item (this is sometimes called `tail`)
 	pub fn pull(&self) -> Option<Self> {
 		self.0.as_ref().map(|s|{Stack(s.pull())})
 	}
 
+	/// return an iterator over the elements from the top of the stack
 	pub fn iter(&self) -> Iter<T> {
 		Iter{ next: self.0.clone() }
 	}
@@ -52,18 +76,22 @@ Head<T> {
 		push_onto(None, name, elem)
 	}
 
-	pub fn push(self, name: Option<Name>, elem: T) -> Self {
-		push_onto(Some(self), name, elem)
+	/// return a list with the new element as head
+	pub fn push(&self, name: Option<Name>, elem: T) -> Self {
+		push_onto(Some(self.clone()), name, elem)
 	}
 
+	/// return the head element
 	pub fn peek(&self) -> T {
 		force(&self.main).elem
 	}
 
+	/// return the list without the head element
 	pub fn pull(&self) -> Option<Self> {
 		force(&self.main).next
 	}
 
+	/// return an iterator over the elements of the list
 	pub fn iter(&self) -> Iter<T> {
 		Iter { next: Some(self.clone()) }
 	}
@@ -91,6 +119,7 @@ fn push_onto<T>(tail: Option<Head<T>>, name: Option<Name>, elem: T) -> Head<T> w
 	}
 }
 
+/// Iterator for list items
 pub struct Iter<T:'static+Debug+Clone+Eq+Hash> {
 	next: Option<Head<T>>,
 }
