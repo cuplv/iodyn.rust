@@ -12,7 +12,7 @@ trait FinMap<K, V> {
 	fn get(Self, K) -> Option<V>;
 	
 	//Should this return a tuple: (Self, Option<V>)? got error: Self must have "Sized" trait
-	fn del(Self, K) -> Self;
+	fn del(Self, K) -> (Option<V>, Self);
 }
 
 impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Hash {
@@ -41,11 +41,11 @@ impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Ha
 		Raz::peek_right(&mut seq_view).unwrap().clone().take()
 	}
 	
-	fn del(curr: Self, key: usize) -> Self {
+	fn del(curr: Self, key: usize) -> (Option<V>, Self) {
 		let mut seq_view = RazTree::focus(curr, key).unwrap();
-		Raz::pop_right(&mut seq_view);
+		let ret = Raz::pop_right(&mut seq_view).unwrap();
 		Raz::push_right(&mut seq_view, None);
-		Raz::unfocus(seq_view)
+		(ret, Raz::unfocus(seq_view))
 	}
 }
 
@@ -56,8 +56,7 @@ trait Graph<NdId, NdData> {
 	
 	fn add_node(Self, NdId, NdData) -> Self;
 	
-	//should return tuple (Self, Option<NdId>)?
-	fn del_node(Self, NdId) -> Self;
+	fn del_node(Self, NdId) -> (Option<NdId>, Self);
 	
 	//semantics for add/del_edge on not existing node?
 	fn add_edge(Self, NdId, NdId) -> Self;
