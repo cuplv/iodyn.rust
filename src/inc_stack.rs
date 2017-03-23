@@ -54,12 +54,20 @@ Stack<T> {
 
 	/// return the top item, if there is one
 	pub fn peek(&self) -> Option<T> {
-		self.0.as_ref().map(|s|{s.peek()})
+		self.0.as_ref().map(|h|{h.peek()})
+	}
+
+	/// get the incremental name of this stack, if it's not empty
+	pub fn name(&self) -> Option<Name> {
+		match self.0 {
+			None => None,
+			Some(ref h) => h.name.clone()
+		}
 	}
 
 	/// return the stack without the top item (this is sometimes called `tail`)
 	pub fn pull(&self) -> Option<Self> {
-		self.0.as_ref().map(|s|{Stack(s.pull())})
+		self.0.as_ref().map(|h|{Stack(h.pull())})
 	}
 
 	/// return an iterator over the elements from the top of the stack
@@ -84,6 +92,11 @@ Head<T> {
 	/// return the head element
 	pub fn peek(&self) -> T {
 		force(&self.main).elem
+	}
+
+	/// get the incremental name of this list
+	pub fn name(&self) -> Option<Name> {
+		self.name.clone()
 	}
 
 	/// return the list without the head element

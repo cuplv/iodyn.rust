@@ -18,6 +18,7 @@ pub mod archive_stack;      // more complex stack (uses stack)
 pub mod gauged_raz;         // raz of vectors using tree_cursor (uses archive_stack and tree_cursor)
 // temp for incremental use
 pub mod inc_stack;
+pub mod inc_archive_stack;
 pub mod inc_level_tree;
 pub mod inc_tree_cursor;
 pub mod inc_gauged_raz;
