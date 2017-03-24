@@ -11,7 +11,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 use inc_tree_cursor as tree;
-use archive_stack as stack;
+use inc_archive_stack as stack;
 
 use adapton::engine::Name;
 
@@ -24,8 +24,8 @@ pub struct Raz<E: Debug+Clone+Eq+Hash+'static> {
 	l_length: usize,
 	r_length: usize,
 	l_forest: tree::Cursor<TreeData<E>>,
-	l_stack: stack::AStack<E,(u32,Option<Name>)>,
-	r_stack: stack::AStack<E,(u32,Option<Name>)>,
+	l_stack: stack::AStack<E,u32>,
+	r_stack: stack::AStack<E,u32>,
 	r_forest: tree::Cursor<TreeData<E>>,
 }
 
@@ -252,16 +252,14 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 		let mut l_nm = None;
 		let mut r_nm = None;
 		// step 1: reconstruct local array from stack
-		let l_vec = if let Some((vec,lev_nm)) = self.l_stack.next_archive() {
-			let (lev,nm) = match lev_nm { None => (None,None), Some((lev,nm)) => (Some(lev),nm)};
+		l_nm = self.l_stack.name();
+		let l_vec = if let Some((vec,lev)) = self.l_stack.next_archive() {
 			l_lev = lev;
-			l_nm = nm;
 			if vec.len() > 0 {Some(vec)} else {None}
 		} else { None };
-		let r_vec = if let Some((vec,lev_nm)) = self.r_stack.next_archive() {
-			let (lev,nm) = match lev_nm { None => (None,None), Some((lev,nm)) => (Some(lev),nm)};
+		r_nm = self.r_stack.name();
+		let r_vec = if let Some((vec,lev)) = self.r_stack.next_archive() {
 			r_lev = lev;
-			r_nm = nm;
 			if vec.len() > 0 {Some(vec)} else {None}
 		} else { None };
 		let vec = match (self.l_stack.is_empty(), l_vec, r_vec, self.r_stack.is_empty()) {
@@ -269,42 +267,41 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 			(_,None,Some(mut v),_) => { v.reverse(); Some(v) },
 			(_,Some(mut lv),Some(mut rv),_) => {rv.reverse(); lv.extend(rv); Some(lv) },
 			(false, None, None, _) => {
-				let (v,lev_nm) = self.l_stack.next_archive().unwrap();
-				let (lev,nm) = match lev_nm { None => (None,None), Some((lev,nm)) => (Some(lev),nm)};
+				l_nm = self.l_stack.name();
+				let (v,lev) = self.l_stack.next_archive().unwrap();
 				l_lev = lev;
-				l_nm = nm;
 				Some(v)
 			},
 			(true, None, None, false) => {
-				let (mut v,lev_nm) = self.r_stack.next_archive().unwrap();
+				r_nm = self.r_stack.name();
+				let (mut v,lev) = self.r_stack.next_archive().unwrap();
 				v.reverse();
-				let (lev,nm) = match lev_nm { None => (None,None), Some((lev,nm)) => (Some(lev),nm)};
 				r_lev = lev;
-				r_nm = nm;
 				Some(v)
 			},
 			_ => None
 		};
 		// step 2: build center tree
 		let tree = if let Some(v) = vec {
-			// OPTIMIZE: linear algorithm
 			let mut cursor = tree::Tree::new(0,None,TreeData::Leaf(Rc::new(v)),None,None).unwrap().into();
-			while let Some((l_vec,lev_nm)) = self.l_stack.next_archive() {
-				let (lev,nm) = match lev_nm { None => (None,None), Some((lev,nm)) => (Some(lev),nm)};
+			let mut next_nm = self.l_stack.name();
+			while let Some((l_vec,next_lev)) = self.l_stack.next_archive() {
 				let l_curs = tree::Tree::new(0,None,TreeData::Leaf(Rc::new(l_vec)),None,None).unwrap().into();
 				let dummy = TreeData::Branch{l_count: 0, r_count: 0};
 				cursor = tree::Cursor::join(l_curs,l_lev.unwrap(),l_nm,dummy,cursor);
-				l_lev = lev;
-				l_nm = nm;
+				l_lev = next_lev;
+				l_nm = next_nm;
+				next_name = self.l_stack.name();
 			}
-			while let Some((mut r_vec,lev_nm)) = self.r_stack.next_archive() {
-				let (lev,nm) = match lev_nm { None => (None,None), Some((lev,nm)) => (Some(lev),nm)};
+			next_name = self.r_stack.name();
+			while let Some((mut r_vec,next_lev)) = self.r_stack.next_archive() {
 				r_vec.reverse();
 				let r_curs = tree::Tree::new(0,None,TreeData::Leaf(Rc::new(r_vec)),None,None).unwrap().into();
 				let dummy = TreeData::Branch{l_count: 0, r_count: 0};
 				cursor = tree::Cursor::join(cursor,r_lev.unwrap(),r_nm,dummy,r_curs);
-				r_lev = lev;
-				r_nm = nm;
+				r_lev = next_lev;
+				r_nm = next_nm;
+				next_nm = self.r_stack.name();
 			}
 			while cursor.up() != tree::UpResult::Fail {}
 			cursor.at_tree().unwrap()
@@ -394,12 +391,25 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	}
 	/// mark the data at the left to be shared
 	pub fn archive_left(&mut self, level: u32, name: Option<Name>) {
-		self.l_stack.archive((level,name));
+		self.l_stack.archive(name,level);
 	}
 	/// mark the data at the right to be shared
 	pub fn archive_right(&mut self, level: u32, name: Option<Name>) {
-		self.r_stack.archive((level,name));
+		self.r_stack.archive(name,level);
 	}
+
+
+
+
+
+
+	//TODO! Keep editing this for the inc_archive_stack changes
+
+
+
+
+
+
 	/// remove and return an element to the left of the cursor
 	pub fn pop_left(&mut self) -> Option<E> {
 		if self.l_stack.len() == 0 {

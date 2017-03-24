@@ -65,7 +65,7 @@ AStack<E,M> {
 	/// the item count of the "fast" mutable vector outside of the archive
 	pub fn active_len(&self) -> usize { self.current.len() }
 	/// get the incremental name of the archive, if it exists
-	pub fn name(&self) -> Name { self.archived.name().unwrap() }
+	pub fn name(&self) -> Option<Name> { self.archived.name() }
 	/// push a element to the "fast" vector outside of the archive
 	pub fn push(&mut self, elm: E) { self.size += 1; self.current.push(elm) }
 
