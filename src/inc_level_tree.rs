@@ -30,7 +30,8 @@ struct TreeNode<E: 'static+Debug+Clone+Eq+Hash>{
 	r_branch: Option<Tree<E>>
 }
 
-impl<E: Debug+Clone+Eq+Hash+'static> Tree<E> {
+impl<E: Debug+Clone+Eq+Hash+'static>
+Tree<E> {
 	/// build a new tree from components, return None if levels are inconsistent
 	pub fn new(
 		level: u32,
