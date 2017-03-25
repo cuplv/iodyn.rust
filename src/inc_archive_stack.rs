@@ -146,15 +146,15 @@ AStack<E,M> {
 	/// associated metadata
 	/// return false if the active vector was empty. In this
 	/// case, no archive will happen and the metadata will be unused
-	pub fn archive(&mut self, name: Name, meta: M) -> bool {
+	pub fn archive(&mut self, name: Option<Name>, meta: M) -> bool {
 		self.archive_with_capacity(name,meta, 0)
 	}
 	/// push the entire active vector into the archive, providing
 	/// a capacity for the new active vector
-	pub fn archive_with_capacity(&mut self, name: Name, meta: M, capacity: usize) -> bool {
+	pub fn archive_with_capacity(&mut self, name: Option<Name>, meta: M, capacity: usize) -> bool {
 		if self.current.len() == 0 { return false; }
 		let old_vec = mem::replace(&mut self.current, Vec::with_capacity(capacity));
-		self.archived = self.archived.push(Some(name),(meta, old_vec));
+		self.archived = self.archived.push(name,(meta, old_vec));
 		true
 	}
 	
@@ -217,11 +217,11 @@ mod tests {
   	stack.push(4);
   	stack.push(2);
   	stack.push(4);
-  	stack.archive(name_of_usize(1),());
+  	stack.archive(Some(name_of_usize(1)),());
   	stack.push(9);
   	stack.push(3);
   	stack.push(7);
-  	stack.archive(name_of_usize(2),());
+  	stack.archive(Some(name_of_usize(2)),());
 
   	assert_eq!(stack.len(), 6);
 
@@ -239,7 +239,7 @@ mod tests {
   	stack.push(4);
   	stack.push(2);
   	stack.push(4);
-  	stack.archive(name_of_usize(1),());
+  	stack.archive(Some(name_of_usize(1)),());
   	stack.push(9);
   	stack.push(3);
 
@@ -255,7 +255,7 @@ mod tests {
   	stack.push(4);
   	stack.push(2);
   	stack.push(4);
-  	stack.archive(name_of_usize(1),());
+  	stack.archive(Some(name_of_usize(1)),());
   	stack.push(9);
   	stack.push(3);
 
@@ -279,11 +279,11 @@ mod tests {
   	stack.push(4);
   	stack.push(2);
   	stack.push(4);
-  	stack.archive(name_of_usize(1),());
+  	stack.archive(Some(name_of_usize(1)),());
   	stack.push(9);
   	stack.push(3);
   	stack.push(7);
-  	stack.archive(name_of_usize(2),());
+  	stack.archive(Some(name_of_usize(2)),());
   	stack.push(6);
   	stack.push(1);
   	stack.push(3);
