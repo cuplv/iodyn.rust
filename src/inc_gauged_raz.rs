@@ -13,7 +13,7 @@ use std::hash::Hash;
 use inc_tree_cursor as tree;
 use inc_archive_stack as stack;
 
-use adapton::engine::Name;
+use adapton::engine::{Name,name_pair,name_of_string};
 
 /// Random access zipper
 ///
@@ -247,17 +247,18 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 	/// unfocus the RAZ before refocusing on a new location
 	/// in the sequence.
 	pub fn unfocus(mut self) -> RazTree<E> {
+		let nmtree = name_of_string(String::from("tree"));
 		let mut l_lev = None;
 		let mut r_lev = None;
 		let mut l_nm;
 		let mut r_nm;
 		// step 1: reconstruct local array from stack
-		l_nm = self.l_stack.name();
+		l_nm = self.l_stack.name().map(|n|name_pair(n,nmtree.clone()));
 		let l_vec = if let Some((vec,lev)) = self.l_stack.next_archive() {
 			l_lev = lev;
 			if vec.len() > 0 {Some(vec)} else {None}
 		} else { None };
-		r_nm = self.r_stack.name();
+		r_nm = self.r_stack.name().map(|n|name_pair(n,nmtree.clone()));
 		let r_vec = if let Some((vec,lev)) = self.r_stack.next_archive() {
 			r_lev = lev;
 			if vec.len() > 0 {Some(vec)} else {None}
@@ -267,13 +268,13 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 			(_,None,Some(mut v),_) => { v.reverse(); Some(v) },
 			(_,Some(mut lv),Some(mut rv),_) => {rv.reverse(); lv.extend(rv); Some(lv) },
 			(false, None, None, _) => {
-				l_nm = self.l_stack.name();
+				l_nm = self.l_stack.name().map(|n|name_pair(n,nmtree.clone()));
 				let (v,lev) = self.l_stack.next_archive().unwrap();
 				l_lev = lev;
 				Some(v)
 			},
 			(true, None, None, false) => {
-				r_nm = self.r_stack.name();
+				r_nm = self.r_stack.name().map(|n|name_pair(n,nmtree.clone()));
 				let (mut v,lev) = self.r_stack.next_archive().unwrap();
 				v.reverse();
 				r_lev = lev;
@@ -284,16 +285,16 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 		// step 2: build center tree
 		let tree = if let Some(v) = vec {
 			let mut cursor = tree::Tree::new(0,None,TreeData::Leaf(Rc::new(v)),None,None).unwrap().into();
-			let mut next_nm = self.l_stack.name();
+			let mut next_nm = self.l_stack.name().map(|n|name_pair(n,nmtree.clone()));
 			while let Some((l_vec,next_lev)) = self.l_stack.next_archive() {
 				let l_curs = tree::Tree::new(0,None,TreeData::Leaf(Rc::new(l_vec)),None,None).unwrap().into();
 				let dummy = TreeData::Branch{l_count: 0, r_count: 0};
 				cursor = tree::Cursor::join(l_curs,l_lev.unwrap(),l_nm,dummy,cursor);
 				l_lev = next_lev;
 				l_nm = next_nm;
-				next_nm = self.l_stack.name();
+				next_nm = self.l_stack.name().map(|n|name_pair(n,nmtree.clone()));
 			}
-			next_nm = self.r_stack.name();
+			next_nm = self.r_stack.name().map(|n|name_pair(n,nmtree.clone()));
 			while let Some((mut r_vec,next_lev)) = self.r_stack.next_archive() {
 				r_vec.reverse();
 				let r_curs = tree::Tree::new(0,None,TreeData::Leaf(Rc::new(r_vec)),None,None).unwrap().into();
@@ -301,7 +302,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
 				cursor = tree::Cursor::join(cursor,r_lev.unwrap(),r_nm,dummy,r_curs);
 				r_lev = next_lev;
 				r_nm = next_nm;
-				next_nm = self.r_stack.name();
+				next_nm = self.r_stack.name().map(|n|name_pair(n,nmtree.clone()));
 			}
 			while cursor.up() != tree::UpResult::Fail {}
 			cursor.at_tree().unwrap()
