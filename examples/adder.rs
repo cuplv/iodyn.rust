@@ -261,7 +261,6 @@ fn main2() {
   	div_of_trace(&tr).write_html(&mut writer);
   }
 
-
   println!("inc times(ns) (tokenize,parse): {:?}", result.computes.iter().map(|c|{
   	(c[0].num_nanoseconds().unwrap(),c[1].num_nanoseconds().unwrap())
   }).collect::<Vec<_>>());

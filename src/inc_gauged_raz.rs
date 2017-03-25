@@ -1086,24 +1086,22 @@ mod tests {
   	r.archive_right(4, Some(name_of_usize(4)));
   	t = r.unfocus();
 
-  	let sums = t.clone().fold_lr_meta(name_of_string(String::from("sum")),(0,0),Rc::new(
-  		|(lev,dat),e:MaybeMeta<&u32>|{ match e {
-  			MaybeMeta::Data(&d)=>(lev,dat+d),
-  			MaybeMeta::Meta(l,_)=>(lev+l,dat),
-  		}}
-  	));
+  	let sums = t.clone().fold_lr_meta(
+  		name_of_string(String::from("sum")),
+  		(0,0),
+  		Rc::new(|(lev,dat),e:&u32|{(lev,dat+e)}),
+  		Rc::new(|(lev,dat),(l,_):(u32,Option<Name>)|{(lev+l,dat)})
+  	);
   	let iter_levs: u32 = (1..6).sum();
   	let iter_sum: u32 = (1..13).sum();
   	assert_eq!((iter_levs,iter_sum), sums);
 
-  	let raz_string = t.clone().fold_lr_meta(name_of_string(String::from("vals")),"s".to_string(),Rc::new(
-  		|l,r:MaybeMeta<&u32>|{
-  			match r{
-  				MaybeMeta::Data(&r)=>format!("{},{}",l,r),
-  				MaybeMeta::Meta(..)=>format!("{},n",l),
-  			}
-  		}
-  	));
+  	let raz_string = t.clone().fold_lr_meta(
+  		name_of_string(String::from("vals")),
+  		"s".to_string(),
+  		Rc::new(|l,r:&u32|{format!("{},{}",l,r)}),
+  		Rc::new(|l,_|{format!("{},n",l)}),
+  	);
   	let string = String::from("s,1,2,n,3,4,n,5,6,n,7,8,n,9,10,n,11,12");
   	assert_eq!(string, raz_string);
   }
