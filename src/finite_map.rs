@@ -106,7 +106,9 @@ impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T
 	}
 	
 	fn adjacents(curr: Self, id: usize) -> Option<Vec<usize>> {
-		let (_, adjs) = FinMap::get(curr, id).unwrap();
-		Some(adjs)
+		match FinMap::get(curr, id) {
+			Some((_, adjs)) => Some(adjs),
+			None => None
+		}
 	}
 }
