@@ -2,6 +2,7 @@ use inc_gauged_raz::*;
 use std::hash::Hash;
 use std::fmt::Debug;
 use adapton::engine::name_of_usize;
+use std::vec::Vec;
 
 trait FinMap<K, V> {
 	//first usize: total size, second: granularity
@@ -65,4 +66,47 @@ trait Graph<NdId, NdData> {
 	fn del_edge(Self, NdId, NdId) -> Self;
 	
 	fn adjacents(Self, NdId) -> Option<Vec<NdId>>;
+}
+
+impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T 
+	where T: FinMap<usize, (Data, Vec<usize>)> + Clone + Copy
+	{
+	fn new(size: usize, gran: usize) -> Self {
+		FinMap::new(size, gran)
+	}
+	
+	fn add_node(curr: Self, id: usize, dt: (Data, Vec<usize>)) -> Self {
+		FinMap::put(curr, id, dt)
+	}
+	
+	fn del_node(curr: Self, id: usize) -> (Option<usize>, Self) {
+		match FinMap::del(curr, id) {
+			(None, _) => (None, curr),
+			(Some(_), _) => (Some(id), curr)
+		}
+	}
+	
+	//Currently assumes that both nodes exist. Semantics undefined if nodes don't exist.
+	//These changes persist into the Map, right?
+	fn add_edge(curr: Self, id1: usize, id2: usize) -> Self {
+		let (_, mut adjs) = FinMap::get(curr, id1).unwrap();
+		adjs.push(id2);
+		let(_, mut adjs2) = FinMap::get(curr, id2).unwrap();
+		adjs2.push(id1);
+		curr
+	}
+	
+	fn del_edge(curr: Self, id1: usize, id2: usize) -> Self {
+		let (_, mut adjs) = FinMap::get(curr, id1).unwrap();
+		//is this an efficient/idiomatic way to do this?
+		adjs.retain( |x: &usize| { x != &id2 } );
+		let (_, mut adjs2) = FinMap::get(curr, id2).unwrap();
+		adjs2.retain( |x: &usize| {x != &id1} );
+		curr
+	}
+	
+	fn adjacents(curr: Self, id: usize) -> Option<Vec<usize>> {
+		let (_, adjs) = FinMap::get(curr, id).unwrap();
+		Some(adjs)
+	}
 }
