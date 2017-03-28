@@ -62,7 +62,7 @@ mod tests {
 	use zip::Zip;
 	use seqzip::{Seq, SeqZip};
   use persist_raz::Raz;
-  use finite_map::FinMap;
+  use finite_map::{FinMap, Graph};
   use inc_gauged_raz::RazTree;
 
   #[test]
@@ -135,5 +135,19 @@ mod tests {
 	  		(_, v) => v
 	  	};
   	assert_eq!(None, FinMap::get(dt, 11));
+  }
+  
+  #[test]
+  fn test_graph() {
+  	let mut dt: RazTree<Option<(usize, Vec<usize>)>> = Graph::new(100, 10);
+  	dt = Graph::add_node(dt, 1, (1, vec!()));
+  	dt = Graph::add_node(dt, 2, (2, vec!()));
+  	dt = Graph::add_node(dt, 3, (3, vec!()));
+  	dt = Graph::add_edge(dt, 1, 2);
+  	dt = Graph::add_edge(dt, 2, 3);
+  	dt = Graph::add_edge(dt, 3, 1);
+  	assert_eq!(Some(vec!(2, 3)), Graph::adjacents(dt.clone(), 1));
+  	dt = Graph::del_edge(dt, 1, 2);
+  	assert_eq!(Some(vec!(3)), Graph::adjacents(dt.clone(), 1))
   }
 }
