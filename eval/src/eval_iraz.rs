@@ -5,6 +5,7 @@ use rand::{Rng,StdRng,Rand};
 use time::Duration;
 use adapton::engine::*;
 use pmfp_collections::{IRaz, IRazTree};
+use pmfp_collections::inc_gauged_raz::{MemoFrom,AtTail};
 use pmfp_collections::inc_tree_cursor::gen_level;
 use primitives::*;
 use interface::{Adapt};
@@ -66,6 +67,17 @@ CreateFrom<IRaz<E>,G> for EvalIRaz<E,G>{
 		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
 			eval.raztree = Some(data.unfocus());
+		});
+		(time,eval)
+	}
+}
+
+impl<E:Adapt,G:Rng+Clone>
+CreateFrom<AtTail<E>,G> for EvalIRaz<E,G>{
+	fn inc_from(data: AtTail<E>, unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+		let time = Duration::span(||{
+			eval.raztree = Some(IRazTree::memo_from(data));
 		});
 		(time,eval)
 	}

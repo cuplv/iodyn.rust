@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 use pmfp_collections::{IRaz};
+use pmfp_collections::inc_archive_stack::AStack as IAStack;
 use adapton::engine::Name;
 
 /// convenience trait for incremental test data
@@ -44,6 +45,30 @@ impl<T:Adapt> IFaceArchive<(u32,Option<Name>)> for IRaz<T> {
 impl<T:Adapt> IFaceNew for IRaz<T> {
 	fn new() -> Self {
 		IRaz::new()
+	}
+}
+
+impl<T:Adapt,M:Adapt> IFaceSeq<T> for IAStack<T,M> {
+	fn seq_push(mut self, val:T) -> Self {
+		self.push(val);
+		self
+	}
+	fn seq_pop(mut self) -> (Option<T>, Self) {
+		let val = self.pop();
+		(val, self)
+	}
+}
+
+impl<T:Adapt,M:Adapt> IFaceArchive<(M,Option<Name>)> for IAStack<T,M> {
+	fn archive(mut self, (m,n):(M,Option<Name>)) -> Self {
+		IAStack::archive(&mut self,n,m);
+		self
+	}
+}
+
+impl<T:Adapt,M:Adapt> IFaceNew for IAStack<T,M> {
+	fn new() -> Self {
+		IAStack::new()
 	}
 }
 

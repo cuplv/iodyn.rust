@@ -17,7 +17,10 @@ use eval::interface::{IFaceSeq,IFaceNew,IFaceArchive};
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
+#[allow(unused)] use eval::eval_iastack::EvalIAStack;
 use eval::test_seq::{TestMResult,EditComputeSequence};
+use pmfp_collections::inc_gauged_raz::{AtTail};
+use pmfp_collections::inc_archive_stack::AStack as IAStack;
 use adapton::engine::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
@@ -217,7 +220,7 @@ fn main2() {
 				|a|{
 					let ts = tokenize_final(a);
 					IncrementalFrom{
-						data: ts,
+						data: AtTail(ts), // This determings the accumulator type
 			      unitgauge: unitgauge,
 			      namegauge: namegauge,
 			      coord: coord.clone(),
@@ -243,7 +246,7 @@ fn main2() {
   let mut rng = StdRng::from_seed(&[editseed]);
   let result: TestMResult<
   	EvalIRaz<Lang,StdRng>, // in type
-  	IRaz<u32>,  // out type
+  	IAStack<u32,u32>,  // out type
   > = test.test(&mut rng);
   // let result: TestMResult<
   // 	EvalVec<Lang,StdRng>,
