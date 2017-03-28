@@ -10,10 +10,12 @@ use std::rc::Rc;
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use inc_level_tree::{Tree};
 use inc_tree_cursor as tree;
 use inc_archive_stack as stack;
 
-use adapton::engine::{Name,name_pair,name_of_string};
+use adapton::macros::*;
+use adapton::engine::*;
 
 /// Random access zipper
 ///
@@ -223,7 +225,8 @@ IntoIterator for RazTree<T> {
 	}
 }
 
-impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
+impl<E: Debug+Clone+Eq+Hash+'static>
+Raz<E> {
 	/// Create a new RAZ, for an empty sequence
 	pub fn new() -> Raz<E> {
 		Raz{
@@ -475,7 +478,6 @@ impl<T: Debug+Clone+Eq+Hash+'static> IterR<T> {
 /////////////////////////////
 use inc_level_tree as ltree;
 use std::convert::From;
-// use std::ops::Deref;
 
 /// convenience fn for making a tree from data
 #[allow(unused)]
@@ -491,96 +493,95 @@ fn bin<E: Debug+Clone+Eq+Hash+'static>(
 	t2: ltree::Tree<TreeData<E>>
 ) -> ltree::Tree<TreeData<E>> {
 	ltree::Tree::new(
-		l,n, TreeData::Branch{l_count:count(&Some(t1.peek())), r_count: count(&Some(t2.peek()))},
-		Some(t1), Some(t2)
+		l,n, TreeData::Branch{
+			l_count: count(&Some(t1.peek())),
+			r_count: count(&Some(t2.peek())),
+		},
+		Some(t1), Some(t2),
 	).unwrap()
 }
 
-// TODO: Update these conversion fn's
-// /// Marker type for interpreting the stack as a sequence.
-// /// 
-// /// Assume the head of the sequence is the edit point.
-// /// Rust's default Vec has the edit point at the tail of the data.
-// #[derive(Clone)]
-// pub struct AtHead<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
-// /// Marker type for interpreting the stack as a sequence.
-// /// 
-// /// Assume the tail of the sequence is the edit point.
-// /// Rust's default Vec has the edit point at the tail of the data.
-// #[derive(Clone)]
-// pub struct AtTail<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
-// impl<T: 'static+Debug+Clone+Eq+Hash>
-// Deref for AtHead<T> {
-// 	type Target = stack::AStack<T,u32>;
-// 	fn deref(&self) -> &Self::Target { &self.0 }
-// }
-// impl<T: 'static+Debug+Clone+Eq+Hash>
-// Deref for AtTail<T> {
-// 	type Target = stack::AStack<T,u32>;
-// 	fn deref(&self) -> &Self::Target { &self.0 }
-// }
+/// Marker type for interpreting the stack as a sequence.
+/// 
+/// Assume the head of the sequence is the edit point.
+/// Rust's default Vec has the edit point at the tail of the data.
+#[derive(Clone)]
+pub struct AtHead<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
+/// Marker type for interpreting the stack as a sequence.
+/// 
+/// Assume the tail of the sequence is the edit point.
+/// Rust's default Vec has the edit point at the tail of the data.
+#[derive(Clone)]
+pub struct AtTail<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
 
+/// Construct `Self` via a memoized conversion
+///
+/// Rerunning `memo_from` on a slightly modified `T` is expected to take
+/// asymptotically less time than the initial run, but with some constant
+/// overhead on the initial run
+pub trait MemoFrom<T> {
+	fn memo_from(T) -> Self;
+}
 
-// impl<E: Debug+Clone+Eq+Hash+'static>
-// From<AtTail<E>> for RazTree<E> {
-// 	// we build this tree right to left
-// 	// note that the left branch _cannot_ have
-// 	// the same level as its parent
-// 	// while the right branch can.
-// 	// TODO: reimplement using (a new) peek_meta() to avoid half the code
-// 	fn from(tailstack: AtTail<E>) -> Self {
-// 		let AtTail(mut stack) = tailstack;
-// 		fn from_stack<E: Debug+Clone+Eq+Hash+'static>(
-// 			stack: &mut stack::AStack<E,(u32,Option<Name>)>,
-// 			right_tree: ltree::Tree<TreeData<E>>,
-// 			mid_level: u32,
-// 			mid_name: Option<Name>,
-// 			top_level: u32
-// 		)	-> (ltree::Tree<TreeData<E>>, Option<u32>, Option<Name>) {
-// 			match stack.next_archive() {
-// 				None => unreachable!(), // if we have a level there will be more data
-// 				Some((list,meta)) => { match meta {
-// 					None => (bin(leaf(list,None), mid_level, mid_name, right_tree), None, None),
-// 					Some((next_level,next_name)) => {
-// 						if next_level >= top_level {
-// 							let tree = bin(leaf(list,None),mid_level,mid_name,right_tree);
-// 							(tree, Some(next_level),next_name)
-// 						} else if next_level >= mid_level {
-// 							let tree = bin(leaf(list,None),mid_level,mid_name,right_tree);
-// 							return from_stack(stack, tree, next_level, next_name, top_level)
-// 						} else {
-// 							let (left_tree, left_level, left_name) = from_stack(
-// 								stack, leaf(list,None), next_level, next_name, mid_level
-// 							);
-// 							let tree = bin(left_tree, mid_level, mid_name, right_tree);
-// 							match left_level {
-// 								None => (tree, None, None),
-// 								Some(left_level) => {
-// 									if left_level > top_level {
-// 										(tree, Some(left_level), left_name)
-// 									} else {
-// 										return from_stack(stack, tree, left_level, left_name, top_level)
-// 									}
-// 								}
-// 							}
-// 						}
-// 					}
-// 				}}
-// 			}
-// 		}
-// 		let (level, name, first_tree) = match stack.next_archive() {
-// 			None => return RazTree{count: 0, tree: None},
-// 			Some((list, meta)) => { match meta {
-// 				None => return RazTree{count: list.len(), tree: Some(leaf(list,None))},
-// 				Some((lev,n)) => (lev, n, leaf(list,None))
-// 			}}
-// 		};
-// 		let (t,l,n) = from_stack(&mut stack, first_tree, level, name, u32::max_value());
-// 		assert!(l.is_none());
-// 		assert!(n.is_none());
-// 		RazTree{count: count(&Some(t.peek())), tree: Some(t)}
-// 	}
-// }
+impl<E: Debug+Clone+Eq+Hash+'static>
+MemoFrom<AtTail<E>>
+for RazTree<E> {
+	// we build this tree right to left
+	// note that the left branch _cannot_ have
+	// the same level as its parent
+	// while the right branch can.
+	fn memo_from(AtTail(mut tailstack): AtTail<E>) -> Self {
+		// memoize from_stack
+		fn from_stack_memo<E: Debug+Clone+Eq+Hash+'static>(
+			s:stack::AStack<E,u32>, l:u32, n:Option<Name>, t: Tree<TreeData<E>>, m:u32
+		) -> (Tree<TreeData<E>>, Option<u32>, Option<Name>, stack::AStack<E,u32>) {
+			match n.clone() {
+				None => return from_stack(s,l,n,t,m),
+				Some(nm) => {
+					let nm = name_pair(nm,name_unit());
+					return memo!(nm =>> from_stack, s:s, l:l, n:n, t:t, m:m)
+				},
+			}
+		}
+		// main function, uses memoized recursive calls from previous function 
+		fn from_stack<E: Debug+Clone+Eq+Hash+'static>(
+			mut stack: stack::AStack<E,u32>,
+			first_level: u32,
+			first_name: Option<Name>,
+			accum_tree: Tree<TreeData<E>>,
+			max_level: u32,
+		) -> (Tree<TreeData<E>>, Option<u32>, Option<Name>, stack::AStack<E,u32>) {
+			assert!(accum_tree.level() <= first_level);
+			if first_level < max_level {
+				let next_name = stack.name();
+				let (vec,next_level) = stack.next_archive().unwrap_or_else(||{panic!("stack was unexpectedly empty")});
+				let leaf_tree = leaf(vec,None);
+				let (small_tree, final_level,final_name,shorter_stack) = match next_level {
+					None => (leaf_tree,None,None,stack::AStack::new()),
+					Some(lev) => from_stack_memo(stack,lev,next_name,leaf_tree,first_level),
+				};
+				let new_tree = bin(small_tree, first_level, first_name, accum_tree);
+				match final_level {
+					None => return (new_tree, None, None, stack::AStack::new()),
+					Some(lev) => from_stack_memo(shorter_stack,lev,final_name,new_tree,max_level),
+				}
+			} else {
+				return (accum_tree, Some(first_level), first_name, stack);
+			}
+		}
+		let name = tailstack.name();
+		let (level, first_tree) = match tailstack.next_archive() {
+			None => return RazTree{count:0, tree: None},
+			Some((vec,None)) => return RazTree{count: vec.len(), tree: Some(leaf(vec,None))},
+			Some((vec,Some(level))) => (level,leaf(vec,None))
+		};
+		let (t,l,n,s) = from_stack_memo(tailstack, level, name, first_tree, u32::max_value());
+		assert!(l.is_none());
+		assert!(n.is_none());
+		assert!(s.is_empty());
+		RazTree{count: count(&Some(t.peek())), tree: Some(t)}
+	}
+}
 
 
 
@@ -647,7 +648,6 @@ impl<E: Debug+Clone+Eq+Hash+'static> SeqZip<E, RazTree<E>> for Raz<E> {
 mod tests {
 	use super::*;
 	use inc_level_tree::good_levels;
-	use adapton::engine::*;
 
   #[test]
   fn test_push_pop() {
@@ -854,95 +854,94 @@ mod tests {
   	}
   }
 
-  // TODO: Update conversion fns
-  // #[test]
-  // fn test_from_stack() {
-  // 	let mut stack = stack::AStack::new();
-  // 	stack.push(1);
-  // 	stack.push(2);
-  // 	stack.archive((3, Some(name_of_usize(3))));
-  // 	stack.push(3);
-  // 	stack.push(4);
-  // 	stack.archive((1, Some(name_of_usize(1))));
-  // 	stack.push(5);
-  // 	stack.push(6);
-  // 	stack.archive((2, Some(name_of_usize(2))));
-  // 	stack.push(7);
-  // 	stack.push(8);
-  // 	stack.archive((5, Some(name_of_usize(5))));
-  // 	stack.push(9);
-  // 	stack.push(10);
-  // 	stack.archive((4, Some(name_of_usize(4))));
-  // 	stack.push(11);
-  // 	stack.push(12);
-  // 	let raz = RazTree::from(AtTail(stack));
+  #[test]
+  fn test_from_stack() {
+  	let mut stack = stack::AStack::new();
+  	stack.push(1);
+  	stack.push(2);
+  	stack.archive(Some(name_of_usize(3)),3);
+  	stack.push(3);
+  	stack.push(4);
+  	stack.archive(Some(name_of_usize(1)),1);
+  	stack.push(5);
+  	stack.push(6);
+  	stack.archive(Some(name_of_usize(2)),2);
+  	stack.push(7);
+  	stack.push(8);
+  	stack.archive(Some(name_of_usize(5)),5);
+  	stack.push(9);
+  	stack.push(10);
+  	stack.archive(Some(name_of_usize(4)),4);
+  	stack.push(11);
+  	stack.push(12);
+  	let raz = RazTree::memo_from(AtTail(stack));
 
-  // 	// check that levels are high-to-low
-  // 	assert!(good_levels(raz.tree.as_ref().unwrap()));
+  	// check that levels are high-to-low
+  	assert!(good_levels(raz.tree.as_ref().unwrap()));
   	
-  // 	// check that all elements are represented
-  // 	let sum = raz.clone().fold_up(Rc::new(|e:&usize|*e),Rc::new(|e1:usize,e2:usize|e1+e2)).unwrap_or(0);
-  // 	let iter_sum: usize = (1..13).sum();
-  // 	assert_eq!(iter_sum, sum);
+  	// check that all elements are represented
+  	let sum = raz.clone().fold_up(Rc::new(|e:&usize|*e),Rc::new(|e1:usize,e2:usize|e1+e2)).unwrap_or(0);
+  	let iter_sum: usize = (1..13).sum();
+  	assert_eq!(iter_sum, sum);
 
-  // 	// check the structure
-  // 	let mut cursor = tree::Cursor::from(raz.tree.unwrap());
-  // 	assert!(cursor.down_left());
-  // 	assert!(cursor.down_left());
-  // 	match cursor.peek() {
-  // 		Some(TreeData::Leaf(ref v)) => {
-  // 			assert_eq!(vec![1,2], **v);
-  // 		},
-  // 		_ => panic!("Wrong data")
-  // 	}
-  // 	assert!(cursor.up() != tree::UpResult::Fail);
-  // 	assert!(cursor.down_right());
-  // 	assert!(cursor.down_left());
-  // 	assert!(cursor.down_left());
-  // 	match cursor.peek() {
-  // 		Some(TreeData::Leaf(ref v)) => {
-  // 			assert_eq!(vec![3,4], **v);
-  // 		},
-  // 		_ => panic!("Wrong data")
-  // 	}
-  // 	assert!(cursor.up() != tree::UpResult::Fail);
-  // 	assert!(cursor.down_right());
-  // 	match cursor.peek() {
-  // 		Some(TreeData::Leaf(ref v)) => {
-  // 			assert_eq!(vec![5,6], **v);
-  // 		},
-  // 		_ => panic!("Wrong data")
-  // 	}
-  // 	assert!(cursor.up() != tree::UpResult::Fail);
-  // 	assert!(cursor.up() != tree::UpResult::Fail);
-  // 	assert!(cursor.down_right());
-  // 	match cursor.peek() {
-  // 		Some(TreeData::Leaf(ref v)) => {
-  // 			assert_eq!(vec![7,8], **v);
-  // 		},
-  // 		_ => panic!("Wrong data")
-  // 	}
-  // 	assert!(cursor.up() != tree::UpResult::Fail);
-  // 	assert!(cursor.up() != tree::UpResult::Fail);
-  // 	assert!(cursor.up() != tree::UpResult::Fail);
-  // 	assert!(cursor.down_right());
-  // 	assert!(cursor.down_right());
-  // 	match cursor.peek() {
-  // 		Some(TreeData::Leaf(ref v)) => {
-  // 			assert_eq!(vec![11,12], **v);
-  // 		},
-  // 		_ => panic!("Wrong data")
-  // 	}
-  // 	assert!(cursor.up() != tree::UpResult::Fail);
-  // 	assert!(cursor.down_left());
-  // 	match cursor.peek() {
-  // 		Some(TreeData::Leaf(ref v)) => {
-  // 			assert_eq!(vec![9,10], **v);
-  // 		},
-  // 		_ => panic!("Wrong data")
-  // 	}
+  	// check the structure
+  	let mut cursor = tree::Cursor::from(raz.tree.unwrap());
+  	assert!(cursor.down_left());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![1,2], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.down_right());
+  	assert!(cursor.down_left());
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![3,4], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.down_right());
+  	match cursor.peek() {
+  		Some(TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![5,6], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.down_right());
+  	match cursor.peek() {
+  		Some(TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![7,8], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.down_right());
+  	assert!(cursor.down_right());
+  	match cursor.peek() {
+  		Some(TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![11,12], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
+  	assert!(cursor.up() != tree::UpResult::Fail);
+  	assert!(cursor.down_left());
+  	match cursor.peek() {
+  		Some(TreeData::Leaf(ref v)) => {
+  			assert_eq!(vec![9,10], **v);
+  		},
+  		_ => panic!("Wrong data")
+  	}
 
-  // }
+  }
 
   #[test]
   fn test_iters() {
