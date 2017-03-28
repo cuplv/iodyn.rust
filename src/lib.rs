@@ -59,3 +59,4 @@ pub type ArchiveStack<E> = archive_stack::AStack<E,()>;
 pub fn inc_level() -> u32 {
   level_tree::gen_branch_level(&mut rand::thread_rng())
 }
+
