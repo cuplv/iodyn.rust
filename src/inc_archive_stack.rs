@@ -31,7 +31,7 @@ use adapton::engine::Name;
 ///
 /// [`next_archive()`]: struct.AStack.html#method.next_archive
 
-#[derive(Clone)]
+#[derive(Debug,PartialEq,Eq,Clone,Hash)]
 pub struct AStack<E:'static+Debug+Clone+Eq+Hash,M:'static+Debug+Clone+Eq+Hash> {
 	size: usize,
 	current: Vec<E>,
