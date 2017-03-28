@@ -69,7 +69,7 @@ pub trait Graph<NdId, NdData> {
 }
 
 impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T 
-	where T: FinMap<usize, (Data, Vec<usize>)> + Clone + Copy
+	where T: FinMap<usize, (Data, Vec<usize>)> + Clone
 	{
 	fn new(size: usize, gran: usize) -> Self {
 		FinMap::new(size, gran)
@@ -81,28 +81,32 @@ impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T
 	
 	fn del_node(curr: Self, id: usize) -> (Option<usize>, Self) {
 		match FinMap::del(curr, id) {
-			(None, _) => (None, curr),
-			(Some(_), _) => (Some(id), curr)
+			(None, new) => (None, new),
+			(Some(_), new) => (Some(id), new)
 		}
 	}
 	
 	//Currently assumes that both nodes exist. Semantics undefined if nodes don't exist.
 	//These changes persist into the Map, right?
 	fn add_edge(curr: Self, id1: usize, id2: usize) -> Self {
-		let (_, mut adjs) = FinMap::get(curr, id1).unwrap();
+		let (k, mut adjs) = FinMap::get(curr.clone(), id1).unwrap();
 		adjs.push(id2);
-		let(_, mut adjs2) = FinMap::get(curr, id2).unwrap();
+		let mut ret = FinMap::put(curr, id1, (k, adjs));
+		let(k, mut adjs2) = FinMap::get(ret.clone(), id2).unwrap();
 		adjs2.push(id1);
-		curr
+		ret = FinMap::put(ret, id2, (k, adjs2));
+		ret
 	}
 	
 	fn del_edge(curr: Self, id1: usize, id2: usize) -> Self {
-		let (_, mut adjs) = FinMap::get(curr, id1).unwrap();
+		let (k, mut adjs) = FinMap::get(curr.clone(), id1).unwrap();
 		//is this an efficient/idiomatic way to do this?
 		adjs.retain( |x: &usize| { x != &id2 } );
-		let (_, mut adjs2) = FinMap::get(curr, id2).unwrap();
+		let mut ret = FinMap::put(curr, id1, (k, adjs));
+		let (k, mut adjs2) = FinMap::get(ret.clone(), id2).unwrap();
 		adjs2.retain( |x: &usize| {x != &id1} );
-		curr
+		ret = FinMap::put(ret, id2, (k, adjs2));
+		ret
 	}
 	
 	fn adjacents(curr: Self, id: usize) -> Option<Vec<usize>> {
