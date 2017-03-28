@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use adapton::engine::name_of_usize;
 use std::vec::Vec;
 
-trait FinMap<K, V> {
+pub trait FinMap<K, V> {
 	//first usize: total size, second: granularity
 	fn new(usize, usize) -> Self;
 	
@@ -51,7 +51,7 @@ impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Ha
 }
 
 //undirected graph
-trait Graph<NdId, NdData> {
+pub trait Graph<NdId, NdData> {
 	//usize params are for size/granularity pass to maps: should be exposed or no?
 	fn new(usize, usize) -> Self;
 	

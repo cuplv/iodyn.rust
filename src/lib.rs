@@ -62,6 +62,8 @@ mod tests {
 	use zip::Zip;
 	use seqzip::{Seq, SeqZip};
   use persist_raz::Raz;
+  use finite_map::FinMap;
+  use inc_gauged_raz::RazTree;
 
   #[test]
   fn test_stack_zipper() {
@@ -119,5 +121,19 @@ mod tests {
 
   	// show off that this is a persistent structure
   	assert_eq!(Ok(7), save.peek_r());
+  }
+  
+  #[test]
+  fn test_fin_map() {
+  	let mut dt: RazTree<Option<usize>> = FinMap::new(100, 10);
+  	dt = FinMap::put(dt, 10, 10);
+  	dt = FinMap::put(dt, 11, 11);
+  	dt = FinMap::put(dt, 12, 12);
+  	assert_eq!(Some(12), FinMap::get(dt.clone(), 12));
+  	let dt =
+	  	match FinMap::del(dt, 11) {
+	  		(_, v) => v
+	  	};
+  	assert_eq!(None, FinMap::get(dt, 11));
   }
 }
