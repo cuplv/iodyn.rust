@@ -12,7 +12,7 @@ extern crate adapton_lab;
 // use time::Duration;
 use rand::{Rand,Rng,StdRng,SeedableRng};
 use eval::actions::*;
-use eval::interface::{IntrfSeq,IntrfNew,IntrfArchive};
+use eval::interface::{IFaceSeq,IFaceNew,IFaceArchive};
 #[allow(unused)] use pmfp_collections::IRaz;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
@@ -146,7 +146,7 @@ fn main2() {
 
 	let coord = StdRng::from_seed(&[dataseed]);
 
-	fn tokenize_step<A: IntrfSeq<Token>>((ts,part):(A,Option<u32>),l:&Lang) -> (A,Option<u32>) {
+	fn tokenize_step<A: IFaceSeq<Token>>((ts,part):(A,Option<u32>),l:&Lang) -> (A,Option<u32>) {
 		let Lang(ref c) = *l;
 		if let Some(num) = c.to_digit(10) {
 			let bigger = part.map_or(num,|p|p*10+num);
@@ -167,17 +167,17 @@ fn main2() {
 			(ts,None)
 		}
 	}
-	fn tokenize_meta<A: IntrfArchive<(u32,Option<Name>)>>((ts,part):(A,Option<u32>),(l,n):(u32,Option<Name>)) -> (A,Option<u32>) {
+	fn tokenize_meta<A: IFaceArchive<(u32,Option<Name>)>>((ts,part):(A,Option<u32>),(l,n):(u32,Option<Name>)) -> (A,Option<u32>) {
 		(ts.archive((l,n.map(|n|{
 			name_pair(n,name_of_string(String::from("tok_accum")))
 		}))),part)
 	}
-	fn tokenize_final<A: IntrfSeq<Token>>((ts,part):(A,Option<u32>)) -> A {
+	fn tokenize_final<A: IFaceSeq<Token>>((ts,part):(A,Option<u32>)) -> A {
 		if let Some(num) = part {
 			ts.seq_push(Token::Num(num))
 		} else { ts }
 	}
-	fn parse_step<A: IntrfSeq<u32>>(n: A, t: &Token) -> A {
+	fn parse_step<A: IFaceSeq<u32>>(n: A, t: &Token) -> A {
 		match *t {
 			Token::Num(a) => n.seq_push(a),
 			Token::OpPlus => {
@@ -193,7 +193,7 @@ fn main2() {
 			}
 		}
 	}
-	fn parse_meta<A: IntrfArchive<(u32,Option<Name>)>>(num: A, (l,n): (u32,Option<Name>)) -> A {
+	fn parse_meta<A: IFaceArchive<(u32,Option<Name>)>>(num: A, (l,n): (u32,Option<Name>)) -> A {
 		num.archive((l,n.map(|n|{
 			name_pair(n,name_of_string(String::from("par_accum")))
 		})))
@@ -211,7 +211,7 @@ fn main2() {
     comp: Compute2::<_,_,_,EvalIRaz<Token,StdRng>,_>::new(
     	MFolder::new(
     		name_of_string(String::from("tokenize")),
-				(IntrfNew::new(),None),
+				(IFaceNew::new(),None),
 				tokenize_step,
 				tokenize_meta,
 				|a|{
@@ -226,7 +226,7 @@ fn main2() {
 			),
     	MFolder::new(
     		name_of_string(String::from("parse")),
-    		IntrfNew::new(),
+    		IFaceNew::new(),
     		parse_step,
     		parse_meta,
     		|a|{a},

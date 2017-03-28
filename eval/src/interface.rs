@@ -8,22 +8,22 @@ pub trait Adapt: 'static+Eq+Clone+Hash+Debug {}
 impl<E> Adapt for E where E: 'static+Eq+Clone+Hash+Debug {}
 
 /// common operations on sequences
-pub trait IntrfSeq<T> {
+pub trait IFaceSeq<T> {
 	fn seq_push(self, val:T) -> Self;
 	fn seq_pop(self) -> (Option<T>, Self);
 }
 
 /// archival structs take metadata
-pub trait IntrfArchive<M> {
+pub trait IFaceArchive<M> {
 	fn archive(self, m:M) -> Self;
 }
 
 /// Polymorphic collection initializaton
-pub trait IntrfNew {
+pub trait IFaceNew {
 	fn new() -> Self;
 }
 
-impl<T:Adapt> IntrfSeq<T> for IRaz<T> {
+impl<T:Adapt> IFaceSeq<T> for IRaz<T> {
 	fn seq_push(mut self, val:T) -> Self {
 		self.push_left(val);
 		self
@@ -34,20 +34,20 @@ impl<T:Adapt> IntrfSeq<T> for IRaz<T> {
 	}
 }
 
-impl<T:Adapt> IntrfArchive<(u32,Option<Name>)> for IRaz<T> {
+impl<T:Adapt> IFaceArchive<(u32,Option<Name>)> for IRaz<T> {
 	fn archive(mut self, (l,n):(u32,Option<Name>)) -> Self {
 		self.archive_left(l,n);
 		self
 	}
 }
 
-impl<T:Adapt> IntrfNew for IRaz<T> {
+impl<T:Adapt> IFaceNew for IRaz<T> {
 	fn new() -> Self {
 		IRaz::new()
 	}
 }
 
-impl<T> IntrfSeq<T> for Vec<T> {
+impl<T> IFaceSeq<T> for Vec<T> {
 	fn seq_push(mut self, val:T) -> Self {
 		self.push(val);
 		self
@@ -58,12 +58,12 @@ impl<T> IntrfSeq<T> for Vec<T> {
 	}
 }
 
-impl<T,M> IntrfArchive<M> for Vec<T> {
+impl<T,M> IFaceArchive<M> for Vec<T> {
 	/// Vec isn't an archival struct, so do nothing
 	fn archive(self, _m:M) -> Self { self }
 }
 
-impl<T> IntrfNew for Vec<T> {
+impl<T> IFaceNew for Vec<T> {
 	fn new() -> Self {
 		Vec::new()
 	}
