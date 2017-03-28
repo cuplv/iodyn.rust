@@ -109,30 +109,25 @@ Tree<E> {
 	}
 
 	/// memoized fold operation, left to right
-	///
-	/// id is never used as is, instead serving to scope this operation
-	pub fn fold_lr<A,F>(self, id: Name, accum: A, node_calc: Rc<F>) -> A where
+	pub fn fold_lr<A,F>(self, accum: A, node_calc: Rc<F>) -> A where
 		A: 'static + Eq + Clone + Hash + Debug,
 		F: 'static + Fn(A,E) -> A,
 	{
-		self.fold_lr_meta(id,accum,Rc::new(move|a,e,_l,_n|{node_calc(a,e)}))
+		self.fold_lr_meta(accum,Rc::new(move|a,e,_l,_n|{node_calc(a,e)}))
 	}
 
 	/// memoized fold operation, left to right, with levels and names
-	///
-	/// id is never used as is, instead serving to scope this operation
-	pub fn fold_lr_meta<A,F>(self, id: Name, accum: A, node_calc: Rc<F>) -> A where
+	pub fn fold_lr_meta<A,F>(self, accum: A, node_calc: Rc<F>) -> A where
 		A: 'static + Eq + Clone + Hash + Debug,
 		F: 'static + Fn(A,E,u32,Option<Name>) -> A,
 	{
 		let fold_memo = |accum,tree:Option<Tree<_>>|{
 			match tree { None => accum, Some(t) => {
-				let nm = t.name.as_ref().map(|n|{name_pair(n.clone(),id.clone())});
-				match nm {
-					None => t.fold_lr_meta(id.clone(),accum,node_calc.clone()),
-					Some(n) => {
-						memo!(n =>>
-							Self::fold_lr_meta, t:t, id:id.clone(), a:accum ;; f:node_calc.clone()
+				match t.name.clone() {
+					None => t.fold_lr_meta(accum,node_calc.clone()),
+					Some(nm) => {
+						memo!(name_fork(nm).0 =>>
+							Self::fold_lr_meta, t:t, a:accum ;; f:node_calc.clone()
 						)
 					}
 				}

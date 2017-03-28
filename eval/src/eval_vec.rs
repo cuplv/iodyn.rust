@@ -156,7 +156,7 @@ CompFoldMeta<E,O,M,F,N> for EvalVec<E,G> where
 {
 	type Target = O;
 	/// Vecs don't take or use metadata, so just fold
-	fn comp_fold_meta(&self, _name: Name, accum: O, f:Rc<F>, _n:Rc<N>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+	fn comp_fold_meta(&self, accum: O, f:Rc<F>, _n:Rc<N>, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let mut res = None;
 		let time = Duration::span(||{
 			res = Some(self.vec.iter().fold(accum,|o,e|f(o,e)));

@@ -26,8 +26,9 @@ pub struct EvalIRaz<E:Adapt,G:Rng> {
 impl<E:Adapt,G:Rng> Debug for EvalIRaz<E,G> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let tree = self.raztree.clone();
+		let size = self.raztree.clone().unwrap().len();
 		let content = tree.unwrap().into_iter().collect::<Vec<_>>();
-		write!(f,"EvalIRaz({:?})",content)
+		write!(f,"EvalIRaz {{ size:{}, data:{:?} }}",size,content)
 	}
 }
 
@@ -387,11 +388,11 @@ CompFoldMeta<E,O,(u32,Option<Name>),F,N> for EvalIRaz<E,G> where
 	N:'static + Fn(O,(u32,Option<Name>))->O,
 {
 	type Target = O;
-	fn comp_fold_meta(&self, name: Name, accum: O, f:Rc<F>, n:Rc<N>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+	fn comp_fold_meta(&self, accum: O, f:Rc<F>, n:Rc<N>, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let clone = self.raztree.clone().unwrap();
 		let mut res = None;
 		let time = Duration::span(||{
-			res = Some(clone.fold_lr_meta(name,accum,f,n));
+			res = Some(clone.fold_lr_meta(accum,f,n));
 		});
 		(time, res.unwrap())
 	}

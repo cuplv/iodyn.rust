@@ -53,5 +53,5 @@ pub trait CompFold<I,O,F:Fn(O,&I)->O> {
 /// folds every element into the binary function, or into meta data
 pub trait CompFoldMeta<I,O,M,B:Fn(O,&I)->O,N:Fn(O,M)->O> {
 	type Target;
-	fn comp_fold_meta(&self, name: Name, accum: O, b:Rc<B>, m:Rc<N>, rng: &mut StdRng) -> (Duration,Self::Target);
+	fn comp_fold_meta(&self, accum: O, b:Rc<B>, m:Rc<N>, rng: &mut StdRng) -> (Duration,Self::Target);
 }

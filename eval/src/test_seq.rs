@@ -106,7 +106,7 @@ for EditComputeSequence<C,E,U> where
 			init_result = Some(self.init.create(rng));
 		});
 		let (init_time,dat) = init_result.unwrap();
-		//println!("{:?}", dat);
+		//println!("created: {:?}", dat);
 		edits.push(init_time);
 		full_edits.push(full_init_time);
 		testdata = dat;
@@ -115,18 +115,18 @@ for EditComputeSequence<C,E,U> where
 			comp_result = Some(self.comp.compute(&testdata,rng));
 		});
 		let (comp_times,_result) = comp_result.unwrap();
-		//println!("{:?}", _result);
+		//println!("first result: {:?}", _result);
 		computes.push(comp_times);
 		full_computes.push(full_comp_time);
 
 		// step 2: run a bunch of edits	
-		for _ in 0..self.changes {
+		for _i in 0..self.changes {
 			let mut edit_result = None;
 			let edit_full_time = Duration::span(||{
 				edit_result = Some(self.edit.edit(testdata,rng));
 			});
 			let (edit_time,dat) = edit_result.unwrap();
-			//println!("{:?}", dat);
+			//println!("edit({}): {:?}", _i, dat);
 			edits.push(edit_time);
 			full_edits.push(edit_full_time);
 			testdata = dat;
@@ -135,7 +135,7 @@ for EditComputeSequence<C,E,U> where
 				comp_result = Some(self.comp.compute(&testdata,rng));
 			});
 			let (comp_times,_result) = comp_result.unwrap();
-			//println!("{:?}", _result);
+			//println!("result({}): {:?}", _i, _result);
 			computes.push(comp_times);
 			full_computes.push(full_comp_time);
 		}

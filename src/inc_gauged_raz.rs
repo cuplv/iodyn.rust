@@ -111,7 +111,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 	}
 
 	/// left-to-right memoized fold with levels and names
-	pub fn fold_lr_meta<A,B,M>(self, id: Name, init: A, bin: Rc<B>, meta: Rc<M>) -> A where
+	pub fn fold_lr_meta<A,B,M>(self, init: A, bin: Rc<B>, meta: Rc<M>) -> A where
 		A: 'static + Eq+Clone+Hash+Debug,
 		B: 'static + Fn(A,&E) -> A,
 		M: 'static + Fn(A,(u32,Option<Name>)) -> A,
@@ -119,7 +119,7 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 		match self.tree {
 			None => init,
 			Some(tree) => {
-				tree.fold_lr_meta(id,init,Rc::new(move|a,e,l,n|{
+				tree.fold_lr_meta(init,Rc::new(move|a,e,l,n|{
 					match e {
 						TreeData::Leaf(ref vec) => {
 							vec.iter().fold(a,|a,e|{bin(a,e)})

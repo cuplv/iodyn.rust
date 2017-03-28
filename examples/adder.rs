@@ -171,9 +171,7 @@ fn main2() {
 		}
 	}
 	fn tokenize_meta<A: IFaceArchive<(u32,Option<Name>)>>((ts,part):(A,Option<u32>),(l,n):(u32,Option<Name>)) -> (A,Option<u32>) {
-		(ts.archive((l,n.map(|n|{
-			name_pair(n,name_of_string(String::from("tok_accum")))
-		}))),part)
+		(ts.archive((l,n)),part)
 	}
 	fn tokenize_final<A: IFaceSeq<Token>>((ts,part):(A,Option<u32>)) -> A {
 		if let Some(num) = part {
@@ -197,10 +195,9 @@ fn main2() {
 		}
 	}
 	fn parse_meta<A: IFaceArchive<(u32,Option<Name>)>>(num: A, (l,n): (u32,Option<Name>)) -> A {
-		num.archive((l,n.map(|n|{
-			name_pair(n,name_of_string(String::from("par_accum")))
-		})))
+		num.archive((l,n))
 	}
+	let name_to_tree = name_of_string(String::from("to_tree"));
   let mut test = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
@@ -219,12 +216,12 @@ fn main2() {
 				tokenize_meta,
 				|a|{
 					let ts = tokenize_final(a);
-					IncrementalFrom{
+					ns(name_to_tree.clone(),||{IncrementalFrom{
 						data: AtTail(ts), // This determings the accumulator type
 			      unitgauge: unitgauge,
 			      namegauge: namegauge,
 			      coord: coord.clone(),
-					}.create(&mut StdRng::new().unwrap()).1
+					}.create(&mut StdRng::new().unwrap()).1})
 				},
 			),
     	MFolder::new(

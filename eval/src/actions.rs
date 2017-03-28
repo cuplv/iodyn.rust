@@ -3,7 +3,7 @@ use std::rc::Rc;
 use rand::{Rng,StdRng};
 use time::Duration;
 use primitives::*;
-use adapton::engine::Name;
+use adapton::engine::{Name,ns,name_fork};
 
 pub trait Creator<R,D> {
 	fn create(&mut self, rnd: &mut StdRng) -> (R,D);
@@ -296,10 +296,12 @@ where
 	D:CompFoldMeta<E,A,M,R,N>,
 {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
-		let (time,run) = data.comp_fold_meta(
-			self.name.clone(), self.init.clone(), self.run.clone(), self.run_meta.clone(), rng
-		);
-		let finish = (self.finish)(run);
+		let (time,run) = ns(self.name.clone(), ||{
+			data.comp_fold_meta(self.init.clone(), self.run.clone(), self.run_meta.clone(), rng)
+		});
+		let finish = ns(name_fork(self.name.clone()).0,||{(
+			self.finish)(run)
+		});
 		#[allow(unused)]
 		let saver = Vec::new().push(finish); // don't let rust compile this away
 		time
@@ -316,10 +318,12 @@ where
 	D:CompFoldMeta<E,A,M,R,N>,
 {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Vec<Duration>,O) {
-		let (time,run) = data.comp_fold_meta(
-			self.name.clone(), self.init.clone(), self.run.clone(), self.run_meta.clone(), rng
-		);
-		let finish = (self.finish)(run);
+		let (time,run) = ns(self.name.clone(), ||{
+			data.comp_fold_meta(self.init.clone(), self.run.clone(), self.run_meta.clone(), rng)
+		});
+		let finish = ns(name_fork(self.name.clone()).0,||{(
+			self.finish)(run)
+		});
 		let mut v = Vec::new();
 		v.push(time);
 		(v,finish)
