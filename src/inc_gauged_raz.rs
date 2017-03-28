@@ -10,6 +10,7 @@ use std::rc::Rc;
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use inc_level_tree::{Tree};
 use inc_tree_cursor as tree;
 use inc_archive_stack as stack;
 
@@ -228,7 +229,8 @@ IntoIterator for RazTree<T> {
 	}
 }
 
-impl<E: Debug+Clone+Eq+Hash+'static> Raz<E> {
+impl<E: Debug+Clone+Eq+Hash+'static>
+Raz<E> {
 	/// Create a new RAZ, for an empty sequence
 	pub fn new() -> Raz<E> {
 		Raz{
@@ -480,7 +482,6 @@ impl<T: Debug+Clone+Eq+Hash+'static> IterR<T> {
 /////////////////////////////
 use inc_level_tree as ltree;
 use std::convert::From;
-// use std::ops::Deref;
 
 /// convenience fn for making a tree from data
 #[allow(unused)]
@@ -496,96 +497,85 @@ fn bin<E: Debug+Clone+Eq+Hash+'static>(
 	t2: ltree::Tree<TreeData<E>>
 ) -> ltree::Tree<TreeData<E>> {
 	ltree::Tree::new(
-		l,n, TreeData::Branch{l_count:count(&Some(t1.peek())), r_count: count(&Some(t2.peek()))},
-		Some(t1), Some(t2)
+		l,n, TreeData::Branch{
+			l_count: count(&Some(t1.peek())),
+			r_count: count(&Some(t2.peek())),
+		},
+		Some(t1), Some(t2),
 	).unwrap()
 }
 
-// TODO: Update these conversion fn's
-// /// Marker type for interpreting the stack as a sequence.
-// /// 
-// /// Assume the head of the sequence is the edit point.
-// /// Rust's default Vec has the edit point at the tail of the data.
-// #[derive(Clone)]
-// pub struct AtHead<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
-// /// Marker type for interpreting the stack as a sequence.
-// /// 
-// /// Assume the tail of the sequence is the edit point.
-// /// Rust's default Vec has the edit point at the tail of the data.
-// #[derive(Clone)]
-// pub struct AtTail<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
-// impl<T: 'static+Debug+Clone+Eq+Hash>
-// Deref for AtHead<T> {
-// 	type Target = stack::AStack<T,u32>;
-// 	fn deref(&self) -> &Self::Target { &self.0 }
-// }
-// impl<T: 'static+Debug+Clone+Eq+Hash>
-// Deref for AtTail<T> {
-// 	type Target = stack::AStack<T,u32>;
-// 	fn deref(&self) -> &Self::Target { &self.0 }
-// }
+/// Marker type for interpreting the stack as a sequence.
+/// 
+/// Assume the head of the sequence is the edit point.
+/// Rust's default Vec has the edit point at the tail of the data.
+#[derive(Clone)]
+pub struct AtHead<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
+/// Marker type for interpreting the stack as a sequence.
+/// 
+/// Assume the tail of the sequence is the edit point.
+/// Rust's default Vec has the edit point at the tail of the data.
+#[derive(Clone)]
+pub struct AtTail<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
 
+/// Construct `Self` via a memoized conversion
+///
+/// Rerunning `memo_from` on a slightly modified `T` is expected to take
+/// asymptotically less time than the initial run, but with some constant
+/// overhead on the initial run
+pub trait MemoFrom<T> {
+	fn memo_from(T) -> Self;
+}
 
-// impl<E: Debug+Clone+Eq+Hash+'static>
-// From<AtTail<E>> for RazTree<E> {
-// 	// we build this tree right to left
-// 	// note that the left branch _cannot_ have
-// 	// the same level as its parent
-// 	// while the right branch can.
-// 	// TODO: reimplement using (a new) peek_meta() to avoid half the code
-// 	fn from(tailstack: AtTail<E>) -> Self {
-// 		let AtTail(mut stack) = tailstack;
-// 		fn from_stack<E: Debug+Clone+Eq+Hash+'static>(
-// 			stack: &mut stack::AStack<E,(u32,Option<Name>)>,
-// 			right_tree: ltree::Tree<TreeData<E>>,
-// 			mid_level: u32,
-// 			mid_name: Option<Name>,
-// 			top_level: u32
-// 		)	-> (ltree::Tree<TreeData<E>>, Option<u32>, Option<Name>) {
-// 			match stack.next_archive() {
-// 				None => unreachable!(), // if we have a level there will be more data
-// 				Some((list,meta)) => { match meta {
-// 					None => (bin(leaf(list,None), mid_level, mid_name, right_tree), None, None),
-// 					Some((next_level,next_name)) => {
-// 						if next_level >= top_level {
-// 							let tree = bin(leaf(list,None),mid_level,mid_name,right_tree);
-// 							(tree, Some(next_level),next_name)
-// 						} else if next_level >= mid_level {
-// 							let tree = bin(leaf(list,None),mid_level,mid_name,right_tree);
-// 							return from_stack(stack, tree, next_level, next_name, top_level)
-// 						} else {
-// 							let (left_tree, left_level, left_name) = from_stack(
-// 								stack, leaf(list,None), next_level, next_name, mid_level
-// 							);
-// 							let tree = bin(left_tree, mid_level, mid_name, right_tree);
-// 							match left_level {
-// 								None => (tree, None, None),
-// 								Some(left_level) => {
-// 									if left_level > top_level {
-// 										(tree, Some(left_level), left_name)
-// 									} else {
-// 										return from_stack(stack, tree, left_level, left_name, top_level)
-// 									}
-// 								}
-// 							}
-// 						}
-// 					}
-// 				}}
-// 			}
-// 		}
-// 		let (level, name, first_tree) = match stack.next_archive() {
-// 			None => return RazTree{count: 0, tree: None},
-// 			Some((list, meta)) => { match meta {
-// 				None => return RazTree{count: list.len(), tree: Some(leaf(list,None))},
-// 				Some((lev,n)) => (lev, n, leaf(list,None))
-// 			}}
-// 		};
-// 		let (t,l,n) = from_stack(&mut stack, first_tree, level, name, u32::max_value());
-// 		assert!(l.is_none());
-// 		assert!(n.is_none());
-// 		RazTree{count: count(&Some(t.peek())), tree: Some(t)}
-// 	}
-// }
+impl<E: Debug+Clone+Eq+Hash+'static>
+MemoFrom<AtTail<E>>
+for RazTree<E> {
+	// we build this tree right to left
+	// note that the left branch _cannot_ have
+	// the same level as its parent
+	// while the right branch can.
+	// TODO: Memoize
+	fn memo_from(AtTail(mut tailstack): AtTail<E>) -> Self {
+		fn from_stack<E: Debug+Clone+Eq+Hash+'static>(
+			mut stack: stack::AStack<E,u32>,
+			first_level: u32,
+			first_name: Option<Name>,
+			accum_tree: Tree<TreeData<E>>,
+			top_level: u32,
+		) -> (Tree<TreeData<E>>, Option<u32>, Option<Name>, stack::AStack<E,u32>) {
+			assert!(accum_tree.level() <= first_level);
+			if first_level < top_level {
+				let next_name = stack.name();
+				let (vec,next_level) = stack.next_archive().unwrap_or_else(||{panic!("stack was unexpectedly empty")});
+				let leaf_tree = leaf(vec,None);
+				let (small_tree, final_level,final_name,shorter_stack) = match next_level {
+					None => (leaf_tree,None,None,stack::AStack::new()),
+					Some(lev) => {
+						from_stack(stack,lev,next_name,leaf_tree,first_level)
+					},
+				};
+				let new_tree = bin(small_tree, first_level, first_name, accum_tree);
+				match final_level {
+					None => return (new_tree, None, None, stack::AStack::new()),
+					Some(lev) => return from_stack(shorter_stack,lev,final_name,new_tree,top_level),
+				}
+			} else {
+				return (accum_tree, Some(first_level), first_name, stack);
+			}
+		}
+		let name = tailstack.name();
+		let (level, first_tree) = match tailstack.next_archive() {
+			None => return RazTree{count:0, tree: None},
+			Some((vec,None)) => return RazTree{count: vec.len(), tree: Some(leaf(vec,None))},
+			Some((vec,Some(level))) => (level,leaf(vec,None))
+		};
+		let (t,l,n,s) = from_stack(tailstack, level, name, first_tree, u32::max_value());
+		assert!(l.is_none());
+		assert!(n.is_none());
+		assert!(s.is_empty());
+		RazTree{count: count(&Some(t.peek())), tree: Some(t)}
+	}
+}
 
 
 
