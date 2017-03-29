@@ -13,3 +13,7 @@ streaming-stats = "0.1"
 [dependencies.adapton]
 git = "https://github.com/cuplv/adapton.rust.git"
 branch = "dev"
+
+[dependencies.adapton-lab]
+git = "https://github.com/cuplv/adapton-lab.rust"
+branch = "wo-raz"

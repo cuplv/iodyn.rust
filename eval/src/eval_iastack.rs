@@ -1,10 +1,8 @@
 use std::fmt::{self,Debug};
-use std::rc::Rc;
-use rand::{StdRng,Rng,Rand};
+use rand::{StdRng,Rng};
 use time::Duration;
 use pmfp_collections::inc_archive_stack::AStack as IAStack;
 use primitives::*;
-use adapton::engine::Name;
 use interface::{Adapt};
 
 /// Test harness for `IAStack`
@@ -12,14 +10,19 @@ use interface::{Adapt};
 /// Coordinates elements and insertion position
 #[derive(Clone)]
 pub struct EvalIAStack<E:Adapt,G:Rng> {
-	vec: IAStack<E,u32>,
+	stack: IAStack<E,u32>,
 	coord: G,
+}
+impl<E:Adapt,G:Rng> Debug for EvalIAStack<E,G> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f,"{:?}",self.stack.clone().into_iter().collect::<Vec<_>>())
+	}
 }
 impl<E:Adapt,G:Rng>
 EvalIAStack<E,G> {
 	fn new(coord:G) -> Self {
 		EvalIAStack {
-			vec: IAStack::new(),
+			stack: IAStack::new(),
 			coord: coord,
 		}
 	}

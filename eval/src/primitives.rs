@@ -1,7 +1,6 @@
 use std::rc::Rc;
 use rand::{Rng,StdRng};
 use time::Duration;
-use adapton::engine::Name;
 
 /// empty initialization of an incremental collection test harness
 pub trait CreateEmpty<G:Rng> {

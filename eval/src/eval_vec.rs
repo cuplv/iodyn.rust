@@ -3,7 +3,6 @@ use std::rc::Rc;
 use rand::{StdRng,Rng,Rand};
 use time::Duration;
 use primitives::*;
-use adapton::engine::Name;
 
 /// Test harness for `Vec`
 ///
