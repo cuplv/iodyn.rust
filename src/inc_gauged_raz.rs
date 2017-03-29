@@ -571,7 +571,10 @@ for RazTree<E> {
 					Some(lev) => from_stack_memo(shorter_stack,lev,final_name,new_tree,max_level),
 				}
 			} else {
-				return (accum_tree, Some(first_level), first_name, stack);
+				// hack to avoid name collisions
+				// TODO: make sure every bin() gets an input name, and memo's get forked names
+				let nm = first_name.map(|n|{name_fork(n).1});
+				return (accum_tree, Some(first_level), nm, stack);
 			}
 		}
 		let name = tailstack.name();
