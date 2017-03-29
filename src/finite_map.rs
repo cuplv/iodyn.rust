@@ -3,6 +3,7 @@ use std::hash::Hash;
 use std::fmt::Debug;
 use adapton::engine::name_of_usize;
 use std::vec::Vec;
+use std::collections::vec_deque::VecDeque;
 
 pub trait FinMap<K, V> {
 	//first usize: total size, second: granularity
@@ -11,6 +12,8 @@ pub trait FinMap<K, V> {
 	fn put(Self, K, V) -> Self;
 	
 	fn get(Self, K) -> Option<V>;
+	
+	fn contains(Self, K) -> bool;
 	
 	//Should this return a tuple: (Self, Option<V>)? got error: Self must have "Sized" trait
 	fn del(Self, K) -> (Option<V>, Self);
@@ -42,6 +45,11 @@ impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Ha
 		Raz::peek_right(&mut seq_view).unwrap().clone().take()
 	}
 	
+	fn contains(curr: Self, key: usize) -> bool {
+		let mut seq_view = RazTree::focus(curr, key).unwrap();
+		None != Raz::peek_right(&mut seq_view)
+	}
+	
 	fn del(curr: Self, key: usize) -> (Option<V>, Self) {
 		let mut seq_view = RazTree::focus(curr, key).unwrap();
 		let ret = Raz::pop_right(&mut seq_view).unwrap();
@@ -66,6 +74,8 @@ pub trait Graph<NdId, NdData> {
 	fn del_edge(Self, NdId, NdId) -> Self;
 	
 	fn adjacents(Self, NdId) -> Option<Vec<NdId>>;
+	
+	fn bfs(Self, NdId) -> Self;
 }
 
 impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T 
@@ -114,6 +124,31 @@ impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T
 			Some((_, adjs)) => Some(adjs),
 			None => None
 		}
+	}
+	
+	//Question: want to keep graph size available (for size of visited map), best way to do this?
+	fn bfs(curr: Self, root: usize) -> Self {
+		//setup
+		let mut q : VecDeque<usize> = VecDeque::new();
+		let mut v : RazTree<Option<bool>> = FinMap::new(100, 10);
+		//let mut g : RazTree<Option<(usize, Vec<usize>)>> = Self::new(100, 10);
+		
+		q.push_back(root);
+		while !q.is_empty() {
+			//get next element in queue
+			let c = q.pop_front().unwrap();
+			let adjs = Self::adjacents(curr.clone(), c).unwrap();
+			//iterate over nodes adjacent to c
+			for n in adjs {
+				//if n is not yet visited
+				if !FinMap::contains(v.clone(), n) {
+					v = FinMap::put(v, n, true);
+					//something to build the graph
+					q.push_back(n)
+				}
+			}
+		}
+		panic!("unfinished");
 	}
 }
 
