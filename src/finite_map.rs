@@ -116,3 +116,36 @@ impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	
+	#[test]
+  fn test_fin_map() {
+  	let mut dt: RazTree<Option<usize>> = FinMap::new(100, 10);
+  	dt = FinMap::put(dt, 10, 10);
+  	dt = FinMap::put(dt, 11, 11);
+  	dt = FinMap::put(dt, 12, 12);
+  	assert_eq!(Some(12), FinMap::get(dt.clone(), 12));
+  	let dt =
+	  	match FinMap::del(dt, 11) {
+	  		(_, v) => v
+	  	};
+  	assert_eq!(None, FinMap::get(dt, 11));
+  }
+  
+  #[test]
+  fn test_graph() {
+  	let mut dt: RazTree<Option<(usize, Vec<usize>)>> = Graph::new(100, 10);
+  	dt = Graph::add_node(dt, 1, (1, vec!()));
+  	dt = Graph::add_node(dt, 2, (2, vec!()));
+  	dt = Graph::add_node(dt, 3, (3, vec!()));
+  	dt = Graph::add_edge(dt, 1, 2);
+  	dt = Graph::add_edge(dt, 2, 3);
+  	dt = Graph::add_edge(dt, 3, 1);
+  	assert_eq!(Some(vec!(2, 3)), Graph::adjacents(dt.clone(), 1));
+  	dt = Graph::del_edge(dt, 1, 2);
+  	assert_eq!(Some(vec!(3)), Graph::adjacents(dt.clone(), 1))
+  }
+}
