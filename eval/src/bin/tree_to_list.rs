@@ -7,27 +7,26 @@ extern crate rand;
 
 extern crate adapton_lab;
 
-// use std::fs::OpenOptions;
-// use std::io::Write;
-// use time::Duration;
 use rand::{StdRng,SeedableRng};
-use eval::actions::*;
-use eval::interface::*;
 #[allow(unused)] use pmfp_collections::{IRaz,IRazTree};
 #[allow(unused)] use pmfp_collections::inc_archive_stack::AStack as IAStack;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::eval_iastack::EvalIAStack;
+#[allow(unused)] use eval::examples::*;
 use eval::test_seq::{TestMResult,EditComputeSequence};
+use eval::actions::*;
+use eval::interface::*;
 use eval::types::*;
-use eval::examples::*;
 use adapton::engine::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
-use std::io::prelude::*;
+//use std::io::prelude::*;
 use std::io::BufWriter;
 use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 fn main () {
 
@@ -93,19 +92,41 @@ fn main2() {
     changes: changes,
   };
 
+  
+  // run experiments
+
+
+  let mut rng = StdRng::from_seed(&[editseed]);
+
+  let noninc_list: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	List<GenSmall>,
+  > = test.test(&mut rng); 
+
+  let noninc_stack: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	List<GenSmall>,
+  > = test.test(&mut rng); 
+
   init_dcg(); assert!(engine_is_dcg());
+
+  let inc_list: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	List<GenSmall>,
+  > = test.test(&mut rng); 
+
   // for visual debugging
   reflect::dcg_reflect_begin();
 
-  // run experiments
-  let mut rng = StdRng::from_seed(&[editseed]);
-  let result: TestMResult<
-  	EvalIRaz<GenSmall,StdRng>,  // in type
+  let inc_stack: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
   	List<GenSmall>,
-  	//IAStack<GenSmall,u32>, // out type
-  > = test.test(&mut rng);
+  > = test.test(&mut rng); 
 
-  // for visual debugging
+
+  // Generate trace of inc stack
+
+
   let traces = reflect::dcg_reflect_end();
   let f = File::create("trace.html").unwrap();
   let mut writer = BufWriter::new(f);
@@ -116,10 +137,88 @@ fn main2() {
   	div_of_trace(&tr).write_html(&mut writer);
   }
 
-  println!("inc times(ns): {:?}", result.computes.iter().map(|c|{
-  	c[0].num_nanoseconds().unwrap()
-  }).collect::<Vec<_>>());
+  
+  // post-process results
 
-  // TODO: chart results
+
+  let comp_nl = noninc_list.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_ns = noninc_stack.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_il = inc_list.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_is = inc_stack.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  
+  println!("computes(noninc_list): {:?}", comp_nl);
+  println!("computes(noninc_stack): {:?}", comp_ns);
+  println!("computes(inc_list): {:?}", comp_il);
+  println!("computes(inc_stack): {:?}", comp_is);
+
+
+  // generate data file
+
+
+  let filename = if let Some(f) = outfile {f} else {"out"};
+
+  let mut dat: Box<Write> =
+    Box::new(
+      OpenOptions::new()
+      .create(true)
+      .write(true)
+      .truncate(true)
+      .open(filename.to_owned()+".dat")
+      .unwrap()
+    )
+  ;
+
+  let (mut nl,mut ns,mut il,mut is) = (0f64,0f64,0f64,0f64);
+  writeln!(dat,"'{}'\t'{}'","Trial","Compute Time").unwrap();
+  for i in 0..changes {
+    nl += comp_nl[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,nl).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    ns += comp_ns[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,ns).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    il += comp_il[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,il).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    is += comp_is[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,is).unwrap();    
+  }
+
+  let mut plotscript =
+    OpenOptions::new()
+    .create(true)
+    .write(true)
+    .truncate(true)
+    .open(filename.to_owned()+".plotscript")
+    .unwrap()
+  ;
+
+  // generate plot script
+
+  writeln!(plotscript,"set terminal pdf").unwrap();
+  writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
+  write!(plotscript,"set title \"{}", "Accumulating time to insert element(s) and build list/stack\\n").unwrap();
+  writeln!(plotscript,"(s)ize: {}, (u)nit-gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,unitgauge,namegauge,edits).unwrap();
+  writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
+  writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
+  writeln!(plotscript,"set key left top box").unwrap();
+  writeln!(plotscript,"plot \\").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Non-inc List").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat"," Non-inc Stack").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Inc List").unwrap();
+  writeln!(plotscript,"'{}' i 3 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Inc Stack").unwrap();
+
+  //generate plot
+
+  ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
 
 }
