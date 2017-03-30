@@ -55,8 +55,8 @@ fn main2() {
     .get_matches();
   let dataseed = value_t!(args, "data_seed", usize).unwrap_or(0);
   let editseed = value_t!(args, "edit_seed", usize).unwrap_or(0);
-	let start_size = value_t!(args, "start", usize).unwrap_or(10_000);
-	let unitgauge = value_t!(args, "unitsize", usize).unwrap_or(100);
+	let start_size = value_t!(args, "start", usize).unwrap_or(1_000_000);
+	let unitgauge = value_t!(args, "unitsize", usize).unwrap_or(1_000);
 	let namegauge = value_t!(args, "namesize", usize).unwrap_or(1);
 	let edits = value_t!(args, "edits", usize).unwrap_or(1);
 	let changes = value_t!(args, "changes", usize).unwrap_or(30);
@@ -71,7 +71,29 @@ fn main2() {
 		a.archive((m,n))
 	}
 
-  let mut test = EditComputeSequence{
+  let mut test_l = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+    //init: IncrementalFrom {
+    //	data: iraztree_depth_4(),
+
+      unitgauge: unitgauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: MFolder::new(
+  		name_of_string(String::from("to_list")),
+			IFaceNew::new(),
+			to_list_step,
+			to_list_meta,
+			|a|{a},
+		),
+    changes: changes,
+  };
+  // exact duplicate, but compiler needs a second
+  // one to consider the functions a different type
+  let mut test_s = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
     //init: IncrementalFrom {
@@ -101,27 +123,27 @@ fn main2() {
   let noninc_list: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
   	List<GenSmall>,
-  > = test.test(&mut rng); 
+  > = test_l.test(&mut rng); 
 
   let noninc_stack: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
-  	List<GenSmall>,
-  > = test.test(&mut rng); 
+  	IAStack<GenSmall,u32>,
+  > = test_s.test(&mut rng); 
 
   init_dcg(); assert!(engine_is_dcg());
 
   let inc_list: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
   	List<GenSmall>,
-  > = test.test(&mut rng); 
+  > = ns(name_of_string(String::from("list")),||{test_l.test(&mut rng)});
 
   // for visual debugging
   reflect::dcg_reflect_begin();
 
   let inc_stack: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
-  	List<GenSmall>,
-  > = test.test(&mut rng); 
+  	IAStack<GenSmall,u32>,
+  > = ns(name_of_string(String::from("stack")),||{test_s.test(&mut rng)});
 
 
   // Generate trace of inc stack
