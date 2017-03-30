@@ -116,10 +116,11 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 		B: 'static + Fn(A,&E) -> A,
 		M: 'static + Fn(A,(u32,Option<Name>)) -> A,
 	{
+		let start_name = Some(name_of_string(String::from("start")));
 		match self.tree {
 			None => init,
 			Some(tree) => {
-				tree.fold_lr_meta(init,Rc::new(move|a,e,l,n|{
+				tree.fold_lr_meta(start_name,init,Rc::new(move|a,e,l,n|{
 					match e {
 						TreeData::Leaf(ref vec) => {
 							vec.iter().fold(a,|a,e|{bin(a,e)})

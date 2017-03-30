@@ -113,30 +113,35 @@ Tree<E> {
 		A: 'static + Eq + Clone + Hash + Debug,
 		F: 'static + Fn(A,E) -> A,
 	{
-		self.fold_lr_meta(accum,Rc::new(move|a,e,_l,_n|{node_calc(a,e)}))
+		let start_name = Some(name_of_string(String::from("start")));
+		self.fold_lr_meta(start_name,accum,Rc::new(move|a,e,_l,_n|{node_calc(a,e)}))
 	}
 
 	/// memoized fold operation, left to right, with levels and names
-	pub fn fold_lr_meta<A,F>(self, accum: A, node_calc: Rc<F>) -> A where
+	pub fn fold_lr_meta<A,F>(self, start_name: Option<Name>, accum: A, node_calc: Rc<F>) -> A where
 		A: 'static + Eq + Clone + Hash + Debug,
 		F: 'static + Fn(A,E,u32,Option<Name>) -> A,
 	{
-		let fold_memo = |accum,tree:Option<Tree<_>>|{
+		let fold_memo = |memo_name:Option<Name>, accum, tree:Option<Tree<_>>|{
 			match tree { None => accum, Some(t) => {
-				match t.name.clone() {
-					None => t.fold_lr_meta(accum,node_calc.clone()),
+				match memo_name {
+					None => t.fold_lr_meta(None,accum,node_calc.clone()),
 					Some(nm) => {
-						memo!(name_fork(nm).0 =>>
-							Self::fold_lr_meta, t:t, a:accum ;; f:node_calc.clone()
+						memo!(nm.clone() =>>
+							Self::fold_lr_meta, t:t, n:Some(nm), a:accum ;; f:node_calc.clone()
 						)
 					}
 				}
 			}}
 		};
+		// left branch memoized by incoming name, matching incoming accumulator
+		let l_name = start_name.map(|n|{name_fork(n).0});
+		// right branch memoized by current name, matching adjusted accumulator
+		let r_name = self.name.clone().map(|n|{name_fork(n).1});
 		match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
-			let accum = fold_memo(accum,l_branch);
+			let accum = fold_memo(l_name,accum,l_branch);
 			let accum = node_calc(accum,data,self.level,self.name);
-			let accum = fold_memo(accum,r_branch);
+			let accum = fold_memo(r_name,accum,r_branch);
 			accum
 		}}
 	}
