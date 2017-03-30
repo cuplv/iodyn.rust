@@ -12,8 +12,9 @@ extern crate adapton_lab;
 // use time::Duration;
 use rand::{StdRng,SeedableRng};
 use eval::actions::*;
-use eval::interface::{IFaceSeq,IFaceNew,IFaceArchive};
+use eval::interface::*;
 #[allow(unused)] use pmfp_collections::{IRaz,IRazTree};
+#[allow(unused)] use pmfp_collections::inc_archive_stack::AStack as IAStack;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
@@ -21,7 +22,6 @@ use eval::interface::{IFaceSeq,IFaceNew,IFaceArchive};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use eval::types::*;
 use eval::examples::*;
-use pmfp_collections::inc_archive_stack::AStack as IAStack;
 use adapton::engine::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
@@ -77,7 +77,7 @@ fn main2() {
       size: start_size,
     //init: IncrementalFrom {
     //	data: iraztree_depth_4(),
-    
+
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
@@ -101,7 +101,8 @@ fn main2() {
   let mut rng = StdRng::from_seed(&[editseed]);
   let result: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,  // in type
-  	IAStack<GenSmall,u32>, // out type
+  	List<GenSmall>,
+  	//IAStack<GenSmall,u32>, // out type
   > = test.test(&mut rng);
 
   // for visual debugging
