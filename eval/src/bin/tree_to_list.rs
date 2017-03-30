@@ -113,6 +113,26 @@ fn main2() {
 		),
     changes: changes,
   };
+  let mut test_v = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+    //init: IncrementalFrom {
+    //	data: iraztree_depth_4(),
+
+      unitgauge: unitgauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: MFolder::new(
+  		name_of_string(String::from("to_list")),
+			IFaceNew::new(),
+			to_list_step,
+			to_list_meta::<(),_>,
+			|a|{a},
+		),
+    changes: changes,
+  };
 
   
   // run experiments
@@ -132,18 +152,24 @@ fn main2() {
 
   init_dcg(); assert!(engine_is_dcg());
 
+  let inc_stack: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	IAStack<GenSmall,u32>,
+  > = ns(name_of_string(String::from("stack")),||{test_s.test(&mut rng)});
+
+  // for visual debugging
+  reflect::dcg_reflect_begin();
+
   let inc_list: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
   	List<GenSmall>,
   > = ns(name_of_string(String::from("list")),||{test_l.test(&mut rng)});
 
-  // for visual debugging
-  reflect::dcg_reflect_begin();
 
-  let inc_stack: TestMResult<
-  	EvalIRaz<GenSmall,StdRng>,
-  	IAStack<GenSmall,u32>,
-  > = ns(name_of_string(String::from("stack")),||{test_s.test(&mut rng)});
+  let noninc_vec: TestMResult<
+  	EvalVec<GenSmall,StdRng>,
+  	Vec<GenSmall>,
+  > = ns(name_of_string(String::from("list")),||{test_v.test(&mut rng)});
 
 
   // Generate trace of inc stack
@@ -167,11 +193,13 @@ fn main2() {
   let comp_ns = noninc_stack.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_il = inc_list.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_is = inc_stack.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_nv = noninc_vec.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
   println!("computes(noninc_list): {:?}", comp_nl);
   println!("computes(noninc_stack): {:?}", comp_ns);
   println!("computes(inc_list): {:?}", comp_il);
   println!("computes(inc_stack): {:?}", comp_is);
+  println!("computes(noninc_vec): {:?}", comp_nv);
 
 
   // generate data file
@@ -190,7 +218,7 @@ fn main2() {
     )
   ;
 
-  let (mut nl,mut ns,mut il,mut is) = (0f64,0f64,0f64,0f64);
+  let (mut nl,mut ns,mut il,mut is,mut nv) = (0f64,0f64,0f64,0f64,0f64);
   writeln!(dat,"'{}'\t'{}'","Trial","Compute Time").unwrap();
   for i in 0..changes {
     nl += comp_nl[i] as f64 / 1_000_000.0;
@@ -213,6 +241,12 @@ fn main2() {
   for i in 0..changes {
     is += comp_is[i] as f64 / 1_000_000.0;
     writeln!(dat,"{}\t{}",i,is).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    nv += comp_nv[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,nv).unwrap();    
   }
 
   let mut plotscript =
@@ -238,6 +272,7 @@ fn main2() {
   writeln!(plotscript,"'{}' i 1 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat"," Non-inc Stack").unwrap();
   writeln!(plotscript,"'{}' i 2 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Inc List").unwrap();
   writeln!(plotscript,"'{}' i 3 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Inc Stack").unwrap();
+  writeln!(plotscript,"'{}' i 4 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Non-inc Vec").unwrap();
 
   //generate plot
 
