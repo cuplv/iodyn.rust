@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use pmfp_collections::{IRaz};
 use pmfp_collections::inc_archive_stack::AStack as IAStack;
-use adapton::engine::*;
+use adapton::engine::Name;
 
 /// convenience trait for incremental test data
 pub trait Adapt: 'static+Eq+Clone+Hash+Debug {}
@@ -22,48 +22,6 @@ pub trait IFaceArchive<M> {
 /// Polymorphic collection initializaton
 pub trait IFaceNew {
 	fn new() -> Self;
-}
-
-//////////
-// List
-/////////
-
-/// Super-simple incremental list type
-#[derive(Debug,PartialEq,Eq,Hash,Clone)]
-pub enum List<X> {
-	Nil,
-	Cons(X, Box<List<X>>),
-	Name(Name, Box<List<X>>),
-	Art(Art<List<X>>),
-}
-
-impl<T:Adapt> IFaceSeq<T> for List<T> {
-	fn seq_push(self, val:T) -> Self {
-		List::Cons(val,Box::new(self))
-	}
-	fn seq_pop(mut self) -> (Option<T>, Self) {
-		match self {
-			List::Nil => (None, List::Nil),
-			List::Cons(v,bl) => (Some(v),*bl),
-			List::Name(_,bl) => bl.seq_pop(),
-			List::Art(al) => force(&al).seq_pop(),
-		} 
-	}
-}
-
-impl<T:Adapt> IFaceArchive<(u32,Option<Name>)> for List<T> {
-	fn archive(self, (_l,n):(u32,Option<Name>)) -> Self {
-		match n {
-			None => self,
-			Some(n) => List::Name(n.clone(),Box::new(List::Art(cell(n,self))))
-		}
-	}
-}
-
-impl<T:Adapt> IFaceNew for List<T> {
-	fn new() -> Self {
-		List::Nil
-	}
 }
 
 //////////

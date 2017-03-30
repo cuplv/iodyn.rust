@@ -15,6 +15,7 @@ use rand::{StdRng,SeedableRng};
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::eval_iastack::EvalIAStack;
 #[allow(unused)] use eval::examples::*;
+#[allow(unused)] use eval::accum_lists::*;
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use eval::actions::*;
 use eval::interface::*;
@@ -71,6 +72,26 @@ fn main2() {
 		a.archive((m,n))
 	}
 
+  let mut test_s = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+    //init: IncrementalFrom {
+    //	data: iraztree_depth_4(),
+
+      unitgauge: unitgauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: MFolder::new(
+  		name_of_string(String::from("to_list")),
+			IFaceNew::new(),
+			to_list_step,
+			to_list_meta,
+			|a|{a},
+		),
+    changes: changes,
+  };
   let mut test_l = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
@@ -91,9 +112,47 @@ fn main2() {
 		),
     changes: changes,
   };
-  // exact duplicate, but compiler needs a second
-  // one to consider the functions a different type
-  let mut test_s = EditComputeSequence{
+  let mut test_rl = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+    //init: IncrementalFrom {
+    //	data: iraztree_depth_4(),
+
+      unitgauge: unitgauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: MFolder::new(
+  		name_of_string(String::from("to_list")),
+			IFaceNew::new(),
+			to_list_step,
+			to_list_meta,
+			|a|{a},
+		),
+    changes: changes,
+  };
+  let mut test_vl = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+    //init: IncrementalFrom {
+    //	data: iraztree_depth_4(),
+
+      unitgauge: unitgauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: MFolder::new(
+  		name_of_string(String::from("to_list")),
+			IFaceNew::new(),
+			to_list_step,
+			to_list_meta,
+			|a|{a},
+		),
+    changes: changes,
+  };
+  let mut test_rvl = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
     //init: IncrementalFrom {
@@ -140,15 +199,35 @@ fn main2() {
 
   let mut rng = StdRng::from_seed(&[editseed]);
 
+  let noninc_stack: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	IAStack<GenSmall,u32>,
+  > = test_s.test(&mut rng); 
+
   let noninc_list: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
   	List<GenSmall>,
   > = test_l.test(&mut rng); 
 
-  let noninc_stack: TestMResult<
+  let noninc_rclist: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
-  	IAStack<GenSmall,u32>,
-  > = test_s.test(&mut rng); 
+  	RcList<GenSmall>,
+  > = test_rl.test(&mut rng); 
+
+  let noninc_veclist: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	VecList<GenSmall>,
+  > = test_vl.test(&mut rng); 
+
+  let noninc_rcveclist: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	RcVecList<GenSmall>,
+  > = test_rvl.test(&mut rng); 
+
+  let noninc_vec: TestMResult<
+  	EvalVec<GenSmall,StdRng>,
+  	Vec<GenSmall>,
+  > = test_v.test(&mut rng);
 
   init_dcg(); assert!(engine_is_dcg());
 
@@ -165,17 +244,27 @@ fn main2() {
   	List<GenSmall>,
   > = ns(name_of_string(String::from("list")),||{test_l.test(&mut rng)});
 
+  let traces = reflect::dcg_reflect_end();
 
-  let noninc_vec: TestMResult<
-  	EvalVec<GenSmall,StdRng>,
-  	Vec<GenSmall>,
-  > = ns(name_of_string(String::from("list")),||{test_v.test(&mut rng)});
+  let inc_rclist: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	RcList<GenSmall>,
+  > = ns(name_of_string(String::from("rclist")),||{test_rl.test(&mut rng)});
+
+  let inc_veclist: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	VecList<GenSmall>,
+  > = ns(name_of_string(String::from("veclist")),||{test_vl.test(&mut rng)});
+
+  let inc_rcveclist: TestMResult<
+  	EvalIRaz<GenSmall,StdRng>,
+  	RcVecList<GenSmall>,
+  > = ns(name_of_string(String::from("rcveclist")),||{test_rvl.test(&mut rng)});
 
 
   // Generate trace of inc stack
 
 
-  let traces = reflect::dcg_reflect_end();
   let f = File::create("trace.html").unwrap();
   let mut writer = BufWriter::new(f);
   writeln!(writer, "{}", style_string()).unwrap();
@@ -189,17 +278,29 @@ fn main2() {
   // post-process results
 
 
-  let comp_nl = noninc_list.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_ns = noninc_stack.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let comp_il = inc_list.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let comp_is = inc_stack.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_nl = noninc_list.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_nrl = noninc_rclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_nvl = noninc_veclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_nrvl = noninc_rcveclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_nv = noninc_vec.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_is = inc_stack.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_il = inc_list.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_irl = inc_rclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_ivl = inc_veclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_irvl = inc_rcveclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
-  println!("computes(noninc_list): {:?}", comp_nl);
   println!("computes(noninc_stack): {:?}", comp_ns);
-  println!("computes(inc_list): {:?}", comp_il);
-  println!("computes(inc_stack): {:?}", comp_is);
+  println!("computes(noninc_list): {:?}", comp_nl);
+  println!("computes(noninc_rclist): {:?}", comp_nrl);
+  println!("computes(noninc_veclist): {:?}", comp_nvl);
+  println!("computes(noninc_rcveclist): {:?}", comp_nrvl);
   println!("computes(noninc_vec): {:?}", comp_nv);
+  println!("computes(inc_stack): {:?}", comp_is);
+  println!("computes(inc_list): {:?}", comp_il);
+  println!("computes(inc_rclist): {:?}", comp_irl);
+  println!("computes(inc_veclist): {:?}", comp_ivl);
+  println!("computes(inc_rcveclist): {:?}", comp_irvl);
 
 
   // generate data file
@@ -218,14 +319,8 @@ fn main2() {
     )
   ;
 
-  let (mut nl,mut ns,mut il,mut is,mut nv) = (0f64,0f64,0f64,0f64,0f64);
+  let (mut nl,mut nrl,mut nvl,mut nrvl,mut ns,mut il,mut irl,mut ivl,mut irvl,mut is,mut nv) = (0f64,0f64,0f64,0f64,0f64,0f64,0f64,0f64,0f64,0f64,0f64);
   writeln!(dat,"'{}'\t'{}'","Trial","Compute Time").unwrap();
-  for i in 0..changes {
-    nl += comp_nl[i] as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}",i,nl).unwrap();    
-  }
-  writeln!(dat,"").unwrap();
-  writeln!(dat,"").unwrap();
   for i in 0..changes {
     ns += comp_ns[i] as f64 / 1_000_000.0;
     writeln!(dat,"{}\t{}",i,ns).unwrap();    
@@ -233,8 +328,32 @@ fn main2() {
   writeln!(dat,"").unwrap();
   writeln!(dat,"").unwrap();
   for i in 0..changes {
-    il += comp_il[i] as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}",i,il).unwrap();    
+    nl += comp_nl[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,nl).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    nrl += comp_nrl[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,nrl).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    nvl += comp_nvl[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,nvl).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    nrvl += comp_nrvl[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,nrvl).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    nv += comp_nv[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,nv).unwrap();    
   }
   writeln!(dat,"").unwrap();
   writeln!(dat,"").unwrap();
@@ -245,8 +364,26 @@ fn main2() {
   writeln!(dat,"").unwrap();
   writeln!(dat,"").unwrap();
   for i in 0..changes {
-    nv += comp_nv[i] as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}",i,nv).unwrap();    
+    il += comp_il[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,il).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    irl += comp_irl[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,irl).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    ivl += comp_ivl[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,ivl).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  for i in 0..changes {
+    irvl += comp_irvl[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}",i,irvl).unwrap();    
   }
 
   let mut plotscript =
@@ -268,11 +405,18 @@ fn main2() {
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Non-inc List").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat"," Non-inc Stack").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Inc List").unwrap();
-  writeln!(plotscript,"'{}' i 3 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Inc Stack").unwrap();
-  writeln!(plotscript,"'{}' i 4 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Non-inc Vec").unwrap();
+  let mut i = 0;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Non-inc Stack").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i," Non-inc List").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Non-inc RcList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Non-inc VecList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i," Non-inc RcVecList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Non-Inc Vec").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc Stack").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc List").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc RcList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc VecList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc RcVecList").unwrap(); i+=1;
 
   //generate plot
 

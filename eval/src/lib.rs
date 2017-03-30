@@ -9,6 +9,7 @@ pub mod primitives;
 pub mod interface;
 pub mod types;
 pub mod examples;
+pub mod accum_lists;
 pub mod test_seq;
 pub mod test_build;
 pub mod eval_nraz;
