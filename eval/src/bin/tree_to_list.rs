@@ -20,7 +20,7 @@ use eval::interface::{IFaceSeq,IFaceNew,IFaceArchive};
 #[allow(unused)] use eval::eval_iastack::EvalIAStack;
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use eval::types::*;
-use pmfp_collections::inc_gauged_raz::{AtTail};
+use eval::examples::*;
 use pmfp_collections::inc_archive_stack::AStack as IAStack;
 use adapton::engine::*;
 use adapton::engine::manage::*;
@@ -75,6 +75,9 @@ fn main2() {
   let mut test = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
+    //init: IncrementalFrom {
+    //	data: iraztree_depth_4(),
+    
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),

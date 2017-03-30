@@ -14,6 +14,11 @@ impl Add for GenSmall{
     GenSmall(self.0 + rhs.0)
   }
 }
+impl From<usize> for GenSmall {
+  fn from(num: usize) -> Self {
+    GenSmall(num % 100)
+  }
+}
 
 #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash,PartialOrd,Ord)]
 pub struct Gen10k(pub usize);

@@ -74,6 +74,17 @@ CreateFrom<IRaz<E>,G> for EvalIRaz<E,G>{
 }
 
 impl<E:Adapt,G:Rng+Clone>
+CreateFrom<IRazTree<E>,G> for EvalIRaz<E,G>{
+	fn inc_from(data: IRazTree<E>, unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+		let time = Duration::span(||{
+			eval.raztree = Some(data);
+		});
+		(time,eval)
+	}
+}
+
+impl<E:Adapt,G:Rng+Clone>
 CreateFrom<AtTail<E>,G> for EvalIRaz<E,G>{
 	fn inc_from(data: AtTail<E>, unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
 		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
