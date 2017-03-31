@@ -33,7 +33,6 @@ use adapton::engine::Name;
 
 #[derive(Debug,PartialEq,Eq,Clone,Hash)]
 pub struct AStack<E:'static+Debug+Clone+Eq+Hash,M:'static+Debug+Clone+Eq+Hash> {
-	size: usize,
 	current: Vec<E>,
 	archived: Stack<(M,Vec<E>)>,
 }
@@ -43,7 +42,6 @@ AStack<E,M> {
 	/// new `AStack` with a new vector as current stack
 	pub fn new() -> Self {
 		AStack {
-			size: 0,
 			current: Vec::new(),
 			archived: Stack::new(),
 		}
@@ -52,31 +50,27 @@ AStack<E,M> {
 	/// new `AStack` with a new pre-allocated vector as current stack
 	pub fn with_capacity(capacity: usize) -> Self {
 		AStack {
-			size: 0,
 			current: Vec::with_capacity(capacity),
 			archived: Stack::new(),
 		}
 	}
 
 	/// whether or not the `AStack` has any data, including archived data
-	pub fn is_empty(&self) -> bool { self.size == 0 }
+	pub fn is_empty(&self) -> bool { self.current.len() == 0  && self.archived.is_empty()}
 	/// the total item count of the `AStack`, including archived data
-	pub fn len(&self) -> usize { self.size }
-	/// the item count of the "fast" mutable vector outside of the archive
 	pub fn active_len(&self) -> usize { self.current.len() }
 	/// get the incremental name of the archive, if it exists
 	pub fn name(&self) -> Option<Name> { self.archived.name() }
 	/// push a element to the "fast" vector outside of the archive
-	pub fn push(&mut self, elm: E) { self.size += 1; self.current.push(elm) }
+	pub fn push(&mut self, elm: E) { self.current.push(elm) }
 
 	/// remove and return the element at the top of the stack, even if it is
 	/// within the archive. 
 	///
 	/// archive metadata is lost when opening an archive in this way
 	pub fn pop(&mut self) -> Option<E> {
-		if self.size == 0 { return None }
+		if self.is_empty() { return None }
 		self.retrieve();
-		self.size -= 1;
 		self.current.pop()
 	}
 
@@ -84,23 +78,20 @@ AStack<E,M> {
 	/// withing the archive. If it was within the archive, return the metadata
 	/// associated with that archive.
 	pub fn pop_meta(&mut self) -> Option<(E,Option<M>)> {
-		if self.size == 0 { return None }
+		if self.is_empty() { return None }
 		let meta = self.retrieve();
-		self.size -= 1;
 		self.current.pop().map(|e|{(e,meta)})
 	}
 
 	// extend the backing vector
 	#[doc(hidden)]
 	pub fn extend(&mut self, extra: &[E]) {
-		self.size += extra.len();
 		self.current.extend_from_slice(extra);
 	}
 
 	// specialized use that will be removed in future updates
 	#[doc(hidden)]
 	pub fn extend_rev(&mut self, extra: &[E]) {
-		self.size += extra.len();
 		self.current.extend_from_slice(extra);
 		self.current.reverse();
 	}
@@ -108,15 +99,12 @@ AStack<E,M> {
 	/// Exposes the last data archived, returning the
 	/// prior active vector and the metadata stored with the archive
 	pub fn next_archive(&mut self) -> Option<(Vec<E>,Option<M>)> {
-		if self.size == 0 { return None }
-		let lost_len = self.current.len();
-		if lost_len == self.size {
-			self.size = 0;
+		if self.is_empty() { return None }
+		if self.archived.is_empty() {
 			let old_vec = mem::replace(&mut self.current, Vec::new());
 			self.archived = Stack::new();
 			return Some((old_vec,None));
 		} else {
-			self.size -= lost_len;
 			let (old_meta,vec) = self.archived.peek().expect("missing data");
 			let old_vec = mem::replace(&mut self.current, vec);
 			self.archived = self.archived.pull().unwrap();
@@ -135,7 +123,7 @@ AStack<E,M> {
 	/// peeking into the archive does not open it, so it will
 	/// retain any associated metadata
 	pub fn peek(&self) -> Option<E> {
-		if self.size == 0 { return None }
+		if self.is_empty() { return None }
 		if self.current.len() == 0 {
 			let (_,v) = self.archived.peek().unwrap();
 	    Some(v.last().unwrap().clone())
@@ -193,7 +181,6 @@ impl<E:'static+Debug+Clone+Eq+Hash>
 From<Vec<E>> for AStack<E,()> {
 	fn from(v: Vec<E>) -> Self {
 		AStack {
-			size: v.len(),
 			current: v,
 			archived: Stack::new(),
 		}
@@ -222,8 +209,6 @@ mod tests {
   	stack.push(3);
   	stack.push(7);
   	stack.archive(Some(name_of_usize(2)),());
-
-  	assert_eq!(stack.len(), 6);
 
   	let (nums,_) = stack.next_archive().unwrap();
   	assert_eq!(nums, vec!());

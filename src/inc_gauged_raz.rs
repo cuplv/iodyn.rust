@@ -404,7 +404,7 @@ Raz<E> {
 
 	/// remove and return an element to the left of the cursor
 	pub fn pop_left(&mut self) -> Option<E> {
-		if self.l_stack.len() == 0 {
+		if self.l_stack.is_empty() {
 			if self.l_forest.up() == tree::UpResult::Fail { return None } else {
 				self.l_forest.down_left_force(tree::Force::Discard);
 				while self.l_forest.down_right() {}
@@ -419,7 +419,7 @@ Raz<E> {
 	}
 	/// remove and return an element to the right of the cursor
 	pub fn pop_right(&mut self) -> Option<E> {
-		if self.r_stack.len() == 0 {
+		if self.r_stack.is_empty() {
 			if self.r_forest.up() == tree::UpResult::Fail { return None } else {
 				self.r_forest.down_right_force(tree::Force::Discard);
 				while self.r_forest.down_left() {}
