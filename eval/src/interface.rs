@@ -67,6 +67,13 @@ impl<T:Adapt,M:Adapt> IFaceSeq<T> for IAStack<T,M> {
 	}
 }
 
+impl<T:Adapt> IFaceArchive<(u32,Option<Name>)> for IAStack<T,u32> {
+	fn archive(mut self, (m,n):(u32,Option<Name>)) -> Self {
+		IAStack::archive(&mut self,n,m);
+		self
+	}
+}
+
 // ignores metadata
 impl<T:Adapt,M:Adapt> IFaceArchive<(M,Option<Name>)> for IAStack<T,()> {
 	fn archive(mut self, (_m,n):(M,Option<Name>)) -> Self {
