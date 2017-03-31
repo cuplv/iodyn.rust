@@ -52,7 +52,8 @@ fn main2() {
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -e, --edits=[edits]       'edits per batch'
       -c, --changes=[changes]   'number of incremental changes'
-      -o, --outfile=[outfile]   'name for output files (of different extensions)' ")
+      -o, --outfile=[outfile]   'name for output files (of different extensions)'
+      --trace                   'perform dcg debugging trace of stack output' ")
     .get_matches();
   let dataseed = value_t!(args, "data_seed", usize).unwrap_or(0);
   let editseed = value_t!(args, "edit_seed", usize).unwrap_or(0);
@@ -62,6 +63,7 @@ fn main2() {
 	let edits = value_t!(args, "edits", usize).unwrap_or(1);
 	let changes = value_t!(args, "changes", usize).unwrap_or(30);
   let outfile = args.value_of("outfile");
+  let do_trace = args.is_present("trace");
 
 	let coord = StdRng::from_seed(&[dataseed]);
 
@@ -229,22 +231,33 @@ fn main2() {
   	Vec<GenSmall>,
   > = test_v.test(&mut rng);
 
-  init_dcg(); assert!(engine_is_dcg());
+	init_dcg(); assert!(engine_is_dcg());
+
+  // for visual debugging
+  if do_trace {reflect::dcg_reflect_begin();}
 
   let inc_stack: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
   	IAStack<GenSmall,()>,
   > = ns(name_of_string(String::from("stack")),||{test_s.test(&mut rng)});
 
-  // for visual debugging
-  reflect::dcg_reflect_begin();
+  if do_trace {
+	  // Generate trace of inc stack
+		let traces = reflect::dcg_reflect_end();
+	  let f = File::create("trace.html").unwrap();
+	  let mut writer = BufWriter::new(f);
+	  writeln!(writer, "{}", style_string()).unwrap();
+	  writeln!(writer, "<div class=\"label\">Editor trace({}):</div>", traces.len()).unwrap();
+	  writeln!(writer, "<div class=\"traces\">").unwrap();
+	  for tr in traces {
+	  	div_of_trace(&tr).write_html(&mut writer);
+	  }
+	}
 
   let inc_list: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
   	List<GenSmall>,
   > = ns(name_of_string(String::from("list")),||{test_l.test(&mut rng)});
-
-  let traces = reflect::dcg_reflect_end();
 
   let inc_rclist: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
@@ -260,19 +273,6 @@ fn main2() {
   	EvalIRaz<GenSmall,StdRng>,
   	RcVecList<GenSmall>,
   > = ns(name_of_string(String::from("rcveclist")),||{test_rvl.test(&mut rng)});
-
-
-  // Generate trace of inc stack
-
-
-  let f = File::create("trace.html").unwrap();
-  let mut writer = BufWriter::new(f);
-  writeln!(writer, "{}", style_string()).unwrap();
-  writeln!(writer, "<div class=\"label\">Editor trace({}):</div>", traces.len()).unwrap();
-  writeln!(writer, "<div class=\"traces\">").unwrap();
-  for tr in traces {
-  	div_of_trace(&tr).write_html(&mut writer);
-  }
 
   
   // post-process results
@@ -406,17 +406,17 @@ fn main2() {
   writeln!(plotscript,"set key left top box").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
   let mut i = 0;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Non-inc Stack").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i," Non-inc List").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Non-inc RcList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Non-inc VecList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i," Non-inc RcVecList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Non-Inc Vec").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc Stack").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc List").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc RcList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc VecList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat",i,"Inc RcVecList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc Stack").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i," Non-inc List").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc RcList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc VecList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i," Non-inc RcVecList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-Inc Vec").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc Stack").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc List").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc RcList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc VecList").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc RcVecList").unwrap(); i+=1;
 
   //generate plot
 

@@ -33,6 +33,8 @@ use adapton::engine::Name;
 
 #[derive(Debug,PartialEq,Eq,Clone,Hash)]
 pub struct AStack<E:'static+Debug+Clone+Eq+Hash,M:'static+Debug+Clone+Eq+Hash> {
+	// OPTIMIZE: Keeping separate vecs requires copying data when archiving
+	// eventually we need to refactor to avoid this
 	current: Vec<E>,
 	archived: Stack<(M,Vec<E>)>,
 }
