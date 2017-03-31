@@ -207,7 +207,8 @@ fn main2() {
       coord: coord.clone(),
     },
     edit: BatchInsert(edits),
-    // The type here determins the type of the accumulator
+    // The type here determins the type of between the
+    // two computation (output from 1 = input to 2)
     // TODO: Move this parameter elsewhere
     comp: Compute2::<_,_,_,EvalIRaz<Token,StdRng>,_>::new(
     	MFolder::new(
@@ -218,7 +219,7 @@ fn main2() {
 				|a|{
 					let ts = tokenize_final(a);
 					ns(name_to_tree.clone(),||{IncrementalFrom{
-						data: AtTail(ts), // This determings the accumulator type
+						data: AtTail(ts), // This determins the accumulator type
 			      unitgauge: unitgauge,
 			      namegauge: namegauge,
 			      coord: coord.clone(),
@@ -243,7 +244,8 @@ fn main2() {
       coord: coord.clone(),
     },
     edit: BatchInsert(edits),
-    // The type here determins the type of the accumulator
+    // The type here determins the type of between the
+    // two computation (output from 1 = input to 2)
     // TODO: Move this parameter elsewhere
     comp: Compute2::<_,_,_,EvalVec<Token,StdRng>,_>::new(
     	MFolder::new(
@@ -254,7 +256,7 @@ fn main2() {
 				|a|{
 					let ts = tokenize_final(a);
 					ns(name_to_tree.clone(),||{IncrementalFrom{
-						data: ts, // This determings the accumulator type
+						data: ts, // This determins the accumulator type
 			      unitgauge: unitgauge,
 			      namegauge: namegauge,
 			      coord: coord.clone(),
@@ -289,7 +291,7 @@ fn main2() {
 
   let result_inc: TestMResult<
   	EvalIRaz<Lang,StdRng>, // in type
-  	RcVecList<u32>,  // out type
+  	IAStack<u32,u32>,  // out type
   > = test_inc.test(&mut rng);
 
   if do_trace {
@@ -369,6 +371,11 @@ fn main2() {
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();
+  writeln!(plotscript,"set grid ytics mytics  # draw lines for each ytics and mytics").unwrap();
+  writeln!(plotscript,"set grid xtics mxtics  # draw lines for each xtics and mxtics").unwrap();
+  writeln!(plotscript,"set mytics 5           # set the spacing for the mytics").unwrap();
+  writeln!(plotscript,"set mxtics 5           # set the spacing for the mxtics").unwrap();
+  writeln!(plotscript,"set grid               # enable the grid").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
   writeln!(plotscript,"'{}' i 0 u 1:($3+$4) t '{}' with lines,\\",filename.to_owned()+".dat","Non-incremental Parse Time").unwrap();
   writeln!(plotscript,"'{}' i 1 u 1:($3+$4) t '{}' with lines,\\",filename.to_owned()+".dat","Incremental Parse Time").unwrap();

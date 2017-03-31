@@ -404,6 +404,11 @@ fn main2() {
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();
+  writeln!(plotscript,"set grid ytics mytics  # draw lines for each ytics and mytics").unwrap();
+  writeln!(plotscript,"set grid xtics mxtics  # draw lines for each xtics and mxtics").unwrap();
+  writeln!(plotscript,"set mytics 5           # set the spacing for the mytics").unwrap();
+  writeln!(plotscript,"set mxtics 5           # set the spacing for the mxtics").unwrap();
+  writeln!(plotscript,"set grid               # enable the grid").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
   let mut i = 0;
   writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc Stack").unwrap(); i+=1;
@@ -411,7 +416,7 @@ fn main2() {
   writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc RcList").unwrap(); i+=1;
   writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc VecList").unwrap(); i+=1;
   writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i," Non-inc RcVecList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-Inc Vec").unwrap(); i+=1;
+  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Common Vec").unwrap(); i+=1;
   writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc Stack").unwrap(); i+=1;
   writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc List").unwrap(); i+=1;
   writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc RcList").unwrap(); i+=1;
