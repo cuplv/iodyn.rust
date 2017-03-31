@@ -201,7 +201,7 @@ fn main2() {
 
   let noninc_stack: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
-  	IAStack<GenSmall,u32>,
+  	IAStack<GenSmall,()>,
   > = test_s.test(&mut rng); 
 
   let noninc_list: TestMResult<
@@ -233,7 +233,7 @@ fn main2() {
 
   let inc_stack: TestMResult<
   	EvalIRaz<GenSmall,StdRng>,
-  	IAStack<GenSmall,u32>,
+  	IAStack<GenSmall,()>,
   > = ns(name_of_string(String::from("stack")),||{test_s.test(&mut rng)});
 
   // for visual debugging
