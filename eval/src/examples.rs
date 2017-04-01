@@ -1,9 +1,9 @@
 //! Example data to use in tests
 //!
 //! Legend:
-//! Name: {a}
-//! Level: (1)
-//! Data as arrays: [1,2,3]
+//! - Name: {a}
+//! - Level: (1)
+//! - Data as arrays: [1,2,3]
 
 use pmfp_collections::{IRaz, IRazTree};
 use interface::Adapt;
@@ -11,6 +11,7 @@ use adapton::engine::*;
 
 /// An example binary tree shaped like this:
 ///
+/// ```text
 ///                 __________{t}(6)___________
 ///                /                           \
 ///         ___{l}(4)__                  _____{r}(5)____
@@ -18,7 +19,7 @@ use adapton::engine::*;
 ///     {ll}(1)       {lr}(2)       {rl}(3)           {rr}(4)
 ///    /     \	     /     \       /      \          /      \
 /// [1,2]  [3,4]  [5,6]  [7,8]  [9,10]  [11,12]  [13,14]  [15,16]
-///
+/// ```
 ///
 pub fn iraztree_depth_4<A:Adapt+From<usize>>() -> IRazTree<A> {
   	let mut r = IRaz::new();

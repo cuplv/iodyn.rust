@@ -1,15 +1,28 @@
-extern crate pmfp_collections;
-extern crate adapton;
-extern crate eval;
-extern crate time;
+//! Test of a non-trivial fold over a tree and conversion from list to tree
+//! 
+//! This test takes a randomized input string, tokenizes it, and evaluates
+//! the tokens to produce a list of numbers. The calculation is a prefix 
+//! addition of numbers.
+//! 
+//! The test is preformed with an incremental tree and sequence combination,
+//! or with a vector(array) to test non-incremental performance.
+
 extern crate rand;
 #[macro_use] extern crate clap;
-
+extern crate adapton;
 extern crate adapton_lab;
+extern crate pmfp_collections;
+extern crate eval;
 
+use std::io::BufWriter;
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::Write;
 use rand::{Rand,Rng,StdRng,SeedableRng};
-use eval::actions::*;
-use eval::interface::{IFaceSeq,IFaceNew,IFaceArchive};
+use adapton::engine::*;
+use adapton::engine::manage::*;
+use adapton_lab::labviz::*;
+use pmfp_collections::inc_gauged_raz::{AtTail};
 #[allow(unused)] use pmfp_collections::IRaz;
 #[allow(unused)] use pmfp_collections::inc_archive_stack::AStack as IAStack;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
@@ -17,15 +30,9 @@ use eval::interface::{IFaceSeq,IFaceNew,IFaceArchive};
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::eval_iastack::EvalIAStack;
 #[allow(unused)] use eval::accum_lists::*;
+use eval::actions::*;
+use eval::interface::{IFaceSeq,IFaceNew,IFaceArchive};
 use eval::test_seq::{TestMResult,EditComputeSequence};
-use pmfp_collections::inc_gauged_raz::{AtTail};
-use adapton::engine::*;
-use adapton::engine::manage::*;
-use adapton_lab::labviz::*;
-use std::io::BufWriter;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io::Write;
 
 /// Input Lang
 ///
@@ -114,6 +121,7 @@ mod reference {
 
 fn main () {
 
+// provide additional stack memory
   let child =
     std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { 
       main2()
@@ -121,6 +129,7 @@ fn main () {
   let _ = child.unwrap().join();
 }
 fn main2() {
+// end provide additional stack memory
 
   //command-line
   let args = clap::App::new("adder")
@@ -147,9 +156,9 @@ fn main2() {
 	let changes = value_t!(args, "changes", usize).unwrap_or(30);
   let outfile = args.value_of("outfile");
   let do_trace = args.is_present("trace");
-
 	let coord = StdRng::from_seed(&[dataseed]);
 
+	// fold function that builds a sequece of tokens
 	fn tokenize_step<A: IFaceSeq<Token>>((ts,part):(A,Option<u32>),l:&Lang) -> (A,Option<u32>) {
 		let Lang(ref c) = *l;
 		if let Some(num) = c.to_digit(10) {
@@ -171,14 +180,17 @@ fn main2() {
 			(ts,None)
 		}
 	}
+	// auxiliary fold function that inserts incremental names
 	fn tokenize_meta<A: IFaceArchive<(u32,Option<Name>)>>((ts,part):(A,Option<u32>),(l,n):(u32,Option<Name>)) -> (A,Option<u32>) {
 		(ts.archive((l,n)),part)
 	}
+	// auxiliary fold function that completes the token sequence
 	fn tokenize_final<A: IFaceSeq<Token>>((ts,part):(A,Option<u32>)) -> A {
 		if let Some(num) = part {
 			ts.seq_push(Token::Num(num))
 		} else { ts }
 	}
+	// fold function that evaluates tokens to build a sequence of numbers
 	fn parse_step<A: IFaceSeq<u32>>(n: A, t: &Token) -> A {
 		match *t {
 			Token::Num(a) => n.seq_push(a),
@@ -195,10 +207,15 @@ fn main2() {
 			}
 		}
 	}
+	// auxiliary fold function that inserts incremental names
 	fn parse_meta<A: IFaceArchive<(u32,Option<Name>)>>(num: A, (l,n): (u32,Option<Name>)) -> A {
 		num.archive((l,n))
 	}
 	let name_to_tree = name_of_string(String::from("to_tree"));
+	
+	// Test parameters - two nearly identical sets, differing
+	// by the type of accumulator used between the tokenize
+	// and parse stages
   let mut test_inc = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
@@ -207,8 +224,10 @@ fn main2() {
       coord: coord.clone(),
     },
     edit: BatchInsert(edits),
-    // The type here determins the type of between the
-    // two computation (output from 1 = input to 2)
+    // The type here determines the type of data between the
+    // two computations (output from 1 = input to 2).
+    // The specific accumulator is determined below in the
+    // conversion to a test harness.
     // TODO: Move this parameter elsewhere
     comp: Compute2::<_,_,_,EvalIRaz<Token,StdRng>,_>::new(
     	MFolder::new(
@@ -219,7 +238,7 @@ fn main2() {
 				|a|{
 					let ts = tokenize_final(a);
 					ns(name_to_tree.clone(),||{IncrementalFrom{
-						data: AtTail(ts), // This determins the accumulator type
+						data: AtTail(ts), // This determines the accumulator type
 			      unitgauge: unitgauge,
 			      namegauge: namegauge,
 			      coord: coord.clone(),
@@ -244,8 +263,10 @@ fn main2() {
       coord: coord.clone(),
     },
     edit: BatchInsert(edits),
-    // The type here determins the type of between the
-    // two computation (output from 1 = input to 2)
+    // The type here determines the type of data between the
+    // two computations (output from 1 = input to 2).
+    // The specific accumulator is determined below in the
+    // conversion to a test harness.
     // TODO: Move this parameter elsewhere
     comp: Compute2::<_,_,_,EvalVec<Token,StdRng>,_>::new(
     	MFolder::new(
@@ -256,7 +277,7 @@ fn main2() {
 				|a|{
 					let ts = tokenize_final(a);
 					ns(name_to_tree.clone(),||{IncrementalFrom{
-						data: ts, // This determins the accumulator type
+						data: ts, // This determines the accumulator type
 			      unitgauge: unitgauge,
 			      namegauge: namegauge,
 			      coord: coord.clone(),
@@ -324,6 +345,7 @@ fn main2() {
 
 
   let filename = if let Some(f) = outfile {f} else {"out"};
+  println!("Generating {}.pdf ...", filename);
 
   let mut dat: Box<Write> =
     Box::new(
@@ -377,8 +399,8 @@ fn main2() {
   writeln!(plotscript,"set mxtics 5           # set the spacing for the mxtics").unwrap();
   writeln!(plotscript,"set grid               # enable the grid").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:($3+$4) t '{}' with lines,\\",filename.to_owned()+".dat","Non-incremental Parse Time").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:($3+$4) t '{}' with lines,\\",filename.to_owned()+".dat","Incremental Parse Time").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:($3+$4) t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-incremental Parse Time").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:($3+$4) t '{}' with linespoints,\\",filename.to_owned()+".dat","Incremental Parse Time").unwrap();
 
   //generate plot
 

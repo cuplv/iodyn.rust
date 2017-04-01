@@ -1,13 +1,43 @@
-extern crate pmfp_collections;
-extern crate adapton;
-extern crate eval;
-extern crate time;
+//! A test of incremental fold and output data structure types.
+//!
+//! Here we test the incremental fold over the RazTree, as
+//! well as its interaction with multiple accumulator types.
+//! 
+//! The test generates a random, probabilistically balanced tree
+//! of integers. We then perform an incremental fold over this
+//! tree, passing some type of sequence as an accumulator. The
+//! built sequence contains a copy of each element from the tree.
+//! The point is to test the performance of breaking the sequence
+//! into short arrays, or using sharable sequences vs owned ones.
+//! 
+//! Some of the tests are run with the incremental engine turned
+//! off, which avoids most of the overhead and benefits it usually
+//! provides.
+//! 
+//! Output sequence types:
+//! - Stack: strict naming structure with arrays
+//! - List: loose naming structure with no arrays
+//! - RefList: loose naming structure with no arrays and reference-counted pointers
+//! - VecList: loose naming structure with arrays
+//! - RefVecList: loose naming structure with arrays and reference-counted pointers
+//! - Vec: No names or pointers, one single array, generated from an array rather than the RazTree
+//! 
+
 extern crate rand;
 #[macro_use] extern crate clap;
-
+extern crate adapton;
 extern crate adapton_lab;
+extern crate pmfp_collections;
+extern crate eval;
 
+use std::io::BufWriter;
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::Write;
 use rand::{StdRng,SeedableRng};
+use adapton::engine::*;
+use adapton::engine::manage::*;
+use adapton_lab::labviz::*;
 #[allow(unused)] use pmfp_collections::{IRaz,IRazTree};
 #[allow(unused)] use pmfp_collections::inc_archive_stack::AStack as IAStack;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
@@ -20,17 +50,11 @@ use eval::test_seq::{TestMResult,EditComputeSequence};
 use eval::actions::*;
 use eval::interface::*;
 use eval::types::*;
-use adapton::engine::*;
-use adapton::engine::manage::*;
-use adapton_lab::labviz::*;
-//use std::io::prelude::*;
-use std::io::BufWriter;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io::Write;
 
 fn main () {
 
+// provide additional stack memory
+// TODO: make macro?
   let child =
     std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { 
       main2()
@@ -38,6 +62,7 @@ fn main () {
   let _ = child.unwrap().join();
 }
 fn main2() {
+// end provide additional stack memory
 
   //command-line
   let args = clap::App::new("tree_to_list")
@@ -64,22 +89,23 @@ fn main2() {
 	let changes = value_t!(args, "changes", usize).unwrap_or(30);
   let outfile = args.value_of("outfile");
   let do_trace = args.is_present("trace");
-
 	let coord = StdRng::from_seed(&[dataseed]);
 
+	// add elements to output sequence
 	fn to_list_step<E:Copy, A: IFaceSeq<E>>(a:A,e:&E) -> A {
 		a.seq_push(*e)
 	}
+	// add names to output sequence 
 	fn to_list_meta<M, A: IFaceArchive<(M,Option<Name>)>>(a:A,(m,n):(M,Option<Name>)) -> A {
 		a.archive((m,n))
 	}
 
+	// The test parameters, copied multiple times because
+	// takeing polymorphic functions as parameters requires a
+	// new datastrucuter for each set of function type parameters
   let mut test_s = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-    //init: IncrementalFrom {
-    //	data: iraztree_depth_4(),
-
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
@@ -97,9 +123,6 @@ fn main2() {
   let mut test_l = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-    //init: IncrementalFrom {
-    //	data: iraztree_depth_4(),
-
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
@@ -117,9 +140,6 @@ fn main2() {
   let mut test_rl = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-    //init: IncrementalFrom {
-    //	data: iraztree_depth_4(),
-
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
@@ -137,9 +157,6 @@ fn main2() {
   let mut test_vl = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-    //init: IncrementalFrom {
-    //	data: iraztree_depth_4(),
-
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
@@ -157,9 +174,6 @@ fn main2() {
   let mut test_rvl = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-    //init: IncrementalFrom {
-    //	data: iraztree_depth_4(),
-
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
@@ -177,9 +191,6 @@ fn main2() {
   let mut test_v = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-    //init: IncrementalFrom {
-    //	data: iraztree_depth_4(),
-
       unitgauge: unitgauge,
       namegauge: namegauge,
       coord: coord.clone(),
@@ -231,6 +242,7 @@ fn main2() {
   	Vec<GenSmall>,
   > = test_v.test(&mut rng);
 
+  // starting now all tests are incremental
 	init_dcg(); assert!(engine_is_dcg());
 
   // for visual debugging
@@ -290,23 +302,25 @@ fn main2() {
   let comp_ivl = inc_veclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_irvl = inc_rcveclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
-  println!("computes(noninc_stack): {:?}", comp_ns);
-  println!("computes(noninc_list): {:?}", comp_nl);
-  println!("computes(noninc_rclist): {:?}", comp_nrl);
-  println!("computes(noninc_veclist): {:?}", comp_nvl);
-  println!("computes(noninc_rcveclist): {:?}", comp_nrvl);
-  println!("computes(noninc_vec): {:?}", comp_nv);
-  println!("computes(inc_stack): {:?}", comp_is);
-  println!("computes(inc_list): {:?}", comp_il);
-  println!("computes(inc_rclist): {:?}", comp_irl);
-  println!("computes(inc_veclist): {:?}", comp_ivl);
-  println!("computes(inc_rcveclist): {:?}", comp_irvl);
+  println!("Computation time(ns): (initial run, first incremental run)");
+  println!("noninc_stack: ({:?}, {:?})", comp_ns[0], comp_ns[1]);
+  println!("noninc_list: ({:?}, {:?})", comp_nl[0], comp_nl[1]);
+  println!("noninc_rclist: ({:?}, {:?})", comp_nrl[0], comp_nrl[1]);
+  println!("noninc_veclist: ({:?}, {:?})", comp_nvl[0], comp_nvl[1]);
+  println!("noninc_rcveclist: ({:?}, {:?})", comp_nrvl[0], comp_nrvl[1]);
+  println!("noninc_vec: ({:?}, {:?})", comp_nv[0], comp_nv[1]);
+  println!("inc_stack: ({:?}, {:?})", comp_is[0], comp_is[1]);
+  println!("inc_list: ({:?}, {:?})", comp_il[0], comp_il[1]);
+  println!("inc_rclist: ({:?}, {:?})", comp_irl[0], comp_irl[1]);
+  println!("inc_veclist: ({:?}, {:?})", comp_ivl[0], comp_ivl[1]);
+  println!("inc_rcveclist: ({:?}, {:?})", comp_irvl[0], comp_irvl[1]);
 
 
   // generate data file
 
 
   let filename = if let Some(f) = outfile {f} else {"out"};
+  println!("Generating {}.pdf ...", filename);
 
   let mut dat: Box<Write> =
     Box::new(
@@ -410,18 +424,18 @@ fn main2() {
   writeln!(plotscript,"set mxtics 5           # set the spacing for the mxtics").unwrap();
   writeln!(plotscript,"set grid               # enable the grid").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  let mut i = 0;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc Stack").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i," Non-inc List").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc RcList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc VecList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i," Non-inc RcVecList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Common Vec").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc Stack").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc List").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc RcList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc VecList").unwrap(); i+=1;
-  writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc RcVecList").unwrap(); i+=1;
+  let mut i = -1;
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc Stack").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i," Non-inc List").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc RcList").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Non-inc VecList").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i," Non-inc RcVecList").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Common Vec").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc Stack").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc List").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc RcList").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc VecList").unwrap();
+  i+=1; writeln!(plotscript,"'{}' i {} u 1:2 t '{}' with linespoints,\\",filename.to_owned()+".dat",i,"Inc RcVecList").unwrap();
 
   //generate plot
 
