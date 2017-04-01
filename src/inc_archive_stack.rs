@@ -39,6 +39,23 @@ pub struct AStack<E:'static+Debug+Clone+Eq+Hash,M:'static+Debug+Clone+Eq+Hash> {
 	archived: Stack<(M,Vec<E>)>,
 }
 
+/// Marker type for interpreting the stack as a sequence.
+/// 
+/// Assume the head of the sequence is the edit point.
+/// Rust's default Vec has the edit point at the tail of the data.
+#[derive(Clone)]
+pub struct AtHead<T: 'static+Debug+Clone+Eq+Hash,M:'static+Debug+Clone+Eq+Hash>(
+	pub AStack<T,M>
+);
+/// Marker type for interpreting the stack as a sequence.
+/// 
+/// Assume the tail of the sequence is the edit point.
+/// Rust's default Vec has the edit point at the tail of the data.
+#[derive(Clone)]
+pub struct AtTail<T: 'static+Debug+Clone+Eq+Hash,M:'static+Debug+Clone+Eq+Hash>(
+	pub AStack<T,M>
+);
+
 impl<E:'static+Debug+Clone+Eq+Hash, M:'static+Debug+Clone+Eq+Hash>
 AStack<E,M> {
 	/// new `AStack` with a new vector as current stack

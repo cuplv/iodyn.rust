@@ -13,6 +13,7 @@ use std::hash::Hash;
 use inc_level_tree::{Tree};
 use inc_tree_cursor as tree;
 use inc_archive_stack as stack;
+use memo::{MemoFrom};
 
 use adapton::macros::*;
 use adapton::engine::*;
@@ -502,36 +503,14 @@ fn bin<E: Debug+Clone+Eq+Hash+'static>(
 	).unwrap()
 }
 
-/// Marker type for interpreting the stack as a sequence.
-/// 
-/// Assume the head of the sequence is the edit point.
-/// Rust's default Vec has the edit point at the tail of the data.
-#[derive(Clone)]
-pub struct AtHead<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
-/// Marker type for interpreting the stack as a sequence.
-/// 
-/// Assume the tail of the sequence is the edit point.
-/// Rust's default Vec has the edit point at the tail of the data.
-#[derive(Clone)]
-pub struct AtTail<T: 'static+Debug+Clone+Eq+Hash>(pub stack::AStack<T,u32>);
-
-/// Construct `Self` via a memoized conversion
-///
-/// Rerunning `memo_from` on a slightly modified `T` is expected to take
-/// asymptotically less time than the initial run, but with some constant
-/// overhead on the initial run
-pub trait MemoFrom<T> {
-	fn memo_from(T) -> Self;
-}
-
 impl<E: Debug+Clone+Eq+Hash+'static>
-MemoFrom<AtTail<E>>
+MemoFrom<stack::AtTail<E,u32>>
 for RazTree<E> {
 	// we build this tree right to left
 	// note that the left branch _cannot_ have
 	// the same level as its parent
 	// while the right branch can.
-	fn memo_from(AtTail(mut tailstack): AtTail<E>) -> Self {
+	fn memo_from(tailstack: &stack::AtTail<E,u32>) -> Self {
 		// memoize from_stack
 		fn from_stack_memo<E: Debug+Clone+Eq+Hash+'static>(
 			s:stack::AStack<E,u32>, l:u32, n:Option<Name>, t: Tree<TreeData<E>>, m:u32
@@ -573,6 +552,7 @@ for RazTree<E> {
 				return (accum_tree, Some(first_level), nm, stack);
 			}
 		}
+		let mut tailstack = tailstack.0.clone();
 		let name = tailstack.name();
 		let (level, first_tree) = match tailstack.next_archive() {
 			None => return RazTree{count:0, tree: None},
@@ -878,7 +858,7 @@ mod tests {
   	stack.archive(Some(name_of_usize(4)),4);
   	stack.push(11);
   	stack.push(12);
-  	let raz = RazTree::memo_from(AtTail(stack));
+  	let raz = RazTree::memo_from(&stack::AtTail(stack));
 
   	// check that levels are high-to-low
   	assert!(good_levels(raz.tree.as_ref().unwrap()));
@@ -1090,22 +1070,22 @@ mod tests {
   	r.archive_right(4, Some(name_of_usize(4)));
   	t = r.unfocus();
 
-  	let sums = t.clone().fold_lr_meta(
-  		name_of_string(String::from("sum")),
-  		(0,0),
-  		Rc::new(|(lev,dat),e:&u32|{(lev,dat+e)}),
-  		Rc::new(|(lev,dat),(l,_):(u32,Option<Name>)|{(lev+l,dat)})
-  	);
+  	let sums = ns(name_of_string(String::from("sum")),||{
+  		t.clone().fold_lr_meta(
+	  		(0,0),
+	  		Rc::new(|(lev,dat),e:&u32|{(lev,dat+e)}),
+	  		Rc::new(|(lev,dat),(l,_):(u32,Option<Name>)|{(lev+l,dat)})
+	  	)});
   	let iter_levs: u32 = (1..6).sum();
   	let iter_sum: u32 = (1..13).sum();
   	assert_eq!((iter_levs,iter_sum), sums);
 
-  	let raz_string = t.clone().fold_lr_meta(
-  		name_of_string(String::from("vals")),
-  		"s".to_string(),
-  		Rc::new(|l,r:&u32|{format!("{},{}",l,r)}),
-  		Rc::new(|l,_|{format!("{},n",l)}),
-  	);
+  	let raz_string = ns(name_of_string(String::from("vals")),||{
+  		t.clone().fold_lr_meta(
+	  		"s".to_string(),
+	  		Rc::new(|l,r:&u32|{format!("{},{}",l,r)}),
+	  		Rc::new(|l,_|{format!("{},n",l)}),
+  	)});
   	let string = String::from("s,1,2,n,3,4,n,5,6,n,7,8,n,9,10,n,11,12");
   	assert_eq!(string, raz_string);
   }
