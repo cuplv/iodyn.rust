@@ -101,8 +101,8 @@ fn main2() {
 	}
 
 	// The test parameters, copied multiple times because
-	// takeing polymorphic functions as parameters requires a
-	// new datastrucuter for each set of function type parameters
+	// taking polymorphic functions as parameters requires a
+	// new data structure for each set of function type parameters
   let mut test_s = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
