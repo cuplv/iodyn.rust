@@ -47,7 +47,7 @@ impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Ha
 	
 	fn contains(curr: Self, key: usize) -> bool {
 		let mut seq_view = RazTree::focus(curr, key).unwrap();
-		None != Raz::peek_right(&mut seq_view)
+		None != *Raz::peek_right(&mut seq_view).unwrap()
 	}
 	
 	fn del(curr: Self, key: usize) -> (Option<V>, Self) {
@@ -78,14 +78,14 @@ pub trait Graph<NdId, NdData> {
 	fn bfs(Self, NdId) -> Self;
 }
 
-impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T 
-	where T: FinMap<usize, (Data, Vec<usize>)> + Clone
+impl<T, Data> Graph<usize, (Option<Data>, Vec<usize>)> for T 
+	where T: FinMap<usize, (Option<Data>, Vec<usize>)> + Clone
 	{
 	fn new(size: usize, gran: usize) -> Self {
 		FinMap::new(size, gran)
 	}
 	
-	fn add_node(curr: Self, id: usize, dt: (Data, Vec<usize>)) -> Self {
+	fn add_node(curr: Self, id: usize, dt: (Option<Data>, Vec<usize>)) -> Self {
 		FinMap::put(curr, id, dt)
 	}
 	
@@ -128,27 +128,35 @@ impl<T, Data> Graph<usize, (Data, Vec<usize>)> for T
 	
 	//Question: want to keep graph size available (for size of visited map), best way to do this?
 	fn bfs(curr: Self, root: usize) -> Self {
+		println!("in bfs");
 		//setup
 		let mut q : VecDeque<usize> = VecDeque::new();
 		let mut v : RazTree<Option<bool>> = FinMap::new(100, 10);
-		//let mut g : RazTree<Option<(usize, Vec<usize>)>> = Self::new(100, 10);
+		let mut g = Self::new(100, 10);
 		
 		q.push_back(root);
+		g = Self::add_node(g, root, (None, vec!()));
+		v = FinMap::put(v, root, true);
 		while !q.is_empty() {
 			//get next element in queue
+			//get c's level
 			let c = q.pop_front().unwrap();
 			let adjs = Self::adjacents(curr.clone(), c).unwrap();
 			//iterate over nodes adjacent to c
 			for n in adjs {
 				//if n is not yet visited
 				if !FinMap::contains(v.clone(), n) {
+					//TODO: this level is q's + 1
+					//TODO: add BFS tree edge from q to n
+					g = Self::add_node(g, n, (None, vec!()));
+					g = Self::add_edge(g, c, n);
 					v = FinMap::put(v, n, true);
 					//something to build the graph
 					q.push_back(n)
 				}
 			}
 		}
-		panic!("unfinished");
+		g
 	}
 }
 
@@ -172,15 +180,35 @@ mod tests {
   
   #[test]
   fn test_graph() {
-  	let mut dt: RazTree<Option<(usize, Vec<usize>)>> = Graph::new(100, 10);
-  	dt = Graph::add_node(dt, 1, (1, vec!()));
-  	dt = Graph::add_node(dt, 2, (2, vec!()));
-  	dt = Graph::add_node(dt, 3, (3, vec!()));
+  	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = Graph::new(100, 10);
+  	dt = Graph::add_node(dt, 1, (Some(1), vec!()));
+  	dt = Graph::add_node(dt, 2, (Some(2), vec!()));
+  	dt = Graph::add_node(dt, 3, (Some(3), vec!()));
   	dt = Graph::add_edge(dt, 1, 2);
   	dt = Graph::add_edge(dt, 2, 3);
   	dt = Graph::add_edge(dt, 3, 1);
   	assert_eq!(Some(vec!(2, 3)), Graph::adjacents(dt.clone(), 1));
   	dt = Graph::del_edge(dt, 1, 2);
   	assert_eq!(Some(vec!(3)), Graph::adjacents(dt.clone(), 1))
+  }
+  
+  #[test]
+  fn test_bfs() {
+  	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = Graph::new(100, 10);
+  	dt = Graph::add_node(dt, 1, (Some(1), vec!()));
+  	dt = Graph::add_node(dt, 2, (Some(2), vec!()));
+  	dt = Graph::add_node(dt, 3, (Some(3), vec!()));
+  	dt = Graph::add_node(dt, 4, (Some(4), vec!()));
+  	dt = Graph::add_edge(dt, 1, 2);
+  	dt = Graph::add_edge(dt, 1, 3);
+  	dt = Graph::add_edge(dt, 2, 4);
+  	dt = Graph::add_edge(dt, 3, 4); //this is the basic diamond graph
+  	
+  	let bfs_tree = Graph::bfs(dt, 1);
+  	
+  	assert_eq!(Some(vec!(2, 3)), Graph::adjacents(bfs_tree.clone(), 1));
+  	assert_eq!(Some(vec!(1, 4)), Graph::adjacents(bfs_tree.clone(), 2));
+  	assert_eq!(Some(vec!(1)), Graph::adjacents(bfs_tree.clone(), 3));
+  	assert_eq!(Some(vec!(2)), Graph::adjacents(bfs_tree.clone(), 4));
   }
 }
