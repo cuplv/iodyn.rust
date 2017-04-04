@@ -6,6 +6,7 @@
 use std::mem;
 use std::hash::Hash;
 use std::fmt;
+use std::rc::Rc;
 use std::fmt::Debug;
 use adapton::engine::{cell,force,Art,Name};
 use adapton::macros::{my_hash};
@@ -35,7 +36,7 @@ const MASK_ODEG : usize = 2;
 /// distinguish keys that are actually distinct, due to their hash
 /// prefixes "colliding".  In these cases, the code below will detect
 /// a hash collision and panic.
-const MASK_IDXC : usize = 20;
+const MASK_IDXC : usize = 12;
 
 #[test]
 fn trie_consts() {
@@ -58,7 +59,7 @@ enum PathIdx<K,V> {
     /// Intra-Chunk sub-trie; the index addresses a vector that is "here", in this chunk.
     Local(Idx),
     /// Inter-Chunk sub-trie; the index addresses a vector that is "there", in another chunk.
-    Global(Art<Chunk<K,V>>, Idx),
+    Global(Art<Rc<Chunk<K,V>>>, Idx),
 }
 
 /// A matrix of path indicies; 
@@ -85,7 +86,7 @@ struct Chunk<K,V> {
 #[derive(Debug,Clone,Hash,Eq,PartialEq)]
 struct Link<K,V> {
     name: Option<Name>,
-    link: Art<Chunk<K,V>>,
+    link: Art<Rc<Chunk<K,V>>>,
 }
 /// The head of the skip list is either a Chunk, or an optionally-named, articulated Link.
 #[derive(Debug,Clone,Hash,Eq,PartialEq)]
@@ -150,17 +151,8 @@ impl<K:Clone,V:Clone> Cursor<K,V> {
     }
 }
 
-fn head_chunk<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> 
-    (chunks:Chunks<K,V>) -> Chunk<K,V> 
-{
-    match chunks {
-        Chunks::Link(lnk) => force(&lnk.link),
-        Chunks::Chunk(c) => c,
-    }
-}
-
 fn translate_path_idxs<K:Clone,V:Clone>
-    (cur_art: &Option<Art<Chunk<K,V>>>, 
+    (cur_art: &Option<Art<Rc<Chunk<K,V>>>>, 
      paths: &Vec<PathIdx<K,V>>) -> Vec<PathIdx<K,V>> 
 {
     match *cur_art { 
@@ -200,7 +192,7 @@ impl<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> Chunk<K,V> {
     }
     
     fn get_cursor(&self, 
-                  cur_art:Option<Art<Chunk<K,V>>>, 
+                  cur_art:Option<Art<Rc<Chunk<K,V>>>>, 
                   cur:&mut Cursor<K,V>, 
                   key:K, key_hash:HashVal) -> Option<Option<V>> 
     {
@@ -218,7 +210,7 @@ impl<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> Chunk<K,V> {
     }
 
     fn get_rec(&self, 
-               cur_art:Option<Art<Chunk<K,V>>>, 
+               cur_art:Option<Art<Rc<Chunk<K,V>>>>, 
                cur:&mut Cursor<K,V>, 
                key:K, key_hash:HashVal) -> Option<Option<V>> 
     {
@@ -231,9 +223,14 @@ impl<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> Chunk<K,V> {
         // Discard bits that we've already "traversed"
         key_bits >>= MASK_BITC * cur.msk_idx;
         chk_bits >>= MASK_BITC * cur.msk_idx;
-        
+
+        let same_hash = { chk_bits == key_bits };
+        let same_keys = { Some(&key) == self.keys.get(cur.chk_idx) };
+        if same_hash && !same_keys {
+            panic!("hash collision:\n keys {:?}\n and {:?}\n both hash to {:b}", key, self.keys.get(cur.chk_idx), key_bits);
+        };        
         // Check for perfect match of remaining bits
-        if chk_bits == key_bits && self.keys.get(cur.chk_idx) == Some(&key) {
+        if same_hash && same_keys {
             // Copy the remaining paths for this chk_idx into the cursor
             for i in cur.msk_idx..MASK_IDXC {
                 cur.paths.push(translate_path_idxs(&cur_art, self.paths.0.get(cur.chk_idx).unwrap().get(i).unwrap()))
@@ -246,7 +243,7 @@ impl<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> Chunk<K,V> {
             // When bits mis-match, move cursor along axis cur.chk_idx, and recur via `get_cursor`.
             let start_idx = cur.msk_idx;
             'matching_bits: 
-            for i in start_idx..(MASK_IDXC-1) {
+            for i in start_idx..MASK_IDXC {
                 let mut ps : Vec<PathIdx<K,V>> = self.paths.0.get(cur.chk_idx).unwrap().get(i).unwrap().clone();
                 if (key_bits & MASK_BITS) == (chk_bits & MASK_BITS) {
                     cur.paths.push(translate_path_idxs(&cur_art, &ps));
@@ -278,7 +275,10 @@ impl<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> Chunk<K,V> {
                     }
                 }
             };
-            panic!("ran out of bits to distinguish keys!\nTo fix this, try increasing the constant MASK_IDXC, if you can.");
+            panic!("ran out of bits to distinguish keys!\n target:{:b} (key: {:?})\n  found:{:b} (key: {:?}),\nHint: To fix this, try increasing the constant MASK_IDXC (currently, {:?}), if you can.", 
+                   key_hash.0, key,
+                   self.hashes.get(cur.chk_idx).unwrap().0.clone(), self.keys.get(cur.chk_idx).unwrap(),
+                   MASK_IDXC);
         }
     }       
 }
@@ -313,14 +313,28 @@ impl<K:'static+Eq+Clone+Debug+Hash,
 
     fn archive(&mut self, n:Name) {
         let chunks = mem::replace(&mut self.head, Chunks::Chunk(Chunk::new()));
-        let c = cell(n.clone(), head_chunk(chunks));
+        let hd_chunk : Rc<Chunk<_,_>> = 
+            match chunks {
+                Chunks::Link(lnk) => force(&lnk.link),
+                Chunks::Chunk(c) => Rc::new(c),
+            };
+        let c = cell(n.clone(), hd_chunk);
         self.head = Chunks::Link(Link{name:Some(n), link:c});
     }
 
     fn ext(&mut self, k:K, opv:Option<V>) -> Option<V> {
         let k_hash = HashVal(my_hash(&k) as usize);
         let mut cur = Cursor::new();
-        let opv_old = self.head.get_cursor(&mut cur, k.clone(), k_hash.clone());
+        let temp_perf_test = false; // XXX TEMP
+        let opv_old = 
+            if temp_perf_test {
+                // Hammer: This code path is bogus; it's just here for some measurements I wanted
+                cur.fill_empty(k_hash.0); 
+                None
+            } else {
+                self.head.get_cursor(&mut cur, k.clone(), k_hash.clone())
+            }
+        ;
         let new_chk = match self.head {
             Chunks::Chunk(ref mut chk) => {
                 chk.head = Some(chk.keys.len());
