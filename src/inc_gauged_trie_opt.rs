@@ -4,10 +4,10 @@
 //! Concretely, they consist of skip-list-like structures.
 
 use std::mem;
-use std::hash::Hash;
 use std::fmt;
 use std::rc::Rc;
 use std::fmt::Debug;
+use std::hash::{Hash,Hasher};
 use adapton::engine::{cell,force,Art,Name};
 use adapton::macros::{my_hash};
 
@@ -26,7 +26,16 @@ struct HashVal(usize);
 /// distinguish keys that are actually distinct, due to their hash
 /// prefixes "colliding".  In these cases, the code below will detect
 /// a hash collision and panic.
-const MAX_PATH_LEN : usize = 32;
+const MAX_PATH_LEN : usize = 12;
+
+#[derive(Debug)]
+struct CloneCounter (usize);
+impl Clone for CloneCounter {
+    fn clone(&self) -> Self {
+        println!("clone count {:?}", self);
+        CloneCounter(self.0 + 1)            
+    }
+}
 
 #[derive(Debug,Clone,Hash,Eq,PartialEq)]
 enum PathIdx<K,V> {
@@ -39,8 +48,10 @@ enum PathIdx<K,V> {
 }
 
 /// A contiguous block of trie paths/keys/values
-#[derive(Debug,Clone,Hash,Eq,PartialEq)]
+#[derive(Debug,Clone)]
 struct Chunk<K,V> {
+    cntr:   CloneCounter,
+    hash:   u64,
     head:   Option<Idx>,
     keys:   Vec<K>,
     vals:   Vec<Option<V>>,    
@@ -77,6 +88,25 @@ struct Cursor<K,V> {
     bit_idx: Idx,
     /// Invariant: `len(paths) ==  bit_idx`
     paths: Vec<PathIdx<K,V>>,
+}
+
+/// High-performance code should avoid this. To make that easier to
+/// detect (dynamically), we panic here:
+//impl<K,V> Clone for Chunk<K,V> { 
+//impl<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> Chunk<K,V> {
+//}
+
+impl<K:Hash,V:Hash> Hash for Chunk<K,V> {
+  fn hash<H>(&self, state: &mut H) where H: Hasher {
+    self.hash.hash(state)
+  }
+}
+impl<K,V> Eq for Chunk<K,V> { }
+impl<K,V> PartialEq for Chunk<K,V> { 
+    fn eq(&self, other:&Self) -> bool { 
+        // XXX -- This isn't generally sound (due to hash collisions); but it's fast
+        self.hash == other.hash
+    }
 }
 
 impl<K:Clone,V:Clone> Cursor<K,V> {
@@ -126,6 +156,8 @@ impl<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> Chunk<K,V> {
 
     fn new() -> Self {
         Chunk{
+            cntr:   CloneCounter(0),
+            hash:   0,
             head:   None,
             keys:   Vec::new(),
             vals:   Vec::new(),
@@ -280,6 +312,7 @@ impl<K:'static+Eq+Clone+Debug+Hash,
         let new_chk = match self.head {
             Chunks::Chunk(ref mut chk) => {
                 chk.head = Some(chk.keys.len());
+                chk.hash = my_hash(&(&chk.hash,&k_hash,&opv,&cur.paths));
                 chk.keys.push(k);
                 chk.vals.push(opv);
                 chk.hashes.push(k_hash);
@@ -289,6 +322,7 @@ impl<K:'static+Eq+Clone+Debug+Hash,
             Chunks::Link(ref _lnk) => {
                 let mut chk = Chunk::new();
                 chk.head = Some(0);
+                chk.hash = my_hash(&(&k_hash,&opv,&cur.paths));
                 chk.keys.push(k);
                 chk.vals.push(opv);
                 chk.hashes.push(k_hash);

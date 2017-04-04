@@ -24,7 +24,8 @@ use adapton_lab::labviz::*;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::accum_lists::*;
-use pmfp_collections::inc_gauged_trie::{FinMap,Trie};
+//use pmfp_collections::inc_gauged_trie::{FinMap,Trie};
+use pmfp_collections::inc_gauged_trie_opt::{FinMap,Trie};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;
@@ -179,8 +180,8 @@ fn main2() {
   let edit_ivl = inc_veclist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
 
-  println!("Computation time(ns): (initial run, first incremental run)");
-  println!("vec_set: ({:?}, {:?})", comp_vec[0], comp_vec[1]);
+  println!("Computation time(ns): (initial run, first incremental run); do_trace={:?}", do_trace);
+  println!("vec_set:  ({:?}, {:?})", comp_vec[0], comp_vec[1]);
   println!("trie_set: ({:?}, {:?})", comp_trie[0], comp_trie[1]);
   println!("vec_list: ({:?}, {:?})", comp_ivl[0], comp_ivl[1]);
 
