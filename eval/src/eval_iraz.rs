@@ -410,3 +410,20 @@ CompFoldMeta<E,O,(u32,Option<Name>),F,N> for EvalIRaz<E,G> where
 	}
 }
 
+impl<E:Adapt,O:Adapt,F,FF,N,G:Rng>
+CompFoldArchive<E,O,(u32,Option<Name>),F,FF,N> for EvalIRaz<E,G> where
+	F:'static + Fn(O,&E)->O,
+	FF:'static + Fn(O,Option<Name>)->O,
+	N:'static + Fn(O,(u32,Option<Name>))->O,
+{
+	type Target = O;
+	fn comp_fold_archive(&self, accum: O, f:Rc<F>, ff:Rc<FF>, n:Rc<N>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let clone = self.raztree.clone().unwrap();
+		let mut res = None;
+		let time = Duration::span(||{
+			res = Some(clone.fold_lr_archive(accum,f,ff,n));
+		});
+		(time, res.unwrap())
+	}
+}
+

@@ -135,6 +135,33 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 		}
 	}
 
+	/// left-to-right memoized fold with levels and names, with a name provided at the leaf
+	pub fn fold_lr_archive<A,B,F,M>(self, init: A, bin: Rc<B>, finbin: Rc<F>, meta: Rc<M>) -> A where
+		A: 'static + Eq+Clone+Hash+Debug,
+		B: 'static + Fn(A,&E) -> A,
+		F: 'static + Fn(A,Option<Name>) -> A,
+		M: 'static + Fn(A,(u32,Option<Name>)) -> A,
+	{
+		let start_name = Some(name_of_string(String::from("start")));
+		match self.tree {
+			None => init,
+			Some(tree) => {
+				tree.fold_lr_meta(start_name,init,Rc::new(move|a,e,l,n|{
+					match e {
+						TreeData::Leaf(ref vec) => {
+							ns(name_of_string(String::from("extra name")),||{
+								finbin(vec.iter().fold(a,|a,e|{bin(a,e)}),n)
+							})
+						},
+						TreeData::Branch{..} => {
+							meta(a,(l,n))
+						},
+					}
+				}))
+			},
+		}
+	}
+
 	/// returns a new tree with data mapped from the old tree
 	pub fn map<R,F>(self, f: Rc<F>) -> RazTree<R> where
 		R: 'static + Eq+Clone+Hash+Debug,

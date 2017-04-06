@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use rand::{Rng,StdRng};
 use time::Duration;
+use adapton::engine::*;
 
 /// empty initialization of an incremental collection test harness
 pub trait CreateEmpty<G:Rng> {
@@ -53,4 +54,10 @@ pub trait CompFold<I,O,F:Fn(O,&I)->O> {
 pub trait CompFoldMeta<I,O,M,B:Fn(O,&I)->O,N:Fn(O,M)->O> {
 	type Target;
 	fn comp_fold_meta(&self, accum: O, b:Rc<B>, m:Rc<N>, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
+/// folds every element into the binary function, or into meta data
+pub trait CompFoldArchive<I,O,M,B:Fn(O,&I)->O,FB:Fn(O,Option<Name>)->O,N:Fn(O,M)->O> {
+	type Target;
+	fn comp_fold_archive(&self, accum: O, b:Rc<B>, fb:Rc<FB>, m:Rc<N>, rng: &mut StdRng) -> (Duration,Self::Target);
 }

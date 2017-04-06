@@ -330,3 +330,85 @@ where
 	}
 }
 
+pub struct HFolder<
+	A:Clone, E, M, T, O, R:Fn(A,&E)->A, RF:Fn(A,Option<Name>)->A, N:Fn(A,M)->A, F:Fn(T)->O
+>{
+	name: Name,
+	init:A,
+	run: Rc<R>,
+	run_fin: Rc<RF>,
+	run_meta: Rc<N>,
+	finish: Rc<F>,
+	accum: PhantomData<A>,
+	elm: PhantomData<E>,
+	meta: PhantomData<M>,
+	target: PhantomData<T>,
+	out: PhantomData<O>,
+}
+
+impl<
+	A:Clone, E, M, T, O, R:Fn(A,&E)->A, RF:Fn(A,Option<Name>)->A, N:Fn(A,M)->A, F:Fn(T)->O
+> HFolder<A,E,M,T,O,R,RF,N,F> {
+	pub fn new(name:Name,a:A,r:R,rf:RF,m:N,f:F) -> Self {
+		HFolder{
+			name: name,
+			init: a,
+			run: Rc::new(r),
+			run_fin: Rc::new(rf),
+			run_meta: Rc::new(m),
+			finish: Rc::new(f),
+			accum: PhantomData,
+			elm: PhantomData,
+			meta: PhantomData,
+			target: PhantomData,
+			out: PhantomData,
+		}
+	}
+}
+impl<A,E,M,O,R,RF,N,F,D>
+Computor<Duration,D>
+for HFolder<A,E,M,D::Target,O,R,RF,N,F> 
+where
+	A:Clone,
+	R:Fn(A,&E)->A,
+	RF:Fn(A,Option<Name>)->A,
+	N:Fn(A,M)->A,
+	F:Fn(D::Target)->O,
+	D:CompFoldArchive<E,A,M,R,RF,N>,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time,run) = ns(self.name.clone(), ||{
+			data.comp_fold_archive(self.init.clone(), self.run.clone(), self.run_fin.clone(), self.run_meta.clone(), rng)
+		});
+		let finish = ns(name_fork(self.name.clone()).0,||{(
+			self.finish)(run)
+		});
+		#[allow(unused)]
+		let saver = Vec::new().push(finish); // don't let rust compile this away
+		time
+	}
+}
+impl<A,E,M,O,R,RF,N,F,D>
+Computor<(Vec<Duration>,O),D>
+for HFolder<A,E,M,D::Target,O,R,RF,N,F> 
+where
+	A:Clone,
+	R:Fn(A,&E)->A,
+	RF:Fn(A,Option<Name>)->A,
+	N:Fn(A,M)->A,
+	F:Fn(D::Target)->O,
+	D:CompFoldArchive<E,A,M,R,RF,N>,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Vec<Duration>,O) {
+		let (time,run) = ns(self.name.clone(), ||{
+			data.comp_fold_archive(self.init.clone(), self.run.clone(), self.run_fin.clone(), self.run_meta.clone(), rng)
+		});
+		let finish = ns(name_fork(self.name.clone()).0,||{(
+			self.finish)(run)
+		});
+		let mut v = Vec::new();
+		v.push(time);
+		(v,finish)
+	}
+}
+

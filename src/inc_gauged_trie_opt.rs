@@ -34,7 +34,7 @@ impl Clone for CloneCounter {
     fn clone(&self) -> Self {
         println!("clone count {:?}", self);
         if self.0 > 2 {
-            panic!("bad programmer!")
+           // panic!("bad programmer!")
         };
         CloneCounter(self.0 + 1)            
     }

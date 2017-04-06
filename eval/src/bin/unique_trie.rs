@@ -105,10 +105,11 @@ fn main2() {
       coord: coord.clone(),
     },
     edit: BatchInsert(edits),
-    comp: MFolder::new(
+    comp: HFolder::new(
       name_of_string(String::from("filltrie")),
       Trie::emp(),
       |mut a,&GenSmall(e)|{ a.put(e, ()); a },
+      |mut a,nm|{ match nm { None => a, Some(nm) => {a.archive(nm); a}}},
       |mut a,(_lev,_nmopt)|{ match _nmopt {None => {a}, Some(nm) => {a.archive(nm);a} }},
       |a|{a},
     ),
