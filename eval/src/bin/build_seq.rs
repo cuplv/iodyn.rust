@@ -26,6 +26,7 @@ const DEFAULT_EDITSEED: usize = 0;
 const DEFAULT_UNITSIZE: usize = 1000;
 const DEFAULT_NAMESIZE: usize = 1;
 const DEFAULT_COUNT: usize = 15;
+const DEFAULT_EDITS: usize = 1;
 const DEFAULT_TRIALS: usize = 10;
 
 fn main() {
@@ -40,6 +41,7 @@ fn main() {
       -u, --unitsize=[unitsize] 'initial elements per structure unit'
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -c, --count=[count]       'number of runs, by default each 2 is 10x larger'
+      -e, --edits=[edits]       'number of edits'
       -t, --trials=[trials]     'trials to average over'
       -o, --outfile=[outfile]   'name for output files (of different extensions)' ")
     .get_matches();
@@ -47,7 +49,8 @@ fn main() {
   let editseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_EDITSEED);
 	let unitsize = value_t!(args, "unitsize", usize).unwrap_or(DEFAULT_UNITSIZE);
 	let namesize = value_t!(args, "namesize", usize).unwrap_or(DEFAULT_NAMESIZE);
-	let count = value_t!(args, "count", usize).unwrap_or(DEFAULT_COUNT);
+  let count = value_t!(args, "count", usize).unwrap_or(DEFAULT_COUNT);
+  let edits = value_t!(args, "edits", usize).unwrap_or(DEFAULT_EDITS);
 	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
   let outfile = args.value_of("outfile");
 
@@ -61,6 +64,7 @@ fn main() {
       namegauge: namesize,
       coord: StdRng::from_seed(&[dataseed]),
     },
+    edit: BatchInsert(edits),
     multiplier: multiplier,
     count: count,
   };
@@ -78,8 +82,13 @@ fn main() {
   let build_iraz = result_iraz.build.iter().map(|d|d.num_nanoseconds().unwrap());
   let build_vec = result_vec.build.iter().map(|d|d.num_nanoseconds().unwrap());
   let build_all: Vec<((i64,i64),i64)> = build_raz.zip(build_iraz).zip(build_vec).collect();
+  let edit_raz = result_raz.edit.iter().map(|d|d.num_nanoseconds().unwrap());
+  let edit_iraz = result_iraz.edit.iter().map(|d|d.num_nanoseconds().unwrap());
+  let edit_vec = result_vec.edit.iter().map(|d|d.num_nanoseconds().unwrap());
+  let edit_all: Vec<((i64,i64),i64)> = edit_raz.zip(edit_iraz).zip(edit_vec).collect();
   
   println!("build time(raz,iraz,vec): {:?}", build_all);
+  println!("edit time(raz,iraz,vec): {:?}", edit_all);
 
   ///////
   // Draft of output generation
@@ -101,25 +110,28 @@ fn main() {
   ;
 
   // generate data file
-  writeln!(dat,"'{}'\t'{}'","Size","Build Time").unwrap();
+  writeln!(dat,"'{}'\t'{}'\t'{}'","Size","Build Time","Edit Time").unwrap();
   for i in 0..count {
     let size = multiplier.powi(i as i32) as usize;
     let br = (build_all[i].0).0 as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}",size,br).unwrap();
+    let ed = (edit_all[i].0).0 as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}\t{}",size,br,ed).unwrap();
   }
   writeln!(dat,"").unwrap();
   writeln!(dat,"").unwrap();
   for i in 0..count {
     let size = multiplier.powi(i as i32) as usize;
     let br = (build_all[i].0).1 as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}",size,br).unwrap();    
+    let ed = (edit_all[i].0).1 as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}\t{}",size,br,ed).unwrap();    
   }
   writeln!(dat,"").unwrap();
   writeln!(dat,"").unwrap();
   for i in 0..count {
     let size = multiplier.powi(i as i32) as usize;
     let bv = build_all[i].1 as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}",size,bv).unwrap();    
+    let ed = edit_all[i].1 as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}\t{}",size,bv,ed).unwrap();    
   }
 
   let mut plotscript =
@@ -134,15 +146,18 @@ fn main() {
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set logscale xy").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
-  write!(plotscript,"set title \"{}", "Time to Build a Sequence\\n").unwrap();
+  write!(plotscript,"set title \"{}", "Time to Build and Edit a Sequence\\n").unwrap();
   writeln!(plotscript,"(u)nit-gauge: {}, (n)ame-gauge: {}\"",unitsize,namesize).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "size").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","NonIncRaz total").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","IncRaz total").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Vec total").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","NonIncRaz build time").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","IncRaz build time").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Vec build time").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","NonIncRaz edit time").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","IncRaz edit time").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","Vec edit time").unwrap();
 
   ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
 

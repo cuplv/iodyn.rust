@@ -16,7 +16,7 @@ pub struct EvalNRaz<E:Adapt,G:Rng> {
 	// Option for cleaner code, None means uninitialized
 	raztree: Option<RazTree<E>>,
 	coord: G,
-	//counter: usize, // for name/levels during edit
+	counter: usize, // for name/levels during edit
 	unitsize: usize,
 }
 
@@ -25,7 +25,7 @@ impl<E: Adapt,G:Rng> EvalNRaz<E,G> {
 		EvalNRaz {
 			raztree: None,
 			coord: coord,
-			//counter: 0,
+			counter: 0,
 			unitsize: us,
 		}
 	}
@@ -67,3 +67,36 @@ for EvalNRaz<E,G> {
 	}
 }
 
+// TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
+impl<E:Adapt+Rand,G:Rng>
+EditInsert for EvalNRaz<E,G> {
+	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
+		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
+		let loc = self.coord.gen::<usize>() % tree.len();
+		let mut focus = None;
+		let focus_time = Duration::span(||{
+			focus = tree.focus(loc);
+		});
+		let mut raz = focus.unwrap_or_else(||panic!("bad edit location"));
+		// pregenerate data
+		let new_levels = batch_size / self.unitsize;
+		let mut lev_vec = Vec::with_capacity(new_levels);
+		for _ in 0..(new_levels + 1) {
+			lev_vec.push(rng.gen())
+		}
+		let data_iter = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
+		let mut lev_iter = lev_vec.into_iter();
+		// time insertions
+		let insert_time = Duration::span(||{
+			for data in data_iter {
+				raz.push_left(data);
+				self.counter += 1;
+				if self.counter % self.unitsize == 0 {
+					raz.archive_left(lev_iter.next().expect("lev"));
+				}
+			}
+			self.raztree = Some(raz.unfocus());
+		});
+		(focus_time+insert_time,self)		
+	}
+}
