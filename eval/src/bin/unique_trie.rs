@@ -92,7 +92,7 @@ fn main2() {
       Trie::emp(),
       |mut a,&GenSmall(e)|{ a.put(e, ()); a },
       |mut a,nm|{ match nm { None => a, Some(nm) => {a.archive(nm); a}}},
-      |mut a,(_lev,_nmopt)|{ match _nmopt {None => {a}, Some(nm) => {a.archive(nm);a} }},
+      |mut a,(_lev,_nmopt)|{ a },
       |a|{a},
     ),
     changes: changes,

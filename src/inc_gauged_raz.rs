@@ -149,9 +149,9 @@ impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 				tree.fold_lr_meta(start_name,init,Rc::new(move|a,e,l,n|{
 					match e {
 						TreeData::Leaf(ref vec) => {
-							ns(name_of_string(String::from("extra name")),||{
+							//ns(name_of_string(String::from("extra name")),||{
 								finbin(vec.iter().fold(a,|a,e|{bin(a,e)}),n)
-							})
+							//})
 						},
 						TreeData::Branch{..} => {
 							meta(a,(l,n))
