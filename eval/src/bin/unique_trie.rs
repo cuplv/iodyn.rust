@@ -89,7 +89,7 @@ fn main2() {
     edit: BatchInsert(edits),
     comp: HFolder::new(
       name_of_string(String::from("filltrie")),
-      Trie::emp(),
+      {let mut t = Trie::emp(); t.archive(name_unit()); t},
       |mut a,&GenSmall(e)|{ a.put(e, ()); a },
       |mut a,nm|{ match nm { None => a, Some(nm) => { a.archive(nm); a }}},
       |mut a,(_lev,_nmopt)|{ if !a.is_archived() { println!("not archived"); }; a },
