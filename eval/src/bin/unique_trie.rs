@@ -91,7 +91,7 @@ fn main2() {
       name_of_string(String::from("filltrie")),
       Trie::emp(),
       |mut a,&GenSmall(e)|{ a.put(e, ()); a },
-      |mut a,nm|{ match nm { None => a, Some(nm) => {a.archive(nm); a}}},
+      |mut a,nm|{ match nm { None => a, Some(nm) => { if !a.is_archived() { println!("not archived"); }; a.archive(nm); a }}},
       |mut a,(_lev,_nmopt)|{ a },
       |a|{a},
     ),

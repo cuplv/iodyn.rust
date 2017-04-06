@@ -279,6 +279,9 @@ pub trait FinMap<K,V>
     fn rem(&mut self, k:K) -> Option<V>;
     /// Map key `k` to its corresponding value in the mapping, if any.
     fn get(&self, k:K) -> Option<V>;
+
+    /// For diagnostics and debugging
+    fn is_archived(&self) -> bool;    
 }
 
 impl<K:'static+Eq+Clone+Debug+Hash,
@@ -288,6 +291,8 @@ impl<K:'static+Eq+Clone+Debug+Hash,
 {    
     fn emp() -> Self { Trie{head:Chunks::Chunk(Chunk::new())} }
 
+    fn is_archived(&self) -> bool { match self.head { Chunks::Link(_) => true, Chunks::Chunk(_) => false }}
+    
     fn archive(&mut self, n:Name) {
         let chunks = mem::replace(&mut self.head, Chunks::Chunk(Chunk::new()));
         let hd_chunk : Rc<Chunk<_,_>> = 
