@@ -26,17 +26,17 @@ struct HashVal(usize);
 /// distinguish keys that are actually distinct, due to their hash
 /// prefixes "colliding".  In these cases, the code below will detect
 /// a hash collision and panic.
-const MAX_PATH_LEN : usize = 12;
+const MAX_PATH_LEN : usize = 32;
 
 #[derive(Debug)]
 struct CloneCounter (usize);
 impl Clone for CloneCounter {
     fn clone(&self) -> Self {
-        println!("clone count {:?}", self);
-        if self.0 > 2 {
-           // panic!("bad programmer!")
+        //println!("clone count {:?}", self);
+        if false && self.0 > 2 {
+            panic!("bad programmer!")
         };
-        CloneCounter(self.0 + 1)            
+        CloneCounter(self.0 + 1)
     }
 }
 

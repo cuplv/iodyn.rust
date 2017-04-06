@@ -78,24 +78,6 @@ fn main2() {
   let do_trace = args.is_present("trace");
   let coord = StdRng::from_seed(&[dataseed]);
 
-  // Fold over raz, use vec as set to gather elements
-  let mut testtree = EditComputeSequence{
-    init: IncrementalInit {
-      size: start_size,
-      unitgauge: unitgauge,
-      namegauge: namegauge,
-      coord: coord.clone(),
-    },
-    edit: BatchInsert(edits),
-    comp: MFolder::new(
-      name_of_string(String::from("fillvec")),
-      Vec::new(),
-      |mut v,&GenSmall(e)|{v.push(e.clone());v.sort();v.dedup();v},
-      |v,_|{v},
-      |a|{a},
-    ),
-    changes: changes,
-  };
   //fold over raz, use trie as set to gather elements
   let mut testtrie = EditComputeSequence{
     init: IncrementalInit {
@@ -115,6 +97,25 @@ fn main2() {
     ),
     changes: changes,
   };
+
+  // Fold over raz, use vec as set to gather elements
+  // let mut testtree = EditComputeSequence{
+  //   init: IncrementalInit {
+  //     size: start_size,
+  //     unitgauge: unitgauge,
+  //     namegauge: namegauge,
+  //     coord: coord.clone(),
+  //   },
+  //   edit: BatchInsert(edits),
+  //   comp: MFolder::new(
+  //     name_of_string(String::from("fillvec")),
+  //     Vec::new(),
+  //     |mut v,&GenSmall(e)|{v.push(e.clone());v.sort();v.dedup();v},
+  //     |v,_|{v},
+  //     |a|{a},
+  //   ),
+  //   changes: changes,
+  // };
   // fold over raz, use vec to store all elements
   let mut test_vl = EditComputeSequence{
     init: IncrementalInit {
@@ -135,17 +136,12 @@ fn main2() {
   };
 
   let _ = init_dcg(); assert!(engine_is_dcg());
-
-  // run experiments
-
   let mut rng = StdRng::from_seed(&[editseed]);
-  let result_raz: TestMResult<
-    EvalIRaz<GenSmall,StdRng>,
-    Vec<usize>,
-  > = testtree.test(&mut rng);
 
   // for visual debugging
   if do_trace {reflect::dcg_reflect_begin()}
+
+  // run experiments
 
   let result_trie: TestMResult<
     EvalIRaz<GenSmall,StdRng>,
@@ -171,18 +167,22 @@ fn main2() {
     VecList<GenSmall>,
   > = ns(name_of_string(String::from("veclist")),||{test_vl.test(&mut rng)});
 
+  // let result_raz: TestMResult<
+  //   EvalIRaz<GenSmall,StdRng>,
+  //   Vec<usize>,
+  // > = testtree.test(&mut rng);
 
   // post-process results
-  let comp_vec = result_raz.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  //let comp_vec = result_raz.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_trie = result_trie.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_ivl = inc_veclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let edit_vec = result_raz.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  //let edit_vec = result_raz.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_trie = result_trie.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_ivl = inc_veclist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
 
   println!("Computation time(ns): (initial run, first incremental run); do_trace={:?}", do_trace);
-  println!("vec_set:  ({:?}, {:?})", comp_vec[0], comp_vec[1]);
+  //println!("vec_set:  ({:?}, {:?})", comp_vec[0], comp_vec[1]);
   println!("trie_set: ({:?}, {:?})", comp_trie[0], comp_trie[1]);
   println!("vec_list: ({:?}, {:?})", comp_ivl[0], comp_ivl[1]);
 
@@ -208,14 +208,14 @@ fn main2() {
   // generate data file
   let (mut e,mut c);
   writeln!(dat,"'{}'\t'{}'\t'{}'\t'{}'","Changes","Edit Time","Compute Time","Edit and Compute").unwrap();
-  e = 0.0; c = 0.0;
-  for i in 0..changes {
-    e += edit_vec[i] as f64 / 1_000_000.0;
-    c += comp_vec[i] as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
-  }
-  writeln!(dat,"").unwrap();
-  writeln!(dat,"").unwrap();
+  // e = 0.0; c = 0.0;
+  // for i in 0..changes {
+  //   e += edit_vec[i] as f64 / 1_000_000.0;
+  //   c += comp_vec[i] as f64 / 1_000_000.0;
+  //   writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
+  // }
+  // writeln!(dat,"").unwrap();
+  // writeln!(dat,"").unwrap();
   e = 0.0; c = 0.0;
   for i in 0..changes {
     e += edit_trie[i] as f64 / 1_000_000.0;

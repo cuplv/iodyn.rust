@@ -5,7 +5,7 @@ use rand::{Rng,Rand};
 pub struct GenSmall(pub usize);
 impl Rand for GenSmall{
   fn rand<R: Rng>(rng: &mut R) -> Self {
-    GenSmall(rng.gen::<usize>() % 100)
+    GenSmall(rng.gen::<usize>())
   }
 }
 impl Add for GenSmall{
@@ -16,7 +16,7 @@ impl Add for GenSmall{
 }
 impl From<usize> for GenSmall {
   fn from(num: usize) -> Self {
-    GenSmall(num % 100)
+    GenSmall(num)
   }
 }
 
