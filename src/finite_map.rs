@@ -75,7 +75,10 @@ pub trait Graph<NdId, NdData> {
 	
 	fn adjacents(Self, NdId) -> Option<Vec<NdId>>;
 	
-	fn bfs(Self, NdId) -> Self;
+	fn get_data(Self, NdId) -> NdData;
+	
+	//TODO: this should return a directed graph when possible. fixes level issue as it's a separate trait
+	fn bfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, (Option<usize>, Vec<NdId>)>;
 }
 
 impl<T, Data> Graph<usize, (Option<Data>, Vec<usize>)> for T 
@@ -97,7 +100,6 @@ impl<T, Data> Graph<usize, (Option<Data>, Vec<usize>)> for T
 	}
 	
 	//Currently assumes that both nodes exist. Semantics undefined if nodes don't exist.
-	//These changes persist into the Map, right?
 	fn add_edge(curr: Self, id1: usize, id2: usize) -> Self {
 		let (k, mut adjs) = FinMap::get(curr.clone(), id1).unwrap();
 		adjs.push(id2);
@@ -126,30 +128,39 @@ impl<T, Data> Graph<usize, (Option<Data>, Vec<usize>)> for T
 		}
 	}
 	
+	fn get_data(curr: Self, id: usize) -> (Option<Data>, Vec<usize>) {
+		FinMap::get(curr, id).unwrap()
+	}
+	
 	//Question: want to keep graph size available (for size of visited map), best way to do this?
-	fn bfs(curr: Self, root: usize) -> Self {
+	//action point: change return type to directed graph
+	fn bfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, (Option<usize>, Vec<usize>)> {
 		println!("in bfs");
 		//setup
 		let mut q : VecDeque<usize> = VecDeque::new();
 		let mut v : RazTree<Option<bool>> = FinMap::new(100, 10);
-		let mut g = Self::new(100, 10);
+		let mut g = Graph::new(100, 10);
 		
 		q.push_back(root);
-		g = Self::add_node(g, root, (None, vec!()));
+		g = Self::add_node(g, root, (Some(0), vec!()));
 		v = FinMap::put(v, root, true);
 		while !q.is_empty() {
 			//get next element in queue
 			//get c's level
 			let c = q.pop_front().unwrap();
+			let c_lev = 
+				match Self::get_data(g.clone(), c) {
+					(Some(l), _) => l,
+					(None, _) => panic!("bfs failure")
+				};
 			let adjs = Self::adjacents(curr.clone(), c).unwrap();
 			//iterate over nodes adjacent to c
 			for n in adjs {
 				//if n is not yet visited
 				if !FinMap::contains(v.clone(), n) {
-					//TODO: this level is q's + 1
-					//TODO: add BFS tree edge from q to n
-					g = Self::add_node(g, n, (None, vec!()));
-					g = Self::add_edge(g, c, n);
+					//TODO: this level is c's + 1
+					g = Self::add_node(g, n, (Some(c_lev + 1), vec!()));
+					g = Self::add_directed_edge(g, c, n);
 					v = FinMap::put(v, n, true);
 					//something to build the graph
 					q.push_back(n)
@@ -157,6 +168,26 @@ impl<T, Data> Graph<usize, (Option<Data>, Vec<usize>)> for T
 			}
 		}
 		g
+	}
+}
+
+pub trait DirectedGraph<NdId, NdData> : Graph<NdId, NdData> {
+	fn add_directed_edge(Self, NdId, NdId) -> Self;
+	
+	fn successors(Self, NdId) -> Option<Vec<NdId>>;
+}
+
+impl<T, Data> DirectedGraph<usize, (Option<Data>, Vec<usize>)> for T 
+	where T: FinMap<usize, (Option<Data>, Vec<usize>)> + Clone
+	{
+	fn add_directed_edge(curr: Self, src: usize, dst: usize) -> Self {
+		let (k, mut adjs) = FinMap::get(curr.clone(), src).unwrap();
+		adjs.push(dst);
+		FinMap::put(curr, src, (k, adjs))
+	}
+	
+	fn successors(curr: Self, id: usize) -> Option<Vec<usize>> {
+		Graph::adjacents(curr, id)
 	}
 }
 
@@ -206,9 +237,9 @@ mod tests {
   	
   	let bfs_tree = Graph::bfs(dt, 1);
   	
-  	assert_eq!(Some(vec!(2, 3)), Graph::adjacents(bfs_tree.clone(), 1));
-  	assert_eq!(Some(vec!(1, 4)), Graph::adjacents(bfs_tree.clone(), 2));
-  	assert_eq!(Some(vec!(1)), Graph::adjacents(bfs_tree.clone(), 3));
-  	assert_eq!(Some(vec!(2)), Graph::adjacents(bfs_tree.clone(), 4));
+  	assert_eq!(Some(vec!(2, 3)), DirectedGraph::successors(bfs_tree.clone(), 1));
+  	assert_eq!(Some(vec!(4)), DirectedGraph::successors(bfs_tree.clone(), 2));
+  	assert_eq!(Some(vec!()), DirectedGraph::successors(bfs_tree.clone(), 3));
+  	assert_eq!(Some(vec!()), DirectedGraph::successors(bfs_tree.clone(), 4));
   }
 }
