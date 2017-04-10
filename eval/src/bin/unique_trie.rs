@@ -99,24 +99,6 @@ fn main2() {
     changes: changes,
   };
 
-  // Fold over raz, use vec as set to gather elements
-  let mut testtree = EditComputeSequence{
-    init: IncrementalInit {
-      size: start_size,
-      unitgauge: unitgauge,
-      namegauge: namegauge,
-      coord: coord.clone(),
-    },
-    edit: BatchInsert(edits),
-    comp: MFolder::new(
-      name_of_string(String::from("fillvec")),
-      Vec::new(),
-      |mut v,&GenSmall(e)|{v.push(e);v.sort();v.dedup();v},
-      |v,_|{v},
-      |a|{a},
-    ),
-    changes: changes,
-  };
   let mut test_hashmap = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
@@ -125,7 +107,7 @@ fn main2() {
       coord: coord.clone(),
     },
     edit: BatchInsert(edits),
-    comp: MFolder::new(
+    comp: MFolder::<_,_,(),_,_,_,_,_>::new(
       name_of_string(String::from("fillhashmap")),
       HashMap::new(),
       |mut m,&GenSmall(e)|{m.insert(e,());m},
@@ -181,7 +163,7 @@ fn main2() {
   }
 
   let result_hash: TestMResult<
-    EvalIRaz<GenSmall,StdRng>,
+    EvalVec<GenSmall,StdRng>,
     HashMap<usize,()>,
   > = ns(name_of_string(String::from("hashmap")),||{test_hashmap.test(&mut rng)});
 
@@ -190,24 +172,16 @@ fn main2() {
     VecList<usize>,
   > = ns(name_of_string(String::from("veclist")),||{test_vl.test(&mut rng)});
 
-  let result_vec: TestMResult<
-    EvalIRaz<GenSmall,StdRng>,
-    Vec<usize>,
-  > = testtree.test(&mut rng);
-
   // post-process results
-  let comp_vec = result_vec.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_hash = result_hash.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_trie = result_trie.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_ivl = inc_veclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let edit_vec = result_vec.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_hash = result_hash.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_trie = result_trie.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_ivl = inc_veclist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
 
   println!("Computation time(ns): (initial run, first incremental run); do_trace={:?}", do_trace);
-  println!("vec_set:  ({:?}, {:?})", comp_vec[0], comp_vec[1]);
   println!("hash_set:  ({:?}, {:?})", comp_hash[0], comp_hash[1]);
   println!("trie_set: ({:?}, {:?})", comp_trie[0], comp_trie[1]);
   println!("vec_list: ({:?}, {:?})", comp_ivl[0], comp_ivl[1]);
@@ -234,14 +208,6 @@ fn main2() {
   // generate data file
   let (mut e,mut c);
   writeln!(dat,"'{}'\t'{}'\t'{}'\t'{}'","Changes","Edit Time","Compute Time","Edit and Compute").unwrap();
-  e = 0.0; c = 0.0;
-  for i in 0..changes {
-    e += edit_vec[i] as f64 / 1_000_000.0;
-    c += comp_vec[i] as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
-  }
-  writeln!(dat,"").unwrap();
-  writeln!(dat,"").unwrap();
   e = 0.0; c = 0.0;
   for i in 0..changes {
     e += edit_hash[i] as f64 / 1_000_000.0;
@@ -290,18 +256,15 @@ fn main2() {
   writeln!(plotscript,"set mxtics 5           # set the spacing for the mxtics").unwrap();
   writeln!(plotscript,"set grid               # enable the grid").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Vec edit").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Vec compute").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Vec total").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "HashMap edit").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","HashMap compute").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","HashMap total").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Trie edit").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Trie compute").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Trie total").unwrap();
-  writeln!(plotscript,"'{}' i 3 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "List edit").unwrap();
-  writeln!(plotscript,"'{}' i 3 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","List (store all) compute").unwrap();
-  writeln!(plotscript,"'{}' i 3 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","List (store all) total").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Non-Inc HashMap edit").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap compute").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap total").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Trie edit").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie compute").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie total").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc List (store all) edit").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List (store all) compute").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List (store all) total").unwrap();
 
   ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
 
