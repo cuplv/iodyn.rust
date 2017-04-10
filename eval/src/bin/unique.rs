@@ -1,6 +1,4 @@
-//! This is a system for creating charts of the
-//! performance of various forms of the raz
-//! data structures defined in this crate
+//! An old version of our test to find unique elements in a list
 
 extern crate rand;
 extern crate time;
