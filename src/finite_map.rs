@@ -59,11 +59,11 @@ impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Ha
 }
 
 //undirected graph
-pub trait Graph<NdId, NdData> {
+pub trait Graph<NdId, Data> {
 	//usize params are for size/granularity pass to maps: should be exposed or no?
 	fn new(usize, usize) -> Self;
 	
-	fn add_node(Self, NdId, NdData) -> Self;
+	fn add_node(Self, NdId, Option<Data>) -> Self;
 	
 	fn del_node(Self, NdId) -> (Option<NdId>, Self);
 	
@@ -75,21 +75,20 @@ pub trait Graph<NdId, NdData> {
 	
 	fn adjacents(Self, NdId) -> Option<Vec<NdId>>;
 	
-	fn get_data(Self, NdId) -> NdData;
+	fn get_data(Self, NdId) -> Option<Data>;
 	
-	//TODO: this should return a directed graph when possible. fixes level issue as it's a separate trait
-	fn bfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, (Option<usize>, Vec<NdId>)>;
+	fn bfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
 }
 
-impl<T, Data> Graph<usize, (Option<Data>, Vec<usize>)> for T 
+impl<T, Data> Graph<usize, Data> for T 
 	where T: FinMap<usize, (Option<Data>, Vec<usize>)> + Clone
 	{
 	fn new(size: usize, gran: usize) -> Self {
 		FinMap::new(size, gran)
 	}
 	
-	fn add_node(curr: Self, id: usize, dt: (Option<Data>, Vec<usize>)) -> Self {
-		FinMap::put(curr, id, dt)
+	fn add_node(curr: Self, id: usize, dt: Option<Data>) -> Self {
+		FinMap::put(curr, id, (dt, vec!()))
 	}
 	
 	fn del_node(curr: Self, id: usize) -> (Option<usize>, Self) {
@@ -128,39 +127,38 @@ impl<T, Data> Graph<usize, (Option<Data>, Vec<usize>)> for T
 		}
 	}
 	
-	fn get_data(curr: Self, id: usize) -> (Option<Data>, Vec<usize>) {
-		FinMap::get(curr, id).unwrap()
+	fn get_data(curr: Self, id: usize) -> Option<Data> {
+		match FinMap::get(curr, id).unwrap() {
+			(Some(d), _) => Some(d),
+			(None, _) => None
+		}
 	}
 	
 	//Question: want to keep graph size available (for size of visited map), best way to do this?
 	//action point: change return type to directed graph
-	fn bfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, (Option<usize>, Vec<usize>)> {
+	fn bfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
 		println!("in bfs");
 		//setup
 		let mut q : VecDeque<usize> = VecDeque::new();
 		let mut v : RazTree<Option<bool>> = FinMap::new(100, 10);
-		let mut g = Graph::new(100, 10);
+		let mut g : T = Graph::new(100, 10);
 		
 		q.push_back(root);
-		g = Self::add_node(g, root, (Some(0), vec!()));
+		g = Self::add_node(g, root, Some(0));
 		v = FinMap::put(v, root, true);
 		while !q.is_empty() {
 			//get next element in queue
 			//get c's level
 			let c = q.pop_front().unwrap();
-			let c_lev = 
-				match Self::get_data(g.clone(), c) {
-					(Some(l), _) => l,
-					(None, _) => panic!("bfs failure")
-				};
+			let c_lev = Self::get_data(g.clone(), c).unwrap();
 			let adjs = Self::adjacents(curr.clone(), c).unwrap();
 			//iterate over nodes adjacent to c
 			for n in adjs {
 				//if n is not yet visited
 				if !FinMap::contains(v.clone(), n) {
 					//TODO: this level is c's + 1
-					g = Self::add_node(g, n, (Some(c_lev + 1), vec!()));
-					g = Self::add_directed_edge(g, c, n);
+					g = Graph::add_node(g, n, Some(c_lev + 1));
+					g = DirectedGraph::add_directed_edge(g, c, n);
 					v = FinMap::put(v, n, true);
 					//something to build the graph
 					q.push_back(n)
@@ -171,13 +169,13 @@ impl<T, Data> Graph<usize, (Option<Data>, Vec<usize>)> for T
 	}
 }
 
-pub trait DirectedGraph<NdId, NdData> : Graph<NdId, NdData> {
+pub trait DirectedGraph<NdId, Data> : Graph<NdId, Data> {
 	fn add_directed_edge(Self, NdId, NdId) -> Self;
 	
 	fn successors(Self, NdId) -> Option<Vec<NdId>>;
 }
 
-impl<T, Data> DirectedGraph<usize, (Option<Data>, Vec<usize>)> for T 
+impl<T, Data> DirectedGraph<usize, Data> for T 
 	where T: FinMap<usize, (Option<Data>, Vec<usize>)> + Clone
 	{
 	fn add_directed_edge(curr: Self, src: usize, dst: usize) -> Self {
@@ -212,9 +210,9 @@ mod tests {
   #[test]
   fn test_graph() {
   	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = Graph::new(100, 10);
-  	dt = Graph::add_node(dt, 1, (Some(1), vec!()));
-  	dt = Graph::add_node(dt, 2, (Some(2), vec!()));
-  	dt = Graph::add_node(dt, 3, (Some(3), vec!()));
+  	dt = Graph::add_node(dt, 1, Some(1));
+  	dt = Graph::add_node(dt, 2, Some(2));
+  	dt = Graph::add_node(dt, 3, Some(3));
   	dt = Graph::add_edge(dt, 1, 2);
   	dt = Graph::add_edge(dt, 2, 3);
   	dt = Graph::add_edge(dt, 3, 1);
@@ -226,10 +224,10 @@ mod tests {
   #[test]
   fn test_bfs() {
   	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = Graph::new(100, 10);
-  	dt = Graph::add_node(dt, 1, (Some(1), vec!()));
-  	dt = Graph::add_node(dt, 2, (Some(2), vec!()));
-  	dt = Graph::add_node(dt, 3, (Some(3), vec!()));
-  	dt = Graph::add_node(dt, 4, (Some(4), vec!()));
+  	dt = Graph::add_node(dt, 1, Some(1));
+  	dt = Graph::add_node(dt, 2, Some(2));
+  	dt = Graph::add_node(dt, 3, Some(3));
+  	dt = Graph::add_node(dt, 4, Some(4));
   	dt = Graph::add_edge(dt, 1, 2);
   	dt = Graph::add_edge(dt, 1, 3);
   	dt = Graph::add_edge(dt, 2, 4);
@@ -241,5 +239,9 @@ mod tests {
   	assert_eq!(Some(vec!(4)), DirectedGraph::successors(bfs_tree.clone(), 2));
   	assert_eq!(Some(vec!()), DirectedGraph::successors(bfs_tree.clone(), 3));
   	assert_eq!(Some(vec!()), DirectedGraph::successors(bfs_tree.clone(), 4));
+  	assert_eq!(Some(0), Graph::get_data(bfs_tree.clone(), 1));
+  	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 2));
+  	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 3));
+  	assert_eq!(Some(2), Graph::get_data(bfs_tree.clone(), 4));
   }
 }
