@@ -32,7 +32,7 @@ const MAX_PATH_LEN : usize = 32;
 struct CloneCounter (usize);
 impl Clone for CloneCounter {
     fn clone(&self) -> Self {
-        println!("clone count {:?}", self);
+        //println!("clone count {:?}", self);
         //if self.0 > 2 { panic!("bad programmer") };
         CloneCounter(self.0 + 1)
     }
@@ -292,7 +292,7 @@ impl<K:'static+Eq+Clone+Debug+Hash,
     fn is_archived(&self) -> bool { match self.head { 
         Chunks::Link(_) => true, 
         Chunks::Chunk(ref c) => {
-            println!("{:?}", c);
+            //println!("{:?}", c);
             false 
         }
     }}

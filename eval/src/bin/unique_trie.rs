@@ -181,10 +181,10 @@ fn main2() {
   let edit_ivl = inc_veclist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
 
-  println!("Computation time(ns): (initial run, first incremental run); do_trace={:?}", do_trace);
-  println!("hash_set:  ({:?}, {:?})", comp_hash[0], comp_hash[1]);
-  println!("trie_set: ({:?}, {:?})", comp_trie[0], comp_trie[1]);
-  println!("vec_list: ({:?}, {:?})", comp_ivl[0], comp_ivl[1]);
+  println!("Computation time (ms): (initial run, first incremental run); do_trace={:?}", do_trace);
+  println!("hash_set: ({:8.3}, {:8.3})", comp_hash[0] as f32 / 1000000.0, comp_hash[1] as f32 / 1000000.0);
+  println!("trie_set: ({:8.3}, {:8.3})", comp_trie[0] as f32 / 1000000.0, comp_trie[1] as f32 / 1000000.0);
+  println!("vec_list: ({:8.3}, {:8.3})", comp_ivl[0]  as f32 / 1000000.0, comp_ivl[1]  as f32 / 1000000.0);
 
   ///////
   // Output generation
