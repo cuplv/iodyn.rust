@@ -26,7 +26,7 @@ use adapton_lab::labviz::*;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::accum_lists::*;
 //use pmfp_collections::inc_gauged_trie::{FinMap,Trie};
-use pmfp_collections::inc_gauged_trie_opt::{FinMap,Trie};
+use pmfp_collections::inc_gauged_trie_opt2::{FinMap,Skiplist};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;
@@ -90,10 +90,10 @@ fn main2() {
     edit: BatchInsert(edits),
     comp: HFolder::new(
       name_of_string(String::from("filltrie")),
-      {let mut t = Trie::emp(); t.archive(name_unit()); t},
+      {let mut t = Skiplist::emp(32, name_unit()); t.archive(name_unit()); t},
       |mut a,&GenSmall(e)|{ a.put(e, ()); a },
       |mut a,nm|{ match nm { None => a, Some(nm) => { a.archive(nm); a }}},
-      |mut a,(_lev,_nmopt)|{ if !a.is_archived() { println!("not archived"); }; a },
+      |mut a,(_lev,_nmopt)|{ a },
       |a|{a},
     ),
     changes: changes,
@@ -145,7 +145,7 @@ fn main2() {
 
   let result_trie: TestMResult<
     EvalIRaz<GenSmall,StdRng>,
-    Trie<usize,()>,
+    Skiplist<usize,()>,
   > = testtrie.test(&mut rng);
 
   if do_trace {
@@ -259,9 +259,9 @@ fn main2() {
   writeln!(plotscript,"'{}' i 0 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Non-Inc HashMap edit").unwrap();
   writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap compute").unwrap();
   writeln!(plotscript,"'{}' i 0 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap total").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Trie edit").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie compute").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie total").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Skiplist edit").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist compute").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist total").unwrap();
   writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc List (store all) edit").unwrap();
   writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List (store all) compute").unwrap();
   writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List (store all) total").unwrap();

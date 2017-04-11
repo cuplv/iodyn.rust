@@ -3,25 +3,15 @@
 //! Conceptually, these finite maps are tries.
 //! Concretely, they consist of skip-list-like structures.
 
-use std::mem;
 use std::fmt;
-use std::rc::Rc;
 use std::fmt::Debug;
-use std::hash::{Hash,Hasher};
+use std::hash::{Hash};
 use adapton::engine::{cell,force,Art,Name,name_pair,name_of_usize};
 use adapton::macros::{my_hash};
 
 /// A hash value -- We define a custom Debug impl for this type.
-#[derive(Debug,Clone,Hash,Eq,PartialEq)]
+#[derive(Clone,Hash,Eq,PartialEq)]
 struct HashVal(usize);
-
-#[derive(Debug,Clone,Hash,Eq,PartialEq)]
-enum PathIdx<K,V> {
-    /// Empty sub-skiplist; every key maps to None
-    Empty,
-    /// Non-empty sub-skiplist
-    Path(Art<Path<K,V>>),
-}
 
 /// A contiguous block of skiplist paths/keys/values
 #[derive(Debug,Clone,Hash,Eq,PartialEq)]
@@ -38,7 +28,7 @@ pub struct Skiplist<K,V> {
     path_len: usize,
     name: Name,
     cntr: usize,
-    head: Art<Option<Path<K,V>>>,
+    head: Option<Art<Path<K,V>>>,
 }
 
 /// Cursor state for traversing the skiplist
@@ -50,6 +40,22 @@ struct Cursor<K,V> {
     paths: Vec<Option<Art<Path<K,V>>>>,
 }
 
+/// TODO-Someday: Do this more efficiently
+fn make_mask(len:usize) -> usize {
+    assert!(len > 0);
+    let mut mask = 0;
+    for _ in 0..len {
+        mask <<= 1;
+        mask |= 0x1;
+    }
+    return mask;
+}
+
+impl fmt::Debug for HashVal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:b}", self.0)
+    }
+}
 
 impl<K:Clone,V:Clone> Cursor<K,V> {
     fn new() -> Self {
@@ -64,19 +70,6 @@ impl<K:Clone,V:Clone> Cursor<K,V> {
         }
     }
 }
-
-
-// impl<K:'static+Hash+Eq+Debug+Clone,V:'static+Hash+Eq+Debug+Clone> Chunks<K,V> {
-//     fn get_cursor(&self, cur:&mut Cursor<K,V>, key:K, key_hash:HashVal) -> Option<Option<V>> {
-//         match *self {
-//             Chunks::Chunk(ref chk) => chk.get_cursor(None, cur, key, key_hash),
-//             Chunks::Link(ref lnk) => {
-//                 let cur_art = &lnk.link;
-//                 (force(&cur_art)).get_cursor(Some(cur_art.clone()), cur, key, key_hash)
-//             },
-//         }
-//     }
-// }
 
 impl<K:'static+Hash+Eq+Debug+Clone,
      V:'static+Hash+Eq+Debug+Clone> Path<K,V> {
@@ -96,13 +89,12 @@ impl<K:'static+Hash+Eq+Debug+Clone,
         key_bits >>= cur.bit_idx;
         hsh_bits >>= cur.bit_idx;
 
-        let same_hash = { hsh_bits == key_bits };
         // Check for perfect match of remaining bits
-        if same_hash {
+        if hsh_bits == key_bits {
             // Copy the remaining paths for this chk_idx into the cursor
-            for i in cur.bit_idx..path_len { cur.paths.push(self.paths.get(i).unwrap().clone()) };
-            //for (k,vo) in self.kvs { if key == k { return Some(vo) } else { continue } };
-            //unreachable!("found matching hash; compared all keys; should be done.")
+            for i in cur.bit_idx..path_len { 
+                cur.paths.push(self.paths.get(i).unwrap().clone()) 
+            };
             return Some(self.kvs.clone());
         } else {    
             // While bits match, move the cursor along axis cur.bit_idx;
@@ -110,10 +102,11 @@ impl<K:'static+Hash+Eq+Debug+Clone,
             let start_idx = cur.bit_idx;
             'matching_bits: 
             for i in start_idx..path_len {
-                let pi : &Option<Art<Path<K,V>>> = self.paths.get(i).unwrap();
+                let oap : &Option<Art<Path<K,V>>> = self.paths.get(i).unwrap();
                 if (key_bits & 0x1) == (hsh_bits & 0x1) {
-                    cur.paths.push(pi.clone());
+                    cur.paths.push(oap.clone());
                     key_bits >>= 1;
+                    hsh_bits >>= 1;
                     continue 'matching_bits;
                 } else {
                     cur.paths.push(cur_art);
@@ -131,7 +124,7 @@ impl<K:'static+Hash+Eq+Debug+Clone,
                     }
                 }
             };
-            unreachable!("compared all bits; should be done")
+            unreachable!("no more bits; this shouldn't happen")
         }
     }       
 }
@@ -167,7 +160,7 @@ impl<K:'static+Eq+Clone+Debug+Hash,
             path_len:path_len,
             name:n.clone(),
             cntr:1,
-            head:cell(name_pair(n, name_of_usize(0)), None),
+            head:None,
         }
     }
    
@@ -177,35 +170,46 @@ impl<K:'static+Eq+Clone+Debug+Hash,
     }
 
     fn ext(&mut self, k:K, opv:Option<V>) -> Option<V> {
-        let k_hash = HashVal(my_hash(&k) as usize);
+        let mask    = make_mask(self.path_len);
+        let k_hash  = HashVal((my_hash(&k) as usize) & mask);
         let mut cur = Cursor::new();
-        let old_kvs = match force(&self.head) {
-            None       => None,
-            Some(path) => path.build_path(self.path_len, None, &mut cur, &k, k_hash.clone()),
+        let old_kvs = match self.head {
+            None => None,
+            Some(ref path) =>
+                force(path).build_path(self.path_len, Some(path.clone()), &mut cur, &k, k_hash.clone()),
         };
         let mut new_kvs = vec![];
         let mut opv_old = None;
         match old_kvs {
             Some(kvs) => {
+                let mut found_key = false;
                 for (k0,opv0) in kvs.into_iter() {
                     if &k == &k0 {
                         new_kvs.push((k0, opv.clone()));
                         opv_old = Some(opv0);
+                        found_key = true;
                     } else {
                         new_kvs.push((k0, opv0));
                     }
-                }},
+                };
+                if !found_key { 
+                    new_kvs.push((k, opv)) 
+                };
+            },
             None => {
+                cur.fill_empty(self.path_len);
                 new_kvs.push((k, opv))
             }
         };
-        let new_path = {
-            panic!("TODO")
+        let new_path = Path{
+            hash:  k_hash,
+            kvs:   new_kvs,
+            paths: cur.paths,
         };
         self.head = 
-            cell(name_pair(self.name.clone(), 
-                           name_of_usize(self.cntr)),
-                 Some(new_path));
+            Some(cell(name_pair(self.name.clone(), 
+                                name_of_usize(self.cntr)), 
+                      new_path));
         self.cntr += 1;
         return opv_old.unwrap_or(None);
     }
@@ -219,18 +223,17 @@ impl<K:'static+Eq+Clone+Debug+Hash,
     }
 
     fn get(&self, k:K) -> Option<V> {
-        let k_hash = HashVal(my_hash(&k) as usize);
+        let mask    = make_mask(self.path_len);
+        let k_hash  = HashVal((my_hash(&k) as usize) & mask);
         let mut cur = Cursor::new();
-        let res = match force(&self.head) {
-            None       => None,
-            Some(path) => path.build_path(self.path_len, None, &mut cur, &k, k_hash),
+        let res = match self.head {
+            None => None,
+            Some(ref path) => force(path).build_path(self.path_len, None, &mut cur, &k, k_hash),
         };            
         match res {
             Some(kvs) => {
                 for (k0,opval) in kvs.into_iter() {
-                    if &k == &k {
-                        return opval
-                    }
+                    if &k == &k0 { return opval }
                 };
                 return None
             },
@@ -239,164 +242,69 @@ impl<K:'static+Eq+Clone+Debug+Hash,
     }
 }
 
-// #[test]
-// fn skiplist_opt_test () {
-//     use std::collections::HashMap;
-//     use rand::{Rng,thread_rng};
-//     use adapton::engine::{manage,name_of_usize};
-//     let mut rng = thread_rng();
-//     let numops = 10000;
-//     let numkeys = 100;
-//     let gauged = true;
-//     let gauge = 100;
+#[test]
+fn skiplist_vs_hashmap () {
+    use std::collections::HashMap;
+    use rand::{Rng,thread_rng};
+    use adapton::engine::{manage,name_of_usize,name_unit};
+    let mut rng = thread_rng();
+    let numops = 10000;
+    let numkeys = 100;
+    let gauged = true;
+    let gauge = 100;
     
-//     manage::init_dcg();
+    manage::init_dcg();
     
-//     let mut m = HashMap::new();
-//     let mut t = Skiplist::emp();
+    let mut m = HashMap::new();
+    let mut t = Skiplist::emp(16,name_unit());
     
-//     for i in 0..numops {        
-//         let r1 : usize = rng.gen(); let r1 = r1 % numkeys;
-//         let r2 : usize = rng.gen(); let r2 = r2 % numkeys;
-//         let nm = if gauged && i % gauge == 0 { Some(name_of_usize(i)) } else { None };
+    for i in 0..numops {        
+        let r1 : usize = rng.gen(); let r1 = r1 % numkeys;
+        let r2 : usize = rng.gen(); let r2 = r2 % numkeys;
+        let nm = if gauged && i % gauge == 0 { Some(name_of_usize(i)) } else { None };
 
-//         // Test random insertion
-//         if !(nm == None) { println!("=========\nname {:?}:", nm); };
-//         println!("insert #{:?}: key {:?} maps to {:?}", i, r1, r2);
-//         m.insert(r1, r2);
-//         t.put(r1, r2);
-//         match nm {
-//             Some(nm) => t.archive(nm),
-//             None => (),
-//         };
+        // Test random insertion
+        if !(nm == None) { println!("=========\nname {:?}:", nm); };
+        println!("insert #{:?}: key {:?} maps to {:?}", i, r1, r2);
+        m.insert(r1, r2);
+        t.put(r1, r2);
+        match nm {
+            Some(nm) => t.archive(nm),
+            None => (),
+        };
 
-//         // Test random lookup        
-//         let r3 : usize = rng.gen(); 
-//         let r3 = r3 % (numkeys * 2); // Look for non-existent keys with prob 0.5
-//         println!("lookup #{:?}: key {:?} maps to {:?}", i, r3, m.get(&r3));
-//         assert_eq!(m.get(&r3).map(|&n|n.clone()), t.get(r3));
-//     }
-// }
+        // Test random lookup        
+        let r3 : usize = rng.gen(); 
+        let r3 = r3 % (numkeys * 2); // Look for non-existent keys with prob 0.5
+        println!("lookup #{:?}: key {:?} maps to {:?}", i, r3, m.get(&r3));
+        assert_eq!(m.get(&r3).map(|&n|n.clone()), t.get(r3));
+    }
+}
 
 
-// #[test]
-// fn skiplist_opt_tiny () {
-//     use adapton::engine::name_of_usize;
-//     let mut c = Skiplist::emp();
-//     c.put(1, 1);
-//     println!("{:?}\n", c);    
-//     c.put(2, 2);
-//     println!("{:?}\n", c);    
-//     c.put(3, 3);
-//     println!("{:?}\n", c);    
-//     c.put(4, 4);
-//     c.archive(name_of_usize(4));
-//     println!("{:?}\n", c);
-//     c.put(5, 5);
-//     println!("{:?}\n", c);
-//     c.put(6, 6);
-//     println!("{:?}\n", c);
+#[test]
+fn skiplist_tiny () {
+    use adapton::engine::{name_unit, name_of_usize};
+    let mut c = Skiplist::emp(8, name_unit());
+    c.put(1, 1);
+    println!("{:?}\n", c);
+    c.put(2, 2);
+    println!("{:?}\n", c);
+    c.put(3, 3);
+    println!("{:?}\n", c);
+    c.put(4, 4);
+    c.archive(name_of_usize(4));
+    println!("{:?}\n", c);
+    c.put(5, 5);
+    println!("{:?}\n", c);
+    c.put(6, 6);
+    println!("{:?}\n", c);
 
-//     assert_eq!(c.get(0), None);
-//     assert_eq!(c.get(1), Some(1));
-//     assert_eq!(c.get(2), Some(2));
-//     assert_eq!(c.get(3), Some(3));
-//     assert_eq!(c.get(4), Some(4));
-//     assert_eq!(c.get(5), Some(5));
-//     assert_eq!(c.get(6), Some(6));
-// }
-
-// #[test]
-// fn skiplist_opt_small () {
-//     let mut c = Skiplist::emp();
-//     c.put(1, 1);
-//     c.put(2, 2);
-//     c.put(3, 3);
-//     c.put(4, 4);
-//     c.put(5, 5);
-//     c.put(6, 6);
-
-//     assert_eq!(c.get(0), None);
-//     assert_eq!(c.get(1), Some(1));
-//     assert_eq!(c.get(2), Some(2));
-//     assert_eq!(c.get(3), Some(3));
-//     assert_eq!(c.get(4), Some(4));
-//     assert_eq!(c.get(5), Some(5));
-//     assert_eq!(c.get(6), Some(6));
-
-//     c.put(11, 11);
-//     c.put(12, 12);
-//     c.put(13, 13);
-//     c.put(14, 14);
-//     c.put(15, 15);
-//     c.put(16, 16);
-
-//     assert_eq!(c.get(0), None);
-//     assert_eq!(c.get(1), Some(1));
-//     assert_eq!(c.get(2), Some(2));
-//     assert_eq!(c.get(3), Some(3));
-//     assert_eq!(c.get(4), Some(4));
-//     assert_eq!(c.get(5), Some(5));
-//     assert_eq!(c.get(6), Some(6));
-    
-//     assert_eq!(c.get(7),  None);
-//     assert_eq!(c.get(8),  None);
-//     assert_eq!(c.get(9),  None);
-//     assert_eq!(c.get(10), None);
-
-//     assert_eq!(c.get(11), Some(11));
-//     assert_eq!(c.get(12), Some(12));
-//     assert_eq!(c.get(13), Some(13));
-//     assert_eq!(c.get(14), Some(14));
-//     assert_eq!(c.get(15), Some(15));
-//     assert_eq!(c.get(16), Some(16));
-
-//     assert_eq!(c.get(17), None);
-//     assert_eq!(c.get(18), None);
-//     assert_eq!(c.get(19), None);
-//     assert_eq!(c.get(20), None);
-
-//     c.put(21, 21);
-//     c.put(22, 22);
-//     c.put(23, 23);
-//     c.put(24, 24);
-//     c.put(25, 25);
-//     c.put(26, 26);
-
-//     assert_eq!(c.get(0), None);
-//     assert_eq!(c.get(1), Some(1));
-//     assert_eq!(c.get(2), Some(2));
-//     assert_eq!(c.get(3), Some(3));
-//     assert_eq!(c.get(4), Some(4));
-//     assert_eq!(c.get(5), Some(5));
-//     assert_eq!(c.get(6), Some(6));
-    
-//     assert_eq!(c.get(7),  None);
-//     assert_eq!(c.get(8),  None);
-//     assert_eq!(c.get(9),  None);
-//     assert_eq!(c.get(10), None);
-
-//     assert_eq!(c.get(11), Some(11));
-//     assert_eq!(c.get(12), Some(12));
-//     assert_eq!(c.get(13), Some(13));
-//     assert_eq!(c.get(14), Some(14));
-//     assert_eq!(c.get(15), Some(15));
-//     assert_eq!(c.get(16), Some(16));
-
-//     assert_eq!(c.get(17), None);
-//     assert_eq!(c.get(18), None);
-//     assert_eq!(c.get(19), None);
-//     assert_eq!(c.get(20), None);
-
-//     assert_eq!(c.get(21), Some(21));
-//     assert_eq!(c.get(22), Some(22));
-//     assert_eq!(c.get(23), Some(23));
-//     assert_eq!(c.get(24), Some(24));
-//     assert_eq!(c.get(25), Some(25));
-//     assert_eq!(c.get(26), Some(26));
-
-//     assert_eq!(c.get(27), None);
-//     assert_eq!(c.get(28), None);
-//     assert_eq!(c.get(29), None);
-//     assert_eq!(c.get(30), None);
-// }
+    assert_eq!(c.get(0), None);
+    assert_eq!(c.get(1), Some(1));
+    assert_eq!(c.get(2), Some(2));
+    assert_eq!(c.get(3), Some(3));
+    assert_eq!(c.get(4), Some(4));
+    assert_eq!(c.get(5), Some(5));
+    assert_eq!(c.get(6), Some(6));
+}

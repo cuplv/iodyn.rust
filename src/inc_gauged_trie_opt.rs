@@ -412,14 +412,27 @@ fn trie_opt_test () {
 fn trie_opt_tiny () {
     use adapton::engine::name_of_usize;
     let mut c = Trie::emp();
+
+    assert_eq!(c.get(0), None);
+    assert_eq!(c.get(1), None);
+
     c.put(1, 1);
-    println!("{:?}\n", c);    
+    assert_eq!(c.get(0), None);
+    assert_eq!(c.get(1), Some(1));
+
     c.put(2, 2);
-    println!("{:?}\n", c);    
+    assert_eq!(c.get(0), None);
+    assert_eq!(c.get(1), Some(1));
+    assert_eq!(c.get(2), Some(2));
+
     c.put(3, 3);
-    println!("{:?}\n", c);    
+    assert_eq!(c.get(0), None);
+    assert_eq!(c.get(1), Some(1));
+    assert_eq!(c.get(2), Some(2));
+    assert_eq!(c.get(3), Some(3));
+
     c.put(4, 4);
-    c.archive(name_of_usize(4));
+    //c.archive(name_of_usize(4));
     println!("{:?}\n", c);
     c.put(5, 5);
     println!("{:?}\n", c);
