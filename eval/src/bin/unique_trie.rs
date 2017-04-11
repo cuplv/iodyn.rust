@@ -26,7 +26,7 @@ use adapton_lab::labviz::*;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::accum_lists::*;
 //use pmfp_collections::inc_gauged_trie::{FinMap,Trie};
-use pmfp_collections::inc_gauged_trie_opt2::{FinMap,Skiplist};
+use pmfp_collections::inc_gauged_trie_opt3::{FinMap,Skiplist};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;

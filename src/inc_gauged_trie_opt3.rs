@@ -3,6 +3,7 @@
 //! Conceptually, these finite maps are tries.
 //! Concretely, they consist of skip-list-like structures.
 
+use std::rc::Rc;
 use std::fmt;
 use std::fmt::Debug;
 use std::hash::{Hash};
@@ -18,7 +19,7 @@ struct HashVal(usize);
 struct Path<K,V> {
     hash:   HashVal,
     kvs:    Vec<(K,Option<V>)>,
-    paths:  Vec<Option<Art<Path<K,V>>>>,
+    paths:  Vec<Option<Art<Rc<Path<K,V>>>>>,
 }
 
 /// The gauged, incremental Skiplist.  This structure maintains the head
@@ -28,7 +29,7 @@ pub struct Skiplist<K,V> {
     path_len: usize,
     name: Name,
     cntr: usize,
-    head: Option<Art<Path<K,V>>>,
+    head: Option<Art<Rc<Path<K,V>>>>,
 }
 
 /// Cursor state for traversing the skiplist
@@ -37,7 +38,7 @@ struct Cursor<K,V> {
     /// Bit/path-position index; Invariant: increases monotonically
     bit_idx: usize,
     /// Invariant: `len(paths) ==  bit_idx`
-    paths: Vec<Option<Art<Path<K,V>>>>,
+    paths: Vec<Option<Art<Rc<Path<K,V>>>>>,
 }
 
 /// TODO-Someday: Do this more efficiently
@@ -75,9 +76,9 @@ impl<K:'static+Hash+Eq+Debug+Clone,
      V:'static+Hash+Eq+Debug+Clone> Path<K,V> {
    
     fn build_path
-        (self,                    
+        (&self,                    
          path_len:usize,
-         cur_art:Option<Art<Path<K,V>>>, 
+         cur_art:Option<Art<Rc<Path<K,V>>>>, 
          cur:&mut Cursor<K,V>, 
          key:&K, key_hash:HashVal) -> Option<Vec<(K,Option<V>)>>
     {
@@ -102,7 +103,7 @@ impl<K:'static+Hash+Eq+Debug+Clone,
             let start_idx = cur.bit_idx;
             'matching_bits: 
             for i in start_idx..path_len {
-                let oap : &Option<Art<Path<K,V>>> = self.paths.get(i).unwrap();
+                let oap : &Option<Art<Rc<Path<K,V>>>> = self.paths.get(i).unwrap();
                 if (key_bits & 0x1) == (hsh_bits & 0x1) {
                     cur.paths.push(oap.clone());
                     key_bits >>= 1;
@@ -119,7 +120,7 @@ impl<K:'static+Hash+Eq+Debug+Clone,
                         Some(ref a) => {
                             let c = force(a);
                             cur.bit_idx = i+1;
-                            return c.build_path(path_len, Some(a.clone()), cur, key, key_hash)
+                            return (*c).build_path(path_len, Some(a.clone()), cur, key, key_hash)
                         }
                     }
                 }
@@ -209,7 +210,7 @@ impl<K:'static+Eq+Clone+Debug+Hash,
         self.head = 
             Some(cell(name_pair(self.name.clone(), 
                                 name_of_usize(self.cntr)), 
-                      new_path));
+                      Rc::new(new_path)));
         self.cntr += 1;
         return opv_old.unwrap_or(None);
     }
