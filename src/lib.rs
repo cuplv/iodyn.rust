@@ -25,6 +25,7 @@ pub mod inc_tree_cursor;
 pub mod inc_gauged_raz;
 pub mod inc_gauged_trie;
 pub mod inc_gauged_trie_opt;
+pub mod inc_gauged_trie_opt2;
 
 /// Persistent Raz - original design, simple but works
 pub type PRaz<E> = persist_raz::Raz<E>;
