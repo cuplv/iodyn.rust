@@ -40,6 +40,7 @@ const DEFAULT_NAMESIZE: usize = 1;
 const DEFAULT_EDITS: usize = 1;
 const DEFAULT_CHANGES: usize = 30;
 const DEFAULT_TRIALS: usize = 10;
+const DEFAULT_PATHLEN: usize = 32;
 
 fn main () {
   use std::thread;
@@ -65,6 +66,7 @@ fn main2() {
       -c, --changes=[changes]   'number of incremental changes'
       -t, --trials=[trials]     'trials to average over'
       -o, --outfile=[outfile]   'name for output files (of different extensions)'
+      -p, --pathlen=[pathlen]   'length of paths in the skiplist'
       --trace                   'produce an output trace of the incremental run' ")
     .get_matches();
   let dataseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_DATASEED);
@@ -75,6 +77,7 @@ fn main2() {
 	let edits = value_t!(args, "edits", usize).unwrap_or(DEFAULT_EDITS);
 	let changes = value_t!(args, "changes", usize).unwrap_or(DEFAULT_CHANGES);
 	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
+  let pathlen = value_t!(args, "pathlen", usize).unwrap_or(DEFAULT_PATHLEN);
   let outfile = args.value_of("outfile");
   let do_trace = args.is_present("trace");
   let coord = StdRng::from_seed(&[dataseed]);
@@ -90,10 +93,10 @@ fn main2() {
     edit: BatchInsert(edits),
     comp: HFolder::new(
       name_of_string(String::from("filltrie")),
-      {let mut t = Skiplist::emp(32, name_unit()); t.archive(name_unit()); t},
+      {let mut t = Skiplist::emp(pathlen, name_unit()); t.archive(name_unit()); t},
       |mut a,&GenSmall(e)|{ a.put(e, ()); a },
       |mut a,nm|{ match nm { None => a, Some(nm) => { a.archive(nm); a }}},
-      |mut a,(_lev,_nmopt)|{ a },
+      |a,(_lev,_nmopt)|{ a },
       |a|{a},
     ),
     changes: changes,
