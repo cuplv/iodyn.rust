@@ -66,7 +66,10 @@ impl<E: Debug+Clone+Eq+Hash+'static> tree::TreeUpdate for TreeData<E> {
 ///
 /// used between refocusing, and for running global algorithms
 #[derive(Clone,PartialEq,Eq,Debug)]
-pub struct RazTree<E: 'static+Debug+Clone+Eq+Hash>{count: usize, tree: Option<tree::Tree<TreeData<E>>>}
+pub struct RazTree<E: 'static+Debug+Clone+Eq+Hash>{
+	count: usize,
+	tree: Option<tree::Tree<TreeData<E>>>
+}
 
 impl<E: Debug+Clone+Eq+Hash+'static> RazTree<E> {
 	/// the number if items in the sequence
@@ -348,7 +351,7 @@ Raz<E> {
 		let mut join_cursor = tree::Cursor::from(tree);
 		if self.l_forest.up() != tree::UpResult::Fail {
 			let lev = self.l_forest.peek_level().unwrap();
-			let nm = self.r_forest.peek_name();
+			let nm = self.l_forest.peek_name();
 			self.l_forest.down_left_force(tree::Force::Discard);
 			let dummy = TreeData::Branch{l_count: 0, r_count: 0};
 			join_cursor = tree::Cursor::join(self.l_forest,lev,nm,dummy,join_cursor);
