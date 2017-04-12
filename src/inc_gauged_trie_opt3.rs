@@ -17,6 +17,8 @@ struct HashVal(usize);
 /// A contiguous block of skiplist paths/keys/values
 #[derive(Debug,Clone,Hash,Eq,PartialEq)]
 struct Path<K,V> {
+    //name:   Name,  // TODO-Soon: Want/need this here?
+    //cntr:   usize, // TODO-Soon: Want/need this here?
     hash:   HashVal,
     kvs:    Vec<(K,Option<V>)>,
     paths:  Vec<Option<Art<Rc<Path<K,V>>>>>,
@@ -72,6 +74,20 @@ impl<K:Clone,V:Clone> Cursor<K,V> {
     }
 }
 
+// struct ObsParam {
+//     path_len:usize,
+//     cur_art:Option<Art<Rc<Path<K,V>>>>,
+//     cur:Cursor<K,V>,
+//     key_hash:HashVal
+// }
+// struct ObsRes {
+//     cur:Cursor<K,V>
+// }
+
+// fn observe(&path:Path<K,V>, obs_st:ObsParam) -> ObsRes {
+    
+// }
+
 impl<K:'static+Hash+Eq+Debug+Clone,
      V:'static+Hash+Eq+Debug+Clone> Path<K,V> {
    
@@ -80,7 +96,7 @@ impl<K:'static+Hash+Eq+Debug+Clone,
          path_len:usize,
          cur_art:Option<Art<Rc<Path<K,V>>>>, 
          cur:&mut Cursor<K,V>, 
-         key:&K, key_hash:HashVal) -> Option<Vec<(K,Option<V>)>>
+         key_hash:HashVal) -> Option<Vec<(K,Option<V>)>>
     {
         // Mutable copies of these bit strings
         let mut key_bits = key_hash.0;
@@ -90,16 +106,12 @@ impl<K:'static+Hash+Eq+Debug+Clone,
         key_bits >>= cur.bit_idx;
         hsh_bits >>= cur.bit_idx;
 
-        // Check for perfect match of remaining bits
         if hsh_bits == key_bits {
-            // Copy the remaining paths for this chk_idx into the cursor
             for i in cur.bit_idx..path_len { 
                 cur.paths.push(self.paths.get(i).unwrap().clone()) 
             };
             return Some(self.kvs.clone());
         } else {    
-            // While bits match, move the cursor along axis cur.bit_idx;
-            // When bits mis-match, move cursor along axis cur.chk_idx, and recur via `get_cursor`.
             let start_idx = cur.bit_idx;
             'matching_bits: 
             for i in start_idx..path_len {
@@ -110,17 +122,15 @@ impl<K:'static+Hash+Eq+Debug+Clone,
                     hsh_bits >>= 1;
                     continue 'matching_bits;
                 } else {
+                    cur.bit_idx = i+1;
                     cur.paths.push(cur_art);
                     match * self.paths.get(i).unwrap() {
                         None => {
-                            cur.bit_idx = i+1;
                             cur.fill_empty(path_len);
                             return None
                         }
                         Some(ref a) => {
-                            let c = force(a);
-                            cur.bit_idx = i+1;
-                            return (*c).build_path(path_len, Some(a.clone()), cur, key, key_hash)
+                            return (force(a)).build_path(path_len, Some(a.clone()), cur, key_hash)
                         }
                     }
                 }
@@ -131,12 +141,12 @@ impl<K:'static+Hash+Eq+Debug+Clone,
 }
 
 
-/// Abstract, finite map interface implemented by the incremental, high-gauge Skiplist.
+/// Abstract, finite map interface implemented by the incremental Skiplist.
 pub trait FinMap<K,V>
 {
     /// An empty mapping; all keys map to `None`.
     fn emp(path_len:usize, nm:Name) -> Self;
-    /// Name and articulate the Skiplist
+    /// Update the Name in the head of the Skiplist
     fn archive(&mut self, nm:Name);
     /// Extend mapping to map key `k` to optional value `opv`. 
     /// Returns the prior mapping of key `k`, if any.
@@ -177,7 +187,7 @@ impl<K:'static+Eq+Clone+Debug+Hash,
         let old_kvs = match self.head {
             None => None,
             Some(ref path) =>
-                force(path).build_path(self.path_len, Some(path.clone()), &mut cur, &k, k_hash.clone()),
+                force(path).build_path(self.path_len, Some(path.clone()), &mut cur, k_hash.clone()),
         };
         let mut new_kvs = vec![];
         let mut opv_old = None;
@@ -229,7 +239,7 @@ impl<K:'static+Eq+Clone+Debug+Hash,
         let mut cur = Cursor::new();
         let res = match self.head {
             None => None,
-            Some(ref path) => force(path).build_path(self.path_len, None, &mut cur, &k, k_hash),
+            Some(ref path) => force(path).build_path(self.path_len, None, &mut cur, k_hash),
         };            
         match res {
             Some(kvs) => {
