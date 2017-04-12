@@ -27,6 +27,7 @@ pub mod inc_gauged_raz;
 //pub mod inc_gauged_trie_opt;
 pub mod inc_gauged_trie_opt2;
 pub mod inc_gauged_trie_opt3;
+pub mod inc_gauged_trie_opt4;
 
 /// Persistent Raz - original design, simple but works
 pub type PRaz<E> = persist_raz::Raz<E>;

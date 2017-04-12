@@ -74,19 +74,37 @@ impl<K:Clone,V:Clone> Cursor<K,V> {
     }
 }
 
-// struct ObsParam {
-//     path_len:usize,
-//     cur_art:Option<Art<Rc<Path<K,V>>>>,
-//     cur:Cursor<K,V>,
-//     key_hash:HashVal
-// }
-// struct ObsRes {
-//     cur:Cursor<K,V>
-// }
+/// Invariant parameters to the observation: The key bits for which we are looking, including how many remain.
+struct ObsParam {
+    // Total number of bits in a full path
+    path_len:usize,
+    // Full list of bits for the search key
+    key_bits:usize,
+    // Which bit is next in our comparison, in interval [0,path_len).
+    key_biti:usize,
+}
+struct ObsRes<K,V> {
+    paths: Vec<Art<Rc<Path<K,V>>>>,
+    next:  Option<Art<Rc<Path<K,V>>>>,
+    kvs:   Option<Vec<(K,Option<V>)>>,
+}
 
-// fn observe(&path:Path<K,V>, obs_st:ObsParam) -> ObsRes {
-    
-// }
+fn observe<K,V>
+    (art:    &Art<Rc<Path<K,V>>>,
+     path:   &Rc<Path<K,V>>,
+     params: ObsParam) -> ObsRes<K,V>
+{
+    // Same algorithm as build_path, except that:
+    //
+    // 1. The `observe` fn is not recursive; rather, it trampolines
+    // using the `next` field of the `ObsRes`, and an external loop.
+    //
+    // 2. The `observe` fn does not call `force`; rather, it's the
+    // function that `force` uses to filter the forced observation
+    // (arg `path`) into a structure with strictly less information,
+    // of type `ObsRes`.
+    panic!("")
+}
 
 impl<K:'static+Hash+Eq+Debug+Clone,
      V:'static+Hash+Eq+Debug+Clone> Path<K,V> {
