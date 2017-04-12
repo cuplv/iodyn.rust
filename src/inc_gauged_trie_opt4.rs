@@ -76,18 +76,26 @@ impl<K:Clone,V:Clone> Cursor<K,V> {
 
 /// Invariant parameters to the observation: The key bits for which we are looking, including how many remain.
 struct ObsParam {
-    // Total number of bits in a full path
+    /// Total number of bits in a full path.
     path_len:usize,
-    // Full list of bits for the search key
+    /// Full list of bits for the search key.
     key_bits:usize,
-    // Which bit is next in our comparison, in interval [0,path_len).
+    /// Which bit is next in our comparison, in interval [0,path_len).
     key_biti:usize,
 }
 struct ObsRes<K,V> {
+    /// The paths that we observe; this is some sub-interval (a 'slice'?) of the full vector of paths in the observed `Path`.
     paths: Vec<Art<Rc<Path<K,V>>>>,
+    /// Case 1: The key_bits do _not_ fully match those of the observed `Path`; the trampoline uses this `Art`, observing it next.
     next:  Option<Art<Rc<Path<K,V>>>>,
+    /// Case 2: The key_bits _do_ fully match those of the observed `Path`; in this case, we also observe the key-value pairs.
     kvs:   Option<Vec<(K,Option<V>)>>,
 }
+
+/// This is the 'generic' signature for an observation function; it
+/// receives the art, its full content of type `T` and returns some
+/// partial view of this content, of type `S`.
+fn generic_observe<T,S> (art: &Art<T>, full_content:T) -> S {  unimplemented!() }
 
 fn observe<K,V>
     (art:    &Art<Rc<Path<K,V>>>,
