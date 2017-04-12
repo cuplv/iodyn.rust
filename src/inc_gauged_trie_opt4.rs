@@ -74,7 +74,8 @@ impl<K:Clone,V:Clone> Cursor<K,V> {
     }
 }
 
-/// Invariant parameters to the observation: The key bits for which we are looking, including how many remain.
+/// Invariant parameters to the observation: The key bits for which we
+/// are looking, including how many remain.
 struct ObsParam {
     /// Total number of bits in a full path.
     path_len:usize,
@@ -84,11 +85,18 @@ struct ObsParam {
     key_biti:usize,
 }
 struct ObsRes<K,V> {
-    /// The paths that we observe; this is some sub-interval (a 'slice'?) of the full vector of paths in the observed `Path`.
+    /// The paths that we observe; this is some sub-interval (a
+    /// 'slice'?) of the full vector of paths in the observed `Path`.
+    /// Its length depends on to what extent the search-key bits match
+    /// those of the observed path.  There are two mutually-exclusive
+    /// cases, each using an optional field below ('next' vs 'kvs').
     paths: Vec<Art<Rc<Path<K,V>>>>,
-    /// Case 1: The key_bits do _not_ fully match those of the observed `Path`; the trampoline uses this `Art`, observing it next.
+    /// Case 1: The key_bits do _not_ fully match those of the
+    /// observed `Path`; the trampoline uses this `Art`, observing it
+    /// next.
     next:  Option<Art<Rc<Path<K,V>>>>,
-    /// Case 2: The key_bits _do_ fully match those of the observed `Path`; in this case, we also observe the key-value pairs.
+    /// Case 2: The key_bits _do_ fully match those of the observed
+    /// `Path`; in this case, we also observe the key-value pairs.
     kvs:   Option<Vec<(K,Option<V>)>>,
 }
 
