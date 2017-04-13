@@ -30,7 +30,7 @@ use pmfp_collections::inc_gauged_trie_opt3::{FinMap,Skiplist};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;
-use adapton::engine::reflect::trace::{Trace};
+use adapton::engine::reflect::trace::*;
 use eval::interface::*;
 
 const DEFAULT_DATASEED: usize = 0;
@@ -80,7 +80,8 @@ fn main2() {
 	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
   let pathlen = value_t!(args, "pathlen", usize).unwrap_or(DEFAULT_PATHLEN);
   let outfile = args.value_of("outfile");
-  let do_trace = args.is_present("trace");
+  let do_trace = args.is_present("trace") || args.is_present("trace-html");
+  let do_trace_html = args.is_present("trace-html");
   let coord = StdRng::from_seed(&[dataseed]);
 
   //fold over raz, use trie as set to gather elements
@@ -149,15 +150,18 @@ fn main2() {
     
   #[derive(Debug)]
   struct TraceCount {
-      dirty: usize,
       reeval_nochange: usize,
       reeval_change:   usize,
+      dirty:           usize,
+      alloc_fresh:     usize,
+      alloc_nochange:  usize,
+      alloc_change:    usize,
   }
 
   fn count_dirty(tr:&Trace, c:&mut TraceCount) -> usize {
       let dirty0 = c.dirty;
       match tr.effect {
-          reflect::trace::Effect::Dirty => c.dirty += 1,
+          Effect::Dirty => c.dirty += 1,
           _ => (),
       };
       for sub_tr in tr.extent.iter() {
@@ -166,11 +170,25 @@ fn main2() {
       return c.dirty - dirty0;
   }
 
-  fn count_reeval(tr:&Trace, c:&mut TraceCount) {
+  fn count_alloc_change(tr:&Trace, c:&mut TraceCount) -> usize {
+      let alloc_change0 = c.alloc_change;
       match tr.effect {
+          Effect::Alloc(AllocCase::LocFresh, _)                           => c.alloc_fresh    += 1,
+          Effect::Alloc(AllocCase::LocExists(ChangeFlag::ContentDiff), _) => c.alloc_change   += 1,
+          Effect::Alloc(AllocCase::LocExists(ChangeFlag::ContentSame), _) => c.alloc_nochange += 1,
+          _ => (),
+      };
+      for sub_tr in tr.extent.iter() {
+          count_alloc_change(sub_tr, c);
+      };
+      return c.alloc_change - alloc_change0;
+  }
+
+  fn count_reeval(tr:&Trace, c:&mut TraceCount) {
+      match tr.effect {          
           reflect::trace::Effect::CleanEval => { 
-              if count_dirty(tr, c) > 0 { 
-                  c.reeval_change += 1 
+              if count_dirty(tr, c) > 0 || count_alloc_change(tr, c) > 0 { 
+                  c.reeval_change += 1
               } 
               else { c.reeval_nochange += 1 }
           },
@@ -186,19 +204,26 @@ fn main2() {
 
   if do_trace {
     let traces = reflect::dcg_reflect_end();
+    
+    // output analytic counts
+    let mut count = TraceCount{ alloc_fresh:0, alloc_change:0, alloc_nochange:0,
+                                reeval_change:0, reeval_nochange:0, dirty: 0};
+    for tr in &traces {
+      count_reeval(&tr, &mut count);
+    };
+    println!("{:?}", count);
 
     // output trace
+    if do_trace_html {
     let f = File::create("trace.html").unwrap();
     let mut writer = BufWriter::new(f);
     writeln!(writer, "{}", style_string()).unwrap();
     writeln!(writer, "<div class=\"label\">Editor trace({}):</div>", traces.len()).unwrap();
     writeln!(writer, "<div class=\"traces\">").unwrap();
-    let mut count = TraceCount{ reeval_change:0, reeval_nochange:0, dirty: 0};
     for tr in traces {
-      count_reeval(&tr, &mut count);
       div_of_trace(&tr).write_html(&mut writer);
     };
-    println!("{:?}", count);
+    }
   }
 
   let result_hash: TestMResult<
