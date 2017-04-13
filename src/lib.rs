@@ -1,3 +1,14 @@
+//! This is a collection of persistent-like data structures
+//!
+//! Many of the structures have an exposed mutable head for fast
+//! updates, and an `archive` function to move the current head
+//! past a pointer. For the incremental structures, this pointer is
+//! mutable in some way, so that the changes can propagate to later
+//! computations
+//!
+//! Currently, the incremental structures are under development, with
+//! features surpassing the structures that were worked on previously
+
 extern crate rand;
 #[macro_use] extern crate adapton;
 
