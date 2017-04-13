@@ -30,6 +30,7 @@ use pmfp_collections::inc_gauged_trie_opt3::{FinMap,Skiplist};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;
+use adapton::engine::reflect::trace::{Trace};
 use eval::interface::*;
 
 const DEFAULT_DATASEED: usize = 0;
@@ -145,6 +146,38 @@ fn main2() {
   if do_trace {reflect::dcg_reflect_begin()}
 
   // run experiments
+    
+  #[derive(Debug)]
+  struct TraceCount {
+      dirty: usize,
+      reeval_nochange: usize,
+      reeval_change:   usize,
+  }
+
+  fn count_dirty(tr:&Trace, c:&mut TraceCount) -> usize {
+      let dirty0 = c.dirty;
+      match tr.effect {
+          reflect::trace::Effect::Dirty => c.dirty += 1,
+          _ => (),
+      };
+      for sub_tr in tr.extent.iter() {
+          count_dirty(sub_tr, c);
+      };
+      return c.dirty - dirty0;
+  }
+
+  fn count_reeval(tr:&Trace, c:&mut TraceCount) {
+      match tr.effect {
+          reflect::trace::Effect::CleanEval => { 
+              if count_dirty(tr, c) > 0 { 
+                  c.reeval_change += 1 
+              } 
+              else { c.reeval_nochange += 1 }
+          },
+          _ => ()
+      };
+      for sub_tr in tr.extent.iter() { count_reeval(sub_tr, c) };
+  }
 
   let result_trie: TestMResult<
     EvalIRaz<GenSmall,StdRng>,
@@ -160,9 +193,12 @@ fn main2() {
     writeln!(writer, "{}", style_string()).unwrap();
     writeln!(writer, "<div class=\"label\">Editor trace({}):</div>", traces.len()).unwrap();
     writeln!(writer, "<div class=\"traces\">").unwrap();
+    let mut count = TraceCount{ reeval_change:0, reeval_nochange:0, dirty: 0};
     for tr in traces {
+      count_reeval(&tr, &mut count);
       div_of_trace(&tr).write_html(&mut writer);
-    }
+    };
+    println!("{:?}", count);
   }
 
   let result_hash: TestMResult<
