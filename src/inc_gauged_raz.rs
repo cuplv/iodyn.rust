@@ -1120,4 +1120,41 @@ mod tests {
   	assert_eq!(string, raz_string);
   }
 
+
+	#[test]
+	fn test_names_many_edits() {
+		use rand::{thread_rng,Rng};
+
+		let mut r = Raz::new();
+		let mut t;
+		for i in 0..10000 {
+			r.push_left(i);
+			r.archive_left(tree::gen_level(&mut thread_rng()),Some(name_of_usize(i)));
+		}
+		t = r.unfocus();
+
+		let original_names = t.clone().fold_lr_meta(
+			Vec::new(),
+			Rc::new(|a,_e:&usize|{a}),
+			Rc::new(|mut a:Vec<Option<Name>>,(_l,n):(_,Option<Name>)|{a.push(n);a}),
+		);
+
+		for i in 0..10000 {
+			r = t.focus(thread_rng().gen::<usize>() % 10000).unwrap();
+			if thread_rng().gen() {
+				r.push_left(i);
+			} else {
+				r.push_right(i);
+			}
+			t = r.unfocus();
+		}
+
+		let new_names = t.clone().fold_lr_meta(
+			Vec::new(),
+			Rc::new(|a,_e:&usize|{a}),
+			Rc::new(|mut a:Vec<Option<Name>>,(_l,n):(_,Option<Name>)|{a.push(n);a}),
+		);
+
+		assert_eq!(original_names, new_names);
+	}
 }
