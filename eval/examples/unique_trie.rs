@@ -11,6 +11,7 @@ extern crate pmfp_collections;
 extern crate eval;
 extern crate adapton_lab;
 
+use std::fmt;
 use std::io::BufWriter;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -149,8 +150,8 @@ fn main2() {
 
   // run experiments
     
-  #[derive(Debug)]
   struct TraceCount {
+      total_updates:   usize,
       reeval_nochange: usize,
       reeval_change:   usize,
       alloc_fresh:     usize,
@@ -158,6 +159,31 @@ fn main2() {
       alloc_change:    usize,
       dirty:           usize,
       clean_rec:       usize,
+  }
+
+  impl fmt::Debug for TraceCount {
+      fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {  
+          write!(f,"\
+Trace counts:      {:>12} {:>12}
+---------------------------------------------
+dirty:             {:>12} {:>12}
+clean_rec:         {:>12} {:>12}
+reeval:
+  reeval_nochange: {:>12} {:>12}
+  reeval_change:   {:>12} {:>12}
+  alloc_fresh:     {:>12} {:>12}
+  alloc_nochange:  {:>12} {:>12}
+  alloc_change:    {:>12} {:>12}",
+                 format!("sum"),        format!("ave"),
+                 self.dirty,            self.dirty           / self.total_updates,
+                 self.clean_rec,        self.clean_rec       / self.total_updates,
+                 self.reeval_nochange,  self.reeval_nochange / self.total_updates, 
+                 self.reeval_change,    self.reeval_change   / self.total_updates,
+                 self.alloc_fresh,      self.alloc_fresh     / self.total_updates,
+                 self.alloc_nochange,   self.alloc_nochange  / self.total_updates,
+                 self.alloc_change,     self.alloc_change    / self.total_updates,
+          )
+      }
   }
 
   fn count_dirty(tr:&Trace, c:&mut TraceCount) -> usize {
@@ -200,7 +226,7 @@ fn main2() {
       match tr.effect {          
           reflect::trace::Effect::CleanEval => { 
               let dirty0 = c.dirty;
-              if  count_dirty(tr, c) > 0 || 
+              if  /* count_dirty(tr, c) > 0 ||  */
                   count_alloc_change(tr, c) > 0 
                    { c.reeval_change   += 1 }
               else { c.reeval_nochange += 1 };
@@ -222,7 +248,9 @@ fn main2() {
     // output analytic counts
     let mut count = TraceCount{ alloc_fresh:0, alloc_change:0, alloc_nochange:0,
                                 reeval_change:0, reeval_nochange:0, 
-                                dirty:0, clean_rec:0};
+                                dirty:0, clean_rec:0,
+                                total_updates: changes,
+    };
     for tr in &traces {
       count_reeval(&tr, &mut count);
       count_clean(&tr, &mut count);
@@ -262,7 +290,8 @@ fn main2() {
   let edit_ivl = inc_veclist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
 
-  println!("Computation time (ms): (initial run, first incremental run); do_trace={:?}", do_trace);
+  println!("----------------------------------------------------------------------------------");
+  println!("Computation time (ms): (initial run, first incremental run); Note:do_trace={:?}", do_trace);
   println!("hash_set: ({:8.3}, {:8.3})", comp_hash[0] as f32 / 1000000.0, comp_hash[1] as f32 / 1000000.0);
   println!("trie_set: ({:8.3}, {:8.3})", comp_trie[0] as f32 / 1000000.0, comp_trie[1] as f32 / 1000000.0);
   println!("vec_list: ({:8.3}, {:8.3})", comp_ivl[0]  as f32 / 1000000.0, comp_ivl[1]  as f32 / 1000000.0);
