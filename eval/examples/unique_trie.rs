@@ -68,7 +68,8 @@ fn main2() {
       -t, --trials=[trials]     'trials to average over'
       -o, --outfile=[outfile]   'name for output files (of different extensions)'
       -p, --pathlen=[pathlen]   'length of paths in the skiplist'
-      --trace                   'produce an output trace of the incremental run' ")
+      --trace                   'trace the incremental run, producing counts'
+      --trace-html              'trace the incremental run, producing counts and HTML (can be very large)'")
     .get_matches();
   let dataseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_DATASEED);
   let editseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_EDITSEED);
@@ -152,10 +153,11 @@ fn main2() {
   struct TraceCount {
       reeval_nochange: usize,
       reeval_change:   usize,
-      dirty:           usize,
       alloc_fresh:     usize,
       alloc_nochange:  usize,
       alloc_change:    usize,
+      dirty:           usize,
+      clean_rec:       usize,
   }
 
   fn count_dirty(tr:&Trace, c:&mut TraceCount) -> usize {
@@ -168,6 +170,16 @@ fn main2() {
           count_dirty(sub_tr, c);
       };
       return c.dirty - dirty0;
+  }
+
+  fn count_clean(tr:&Trace, c:&mut TraceCount) {
+      match tr.effect {
+          Effect::CleanRec => c.clean_rec += 1,
+          _ => (),
+      };
+      for sub_tr in tr.extent.iter() {
+          count_clean(sub_tr, c);
+      };
   }
 
   fn count_alloc_change(tr:&Trace, c:&mut TraceCount) -> usize {
@@ -187,10 +199,12 @@ fn main2() {
   fn count_reeval(tr:&Trace, c:&mut TraceCount) {
       match tr.effect {          
           reflect::trace::Effect::CleanEval => { 
-              if count_dirty(tr, c) > 0 || count_alloc_change(tr, c) > 0 { 
-                  c.reeval_change += 1
-              } 
-              else { c.reeval_nochange += 1 }
+              let dirty0 = c.dirty;
+              if  count_dirty(tr, c) > 0 || 
+                  count_alloc_change(tr, c) > 0 
+                   { c.reeval_change   += 1 }
+              else { c.reeval_nochange += 1 };
+              c.dirty = dirty0;
           },
           _ => ()
       };
@@ -207,9 +221,12 @@ fn main2() {
     
     // output analytic counts
     let mut count = TraceCount{ alloc_fresh:0, alloc_change:0, alloc_nochange:0,
-                                reeval_change:0, reeval_nochange:0, dirty: 0};
+                                reeval_change:0, reeval_nochange:0, 
+                                dirty:0, clean_rec:0};
     for tr in &traces {
       count_reeval(&tr, &mut count);
+      count_clean(&tr, &mut count);
+      count_dirty(&tr, &mut count);
     };
     println!("{:?}", count);
 
