@@ -302,7 +302,7 @@ mod tests {
 				Tree::new(0,None,Some(6),None,None),
 			)
 		).unwrap();
-		let tree_plus1 = t.clone().map(Rc::new(|d: Option<usize>| {
+		let tree_plus1 = t.clone().map(Rc::new(|d: Option<usize>,_l,_n,_t1:Option<&_>,_t2:Option<&_>| {
 			d.map(|n|n+1)
 		}));
 		let leaf = tree_plus1.l_tree().unwrap().r_tree().unwrap().l_tree().unwrap().r_tree().unwrap();

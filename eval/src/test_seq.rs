@@ -85,8 +85,8 @@ pub struct TestMResult<I,O> {
 	in_type: PhantomData<I>,
 	out_type: PhantomData<O>,
 }
-use std::fmt::Debug;
-impl<C,E,U,I:Debug,O:Debug>
+//use std::fmt::Debug;
+impl<C,E,U,I,O>
 Testor<TestMResult<I,O>>
 for EditComputeSequence<C,E,U> where
 	C: Creator<Duration,I>,

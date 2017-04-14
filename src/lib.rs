@@ -35,7 +35,7 @@ pub mod inc_level_tree;
 pub mod inc_tree_cursor;
 pub mod inc_gauged_raz;
 pub mod raz_meta;
-pub mod inc_gauged_trie;
+// pub mod inc_gauged_trie;
 pub mod inc_gauged_trie_opt;
 
 /// Persistent Raz - original design, simple but works
