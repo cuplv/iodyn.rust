@@ -156,9 +156,14 @@ Tree<E> {
 	}
 
   /// memoized map operation
+  ///
+  /// because of the possibility of meta data in tree nodes, the
+  /// mapping function takes all the data of a tree, including refs
+  /// to subtrees. Names passed to the mapping function are USED in the
+  /// resulting tree and should not be reused for the creation of arts.
   pub fn map<R:Eq+Clone+Hash+Debug+'static,F>(self, map_val: Rc<F>) -> Tree<R>
   where
-  	F: 'static + Fn(E) -> R
+  	F: 'static + Fn(E,u32,Option<Name>,Option<&Tree<R>>,Option<&Tree<R>>) -> R
   {
 		// TODO: use the branch's name to memoize its mapping
     match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
@@ -175,12 +180,13 @@ Tree<E> {
       		)
       	}
       };
-      Tree::new(self.level, self.name, map_val(data), l, r).unwrap()
+      let new_data = map_val(data, self.level, self.name.clone(), l.as_ref(), r.as_ref());
+      Tree::new(self.level, self.name, new_data, l, r).unwrap()
     }}
   }
 }
 
-/// Use good_levels to verify level consistancy when debugging
+/// Use good_levels to verify level consistency when debugging
 ///
 /// This is an O(n) operation, so it shouldn't be used in release mode
 ///
@@ -195,7 +201,7 @@ Tree<E> {
 /// of non-increasing to the left branch and decreasing to the
 /// right branch
 ///
-/// also prints the levels of the failing trees and branchs
+/// also prints the levels of the failing trees and branches
 pub fn good_levels<E: Debug+Clone+Eq+Hash+'static>(tree: &Tree<E>) -> bool {
 	let mut good = true;
 	if let Some(ref t) = force(&tree.link).l_branch {
