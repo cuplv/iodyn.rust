@@ -199,7 +199,8 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 
 
 	/// focus on a location in the sequence to begin editing.
-	pub fn focus(self, mut index: M::Index) -> Option<Raz<E,M>> {
+	pub fn focus<I:Into<M::Index>>(self, index: I) -> Option<Raz<E,M>> {
+		let mut index = index.into();
 		match self { 
 			RazTree{tree:None, ..} => {
 				Some(Raz{
@@ -727,9 +728,9 @@ mod tests {
   	let tree = example_tree();
   	assert!(good_levels(tree.tree.as_ref().unwrap()));
 
-  	let mut left = tree.clone().focus(0).unwrap();
-  	let mut deep = tree.clone().focus(5).unwrap();
-  	let mut right = tree.clone().focus(12).unwrap();
+  	let mut left = tree.clone().focus(0usize).unwrap();
+  	let mut deep = tree.clone().focus(5usize).unwrap();
+  	let mut right = tree.clone().focus(12usize).unwrap();
 
   	assert_eq!(Some(1), left.pop_right());
   	assert_eq!(Some(12), right.pop_left());
@@ -770,13 +771,13 @@ mod tests {
   	r.push_left(5);
   	r.push_right(6);
   	t = r.unfocus();
-  	r = t.focus(0).expect("focus on 0");
+  	r = t.focus(0usize).expect("focus on 0");
   	r.push_left(1);
   	r.push_left(2);
   	r.archive_left(3, Some(name_of_usize(3)));
   	t = r.unfocus();
 
-  	r = t.focus(8).expect("focus on 8");
+  	r = t.focus(8usize).expect("focus on 8");
   	r.archive_left(5, Some(name_of_usize(5)));
   	r.push_left(9);
   	r.push_left(10);
@@ -788,7 +789,7 @@ mod tests {
   	assert!(good_levels(t.tree.as_ref().unwrap()));
 
   	// focus and read
-  	r = t.focus(7).expect("focus on 7");
+  	r = t.focus(7usize).expect("focus on 7");
   	assert_eq!(Some(7), r.pop_left());
   	assert_eq!(Some(6), r.pop_left());
   	assert_eq!(Some(5), r.pop_left());
@@ -797,7 +798,7 @@ mod tests {
   	assert_eq!(Some(2), r.pop_left());
   	assert_eq!(Some(1), r.pop_left());
   	t = r.unfocus();
-  	r = t.focus(5).expect("focus on 5");
+  	r = t.focus(5usize).expect("focus on 5");
   	assert_eq!(None, r.pop_right());
   	assert_eq!(Some(12), r.pop_left());
   	assert_eq!(Some(11), r.pop_left());
@@ -1080,12 +1081,12 @@ mod tests {
   	r.push_left(5);
   	r.push_right(6);
   	t = r.unfocus();
-  	r = t.focus(0).expect("focus on 0");
+  	r = t.focus(0usize).expect("focus on 0");
   	r.push_left(1);
   	r.push_left(2);
   	r.archive_left(3, Some(name_of_usize(3)));
   	t = r.unfocus();
-  	r = t.focus(8).expect("focus on 8");
+  	r = t.focus(8usize).expect("focus on 8");
   	r.archive_left(5, Some(name_of_usize(5)));
   	r.push_left(9);
   	r.push_left(10);
@@ -1150,5 +1151,31 @@ mod tests {
 		);
 
 		assert_eq!(original_names, new_names);
+	}
+
+
+	#[test]
+	fn test_name_indexes() {
+		use raz_meta::Names;
+		use rand::{thread_rng,Rng};
+
+		let mut r: Raz<_,Names> = Raz::new();
+		for i in 0..1000 {
+			r.push_left(i);
+			if i % 10 == 0 {
+				r.archive_left(::inc_level(),Some(name_of_usize(i)));
+			}	
+		}
+		let t = r.unfocus();
+
+		println!("top: {:?}", t.meta());
+
+		for _ in 0..10 {
+			let val = (thread_rng().gen::<usize>() % 100) * 10;
+			let tree_name = name_pair(name_of_usize(val),name_of_string(String::from("tree")));
+			println!("{:?}", tree_name);
+			let r = t.clone().focus(tree_name).unwrap();
+			assert_eq!(Some(val), r.peek_left());
+		}
 	}
 }

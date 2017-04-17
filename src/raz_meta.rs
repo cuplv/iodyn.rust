@@ -3,7 +3,8 @@
 //! This meta data will be used when focusing into the Raz
 
 use std::fmt::Debug;
-use std::hash::Hash;
+use std::hash::{Hash,Hasher};
+use std::collections::HashMap;
 use adapton::engine::Name;
 
 pub trait RazMeta<E>: Sized+Debug+Clone+Eq+Hash {
@@ -14,6 +15,12 @@ pub trait RazMeta<E>: Sized+Debug+Clone+Eq+Hash {
 	/// create meta data from a leaf vec
 	fn from_vec(vec: &Vec<E>) -> Self;
 	/// create meta data from the pair of meta data in branches
+	///
+	/// Each branch contains a pair of meta data, so if this fn
+	/// is being used to create left meta data, it will receive
+	/// the left and right pair from the left branch, along with
+	/// the current level and name. This is similar for creating
+	/// the right meta data.
 	///
 	/// The names passed into here are USED in the tree that it
 	/// rebuilds the meta data for, and should not be used again to
@@ -112,4 +119,67 @@ impl FirstLast for usize {
 	fn last() -> Self { usize::max_value() }
 }
 
-// TODO: HashMap
+/// Metadata for names in a raz tree.
+///
+/// Hash is implemented by a no-op, since the data here
+/// can be found elsewhere in the tree. This is not intended
+/// to be used outside of a raz.
+#[derive(Clone,Eq,PartialEq,Debug)]
+pub struct Names(pub HashMap<Name,()>);
+impl Hash for Names {
+	/// does nothing
+	fn hash<H:Hasher>(&self, _state: &mut H) {}
+}
+
+#[derive(Clone,Debug)]
+pub enum NameIndex {
+	FarLeft,
+	FarRight,
+	Name(Name),
+}
+
+impl From<Name> for NameIndex {
+	fn from(nm: Name) -> Self { NameIndex::Name(nm) }
+}
+
+impl FirstLast for NameIndex {
+	fn first() -> Self { NameIndex::FarLeft }
+	fn last() -> Self { NameIndex::FarRight }
+}
+
+impl<E> RazMeta<E> for Names {
+	type Index = NameIndex;
+
+	fn from_none() -> Self { Names(HashMap::new()) }
+	fn from_vec(_vec: &Vec<E>) -> Self { Names(HashMap::new()) }
+	fn from_meta(l: &Self, r: &Self, _lev: u32, n: Option<Name>) -> Self {
+		let mut h = HashMap::new();
+		for k in l.0.keys() { h.insert(k.clone(),()); }
+		for k in r.0.keys() { h.insert(k.clone(),()); }
+		match n {None=>{},Some(nm)=>{ h.insert(nm,()); }}
+		Names(h)
+	}
+	fn choose_side(l: &Self, r: &Self, index: &Self::Index) -> SideChoice<Self::Index> {
+		match *index {
+			NameIndex::FarLeft => SideChoice::Left(NameIndex::FarLeft),
+			NameIndex::FarRight => SideChoice::Right(NameIndex::FarRight),
+			NameIndex::Name(ref nm) => {
+				match (l.0.contains_key(nm),r.0.contains_key(nm)) {
+					(true,true) => SideChoice::Here,
+					(true,false) => SideChoice::Left(index.clone()),
+					(false,true) => SideChoice::Right(index.clone()),
+					(false,false) => SideChoice::Nowhere,
+				}
+			}
+		}
+	}
+	/// # Panics
+	/// Panics if a name is given as index 
+	fn split_vec<'a>(vec: &'a Vec<E>, index: &Self::Index) -> (&'a [E],&'a [E]) {
+		match *index {
+			NameIndex::FarLeft => vec.split_at(0),
+			NameIndex::FarRight => vec.split_at(vec.len()),
+			_ => panic!("There are no names in this region")
+		}
+	}
+}
