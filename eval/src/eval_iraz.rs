@@ -237,103 +237,6 @@ EditAppend for EvalIRaz<E,G> {
 	}
 }
 
-// /// Appends to a `RazTree` by focusing to the end, pushing
-// /// data, levels, and names, then unfocusing
-// // uses (saved) Params::{namesize,unitsize}
-// // TODO: Buggy
-// impl<E:Adapt+Rand,G:Rng>
-// EditExtend for EvalIRaz<E,G> {
-// 	fn extend(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
-// 		let tree = self.raztree.take().unwrap();
-
-// 		// measure stuff
-// 		let len = tree.meta().0;
-// 		let mut newelems = batch_size;
-// 		// fill in the level
-// 		let levelless = len % self.unitsize;
-// 		let pre_elems = cmp::min(self.unitsize - levelless, newelems);
-// 		let madelevel = if levelless + pre_elems == self.unitsize {1} else {0}; 
-// 		newelems -= pre_elems;
-// 		// fill in the name
-// 		let nameless = len % (self.namesize*self.unitsize);
-// 		let pre_levels = cmp::min(
-// 			(self.namesize - nameless - pre_elems) / self.unitsize,
-// 			newelems / self.unitsize
-// 		);
-// 		let madename = if
-// 			nameless / self.unitsize + madelevel + pre_levels
-// 			== self.namesize
-// 			{1} else {0}
-// 		;
-// 		newelems -= pre_levels * self.unitsize;
-// 		// add more names etc. like above
-// 		let names = newelems /(self.namesize*self.unitsize);
-// 		let new_levels = madelevel + pre_levels + (newelems / self.unitsize);
-// 		let nonames = newelems - names;
-// 		let units = nonames / self.unitsize;
-// 		let nounits = nonames - units;
-
-// 		// pregenerate data
-// 		let mut lev_vec = Vec::with_capacity(new_levels);
-// 		for _ in 0..(new_levels) {
-// 			lev_vec.push(gen_level(rng))
-// 		}
-// 		let mut name_vec = Vec::with_capacity(madename + names*self.namesize);
-// 		if madename == 1 {name_vec.push(Some(self.next_name()))}
-// 		for _ in 0..names {
-// 			for _ in 0..(self.namesize-1){
-// 				// no name with these levels
-// 				name_vec.push(None)
-// 			}
-// 			name_vec.push(Some(self.next_name()));
-// 		}
-// 		let mut data_iter = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
-// 		let mut name_iter = name_vec.into_iter();
-// 		let mut level_iter = lev_vec.into_iter();
-
-// 		// time the append
-// 		let time = Duration::span(||{
-// 			// finish the last level, name
-// 			let mut raz = tree.focus(len).expect("02");
-// 			for _ in 0..pre_elems {
-// 				raz.push_left(data_iter.next().expect("03"));
-// 			}
-// 			for _ in 0..pre_levels {
-// 				raz.archive_left(level_iter.next().expect("04"), None);
-// 				for _ in 0..self.unitsize {
-// 					raz.push_left(data_iter.next().expect("05"));
-// 				}
-// 			}
-// 			if madename == 1 {
-// 				raz.archive_left(level_iter.next().expect("06"), name_iter.next().expect("07"))
-// 			} else if madelevel == 1 {
-// 				raz.archive_left(level_iter.next().expect("08"), None)
-// 			}
-// 			// add new elms, levels, names, like above
-// 			for _ in 0..names {
-// 				for _ in 0..self.namesize {
-// 					for _ in 0..self.unitsize {
-// 						raz.push_left(data_iter.next().expect("09"));
-// 					}
-// 					raz.archive_left(level_iter.next().expect("10"), name_iter.next().expect("11"));
-// 				}
-// 				// name inserted above
-// 			}
-// 			for _ in 0..units {
-// 				for _ in 0..self.unitsize {
-// 					raz.push_left(data_iter.next().expect("12"));
-// 				}
-// 				raz.archive_left(level_iter.next().expect("13"), None);
-// 			}
-// 			for _ in 0..nounits {
-// 				raz.push_left(data_iter.next().expect("14"));
-// 			}
-// 			self.raztree = Some(raz.unfocus());
-// 		});
-// 		(time,self)
-// 	}
-// }
-
 impl<E:Adapt+Ord,G:Rng>
 CompMax for EvalIRaz<E,G> {
 	type Target = Option<E>;
@@ -379,21 +282,20 @@ CompMap<E,O,F> for EvalIRaz<E,G> where
 
 }
 
-// Uses the old buggy fold
-// impl<E:Adapt,O:Adapt,F,G:Rng>
-// CompFold<E,O,F> for EvalIRaz<E,G> where
-// 	F:'static + Fn(O,&E)->O,
-// {
-// 	type Target = O;
-// 	fn comp_fold(&self, accum: O, f:Rc<F>, _rng: &mut StdRng) -> (Duration,Self::Target) {
-// 		let clone = self.raztree.clone().unwrap();
-// 		let mut res = None;
-// 		let time = Duration::span(||{
-// 			res = Some(clone.fold_lr(accum,f));
-// 		});
-// 		(time, res.unwrap())
-// 	}
-// }
+impl<E:Adapt,O:Adapt,F,G:Rng>
+CompFold<E,O,F> for EvalIRaz<E,G> where
+	F:'static + Fn(O,&E)->O,
+{
+	type Target = O;
+	fn comp_fold(&self, accum: O, f:Rc<F>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let clone = self.raztree.clone().unwrap();
+		let mut res = None;
+		let time = Duration::span(||{
+			res = Some(clone.fold_lr_meta(accum,f,Rc::new(|a,_|{a})));
+		});
+		(time, res.unwrap())
+	}
+}
 
 impl<E:Adapt,O:Adapt,F,N,G:Rng>
 CompFoldMeta<E,O,(u32,Option<Name>),F,N> for EvalIRaz<E,G> where

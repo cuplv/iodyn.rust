@@ -118,14 +118,6 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		})
 	}
 
-	// /// left-to-right memoized fold (Old version, poor incremental performance)
-	// pub fn fold_lr<A,B>(self, init: A, bin: Rc<B>) -> A where
-	// 	A: 'static + Eq+Clone+Hash+Debug,
-	// 	B: 'static + Fn(A,&E) -> A,
-	// {
-	// 	self.into_iter().inc_fold_out(init,bin)
-	// }
-
 	/// left-to-right memoized fold with levels and names
 	pub fn fold_lr_meta<A,B,N>(self, init: A, bin: Rc<B>, meta: Rc<N>) -> A where
 		A: 'static + Eq+Clone+Hash+Debug,
@@ -507,14 +499,14 @@ Raz<E,M> {
 // impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterL<T> {
 // 	type Item = T;
 // 	fn next(&mut self) -> Option<Self::Item> {
-// 		self.0.pop_left()
+// 		unimplemented!() // don't change the data!
 // 	}
 // }
 // pub struct IterR<T: Debug+Clone+Eq+Hash+'static>(Raz<T>);
 // impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterR<T> {
 // 	type Item = T;
 // 	fn next(&mut self) -> Option<Self::Item> {
-// 		self.0.pop_right()
+// 		unimplemented!() // don't change the data!
 // 	}
 // }
 // impl<T: Debug+Clone+Eq+Hash+'static> IterR<T> {
