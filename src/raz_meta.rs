@@ -36,27 +36,41 @@ pub trait FirstLast {
 }
 
 impl<E> RazMeta<E> for () {
-	type Index = ();
+	type Index = OnlyEnds;
 
 	fn from_none() -> Self { () }
 	fn from_vec(_vec: &Vec<E>) -> Self { () }
 	fn from_meta(_l: &Self, _r: &Self, _lev: u32, _n: Option<Name>) -> Self { () }
-	fn choose_side(_l: &Self, _r: &Self, _index: &Self::Index) -> SideChoice<Self::Index> {
-		SideChoice::Nowhere
+	fn choose_side(_l: &Self, _r: &Self, index: &Self::Index) -> SideChoice<Self::Index> {
+		match *index {
+			OnlyEnds::First => SideChoice::Left(OnlyEnds::First),
+			OnlyEnds::Last => SideChoice::Right(OnlyEnds::Last),
+		}
 	}
-	/// # Panics
-	/// always panics
-	fn split_vec<'a>(_vec: &'a Vec<E>, _index: &Self::Index) -> (&'a [E],&'a [E]) {
-		panic!("no indexing available")
+	fn split_vec<'a>(vec: &'a Vec<E>, index: &Self::Index) -> (&'a [E],&'a [E]) {
+		match *index {
+			OnlyEnds::First => vec.split_at(0),
+			OnlyEnds::Last => vec.split_at(vec.len()),
+		}
 	}
 }
 
-impl FirstLast for () {
-	fn first() -> Self {()}
-	fn last() -> Self {()}
+#[derive(Debug,Clone,Eq,PartialEq,Hash)]
+pub enum OnlyEnds {
+	First,
+	Last,
+}
+
+impl FirstLast for OnlyEnds {
+	fn first() -> Self {OnlyEnds::First}
+	fn last() -> Self {OnlyEnds::Last}
 }
 
 /// Meta data for element count and positioning from the left
+///
+/// usize::max_value() is a special marker for
+/// the end of the sequence, otherwise, values too large will
+/// fail in some appropriate way.
 #[derive(Clone,Eq,PartialEq,Hash,Debug)]
 pub struct Count(pub usize);
 
@@ -76,7 +90,8 @@ impl<E> RazMeta<E> for Count {
 		index: &Self::Index
 	) -> SideChoice<Self::Index> {
 		let i = *index;
-		if i > l + r { SideChoice::Nowhere }
+		if i == usize::max_value() { SideChoice::Right(i) }
+		else if i > l + r { SideChoice::Nowhere }
 		else if i > l { SideChoice::Right(i - l) }
 		else if i == l { SideChoice::Here }
 		else { SideChoice::Left(i) }
@@ -93,8 +108,8 @@ impl<E> RazMeta<E> for Count {
 }
 
 impl FirstLast for usize {
-	fn first() -> Self { usize::max_value() }
-	fn last() -> Self { 0 }
+	fn first() -> Self { 0 }
+	fn last() -> Self { usize::max_value() }
 }
 
 // TODO: HashMap

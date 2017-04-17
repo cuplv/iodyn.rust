@@ -233,7 +233,7 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 						SideChoice::Here => {
 							assert!(cursor.down_left());
 							while cursor.down_right() {}
-							index = M::Index::first();
+							index = M::Index::last();
 						},
 						SideChoice::Nowhere => { return None }, 
 					}
