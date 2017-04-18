@@ -7,13 +7,26 @@ use std::hash::{Hash,Hasher};
 use std::collections::HashMap;
 use adapton::engine::Name;
 
+/// trait for creating and searching for meta data in the
+/// branches of the raz. There are two pieces of meta data
+/// in each node, one created from its left branch and one
+/// created from its right branch. The level and name from
+/// the current node are also available.
 pub trait RazMeta<E>: Sized+Debug+Clone+Eq+Hash {
 	type Index: FirstLast;
 
 	/// create meta data for an empty branch
-	fn from_none() -> Self;
+	///
+	/// The names passed into here are USED in the tree that it
+	/// rebuilds the meta data for, and should not be used again to
+	/// name arts
+	fn from_none(lev: u32, n: Option<Name>) -> Self;
 	/// create meta data from a leaf vec
-	fn from_vec(vec: &Vec<E>) -> Self;
+	///
+	/// The names passed into here are USED in the tree that it
+	/// rebuilds the meta data for, and should not be used again to
+	/// name arts
+	fn from_vec(vec: &Vec<E>, lev: u32, n: Option<Name>) -> Self;
 	/// create meta data from the pair of meta data in branches
 	///
 	/// Each branch contains a pair of meta data, so if this fn
@@ -45,8 +58,8 @@ pub trait FirstLast {
 impl<E> RazMeta<E> for () {
 	type Index = OnlyEnds;
 
-	fn from_none() -> Self { () }
-	fn from_vec(_vec: &Vec<E>) -> Self { () }
+	fn from_none(_lev: u32, _n: Option<Name>) -> Self { () }
+	fn from_vec(_vec: &Vec<E>, _lev: u32, _n: Option<Name>) -> Self { () }
 	fn from_meta(_l: &Self, _r: &Self, _lev: u32, _n: Option<Name>) -> Self { () }
 	fn choose_side(_l: &Self, _r: &Self, index: &Self::Index) -> SideChoice<Self::Index> {
 		match *index {
@@ -84,8 +97,8 @@ pub struct Count(pub usize);
 impl<E> RazMeta<E> for Count {
 	type Index = usize;
 
-	fn from_none() -> Self { Count(0) }
-	fn from_vec(vec: &Vec<E>) -> Self {
+	fn from_none(_lev: u32, _n: Option<Name>) -> Self { Count(0) }
+	fn from_vec(vec: &Vec<E>, _lev: u32, _n: Option<Name>) -> Self {
 		Count(vec.len())
 	}
 	fn from_meta(&Count(l): &Self, &Count(r): &Self, _l: u32, _n: Option<Name>) -> Self {
