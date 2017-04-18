@@ -148,95 +148,6 @@ fn main2() {
   // for visual debugging
   if do_trace {reflect::dcg_reflect_begin()}
 
-  // run experiments
-    
-  struct TraceCount {
-      total_updates:   usize,
-      reeval_nochange: usize,
-      reeval_change:   usize,
-      alloc_fresh:     usize,
-      alloc_nochange:  usize,
-      alloc_change:    usize,
-      dirty:           usize,
-      clean_rec:       usize,
-  }
-
-  impl fmt::Debug for TraceCount {
-      fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {  
-          write!(f,"\
-Trace counts:      {:>12} {:>12}
----------------------------------------------
-dirty:             {:>12} {:>12}
-clean_rec:         {:>12} {:>12}
-reeval:
-  reeval_nochange: {:>12} {:>12}
-  reeval_change:   {:>12} {:>12}
-  alloc_fresh:     {:>12} {:>12}
-  alloc_nochange:  {:>12} {:>12}
-  alloc_change:    {:>12} {:>12}",
-                 format!("sum"),        format!("ave"),
-                 self.dirty,            self.dirty           / self.total_updates,
-                 self.clean_rec,        self.clean_rec       / self.total_updates,
-                 self.reeval_nochange,  self.reeval_nochange / self.total_updates, 
-                 self.reeval_change,    self.reeval_change   / self.total_updates,
-                 self.alloc_fresh,      self.alloc_fresh     / self.total_updates,
-                 self.alloc_nochange,   self.alloc_nochange  / self.total_updates,
-                 self.alloc_change,     self.alloc_change    / self.total_updates,
-          )
-      }
-  }
-
-  fn count_dirty(tr:&Trace, c:&mut TraceCount) -> usize {
-      let dirty0 = c.dirty;
-      match tr.effect {
-          Effect::Dirty => c.dirty += 1,
-          _ => (),
-      };
-      for sub_tr in tr.extent.iter() {
-          count_dirty(sub_tr, c);
-      };
-      return c.dirty - dirty0;
-  }
-
-  fn count_clean(tr:&Trace, c:&mut TraceCount) {
-      match tr.effect {
-          Effect::CleanRec => c.clean_rec += 1,
-          _ => (),
-      };
-      for sub_tr in tr.extent.iter() {
-          count_clean(sub_tr, c);
-      };
-  }
-
-  fn count_alloc_change(tr:&Trace, c:&mut TraceCount) -> usize {
-      let alloc_change0 = c.alloc_change;
-      match tr.effect {
-          Effect::Alloc(AllocCase::LocFresh, _)                           => c.alloc_fresh    += 1,
-          Effect::Alloc(AllocCase::LocExists(ChangeFlag::ContentDiff), _) => c.alloc_change   += 1,
-          Effect::Alloc(AllocCase::LocExists(ChangeFlag::ContentSame), _) => c.alloc_nochange += 1,
-          _ => (),
-      };
-      for sub_tr in tr.extent.iter() {
-          count_alloc_change(sub_tr, c);
-      };
-      return c.alloc_change - alloc_change0;
-  }
-
-  fn count_reeval(tr:&Trace, c:&mut TraceCount) {
-      match tr.effect {          
-          reflect::trace::Effect::CleanEval => { 
-              let dirty0 = c.dirty;
-              if  /* count_dirty(tr, c) > 0 ||  */
-                  count_alloc_change(tr, c) > 0 
-                   { c.reeval_change   += 1 }
-              else { c.reeval_nochange += 1 };
-              c.dirty = dirty0;
-          },
-          _ => ()
-      };
-      for sub_tr in tr.extent.iter() { count_reeval(sub_tr, c) };
-  }
-
   let result_trie: TestMResult<
     EvalIRaz<GenSmall,StdRng>,
     Skiplist<usize,()>,
@@ -246,16 +157,7 @@ reeval:
     let traces = reflect::dcg_reflect_end();
     
     // output analytic counts
-    let mut count = TraceCount{ alloc_fresh:0, alloc_change:0, alloc_nochange:0,
-                                reeval_change:0, reeval_nochange:0, 
-                                dirty:0, clean_rec:0,
-                                total_updates: changes,
-    };
-    for tr in &traces {
-      count_reeval(&tr, &mut count);
-      count_clean(&tr, &mut count);
-      count_dirty(&tr, &mut count);
-    };
+    let count = trace_count(&traces, Some(changes));
     println!("{:?}", count);
 
     // output trace
