@@ -163,8 +163,16 @@ impl FirstLast for NameIndex {
 impl<E> RazMeta<E> for Names {
 	type Index = NameIndex;
 
-	fn from_none() -> Self { Names(HashMap::new()) }
-	fn from_vec(_vec: &Vec<E>) -> Self { Names(HashMap::new()) }
+	fn from_none(_lev: u32, n: Option<Name>) -> Self {
+		let mut h = HashMap::new();
+		match n {None=>{},Some(nm)=>{ h.insert(nm,()); }}
+		Names(h)
+	}
+	fn from_vec(_vec: &Vec<E>, _lev: u32, n: Option<Name>) -> Self {
+		let mut h = HashMap::new();
+		match n {None=>{},Some(nm)=>{ h.insert(nm,()); }}
+		Names(h)
+	}
 	fn from_meta(l: &Self, r: &Self, _lev: u32, n: Option<Name>) -> Self {
 		let mut h = HashMap::new();
 		for k in l.0.keys() { h.insert(k.clone(),()); }

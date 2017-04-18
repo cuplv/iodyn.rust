@@ -1178,12 +1178,12 @@ mod tests {
 		}
 		let t = r.unfocus();
 
-		println!("top: {:?}", t.meta());
+		//println!("top: {:?}", t.meta());
 
 		for _ in 0..10 {
 			let val = (thread_rng().gen::<usize>() % 100) * 10;
 			let tree_name = name_pair(name_of_usize(val),name_of_string(String::from("tree")));
-			println!("{:?}", tree_name);
+			//println!("{:?}", tree_name);
 			let r = t.clone().focus(tree_name).unwrap();
 			assert_eq!(Some(val), r.peek_left());
 		}
