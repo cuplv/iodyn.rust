@@ -37,6 +37,7 @@ const DEFAULT_SECTION_CAPACITY: usize = 500;
 /// The data stored in the tree structure of the RAZ.
 #[derive(PartialEq,Eq,Debug,Hash,Clone)]
 enum TreeData<E:Debug+Clone+Eq+Hash, M:RazMeta<E>> {
+	Dummy, // used when rebuild is certain
 	Branch(M,M),
 	Leaf(Rc<Vec<E>>),
 }
@@ -50,8 +51,9 @@ tree::TreeUpdate for TreeData<E,M> {
 			_ => {
 				let meta = |b: Option<&TreeData<E,M>>| {
 					match b {
-						None => M::from_none(),
-						Some(&TreeData::Leaf(ref vec)) => M::from_vec(vec),
+						None => M::from_none(level, name.clone()),
+						Some(&TreeData::Dummy) => unreachable!(),
+						Some(&TreeData::Leaf(ref vec)) => M::from_vec(vec,level,name.clone()),
 						Some(&TreeData::Branch(ref l,ref r)) => M::from_meta(l,r,level,name.clone()),
 					}
 				};
@@ -70,15 +72,17 @@ pub struct RazTree<E:'static+Debug+Clone+Eq+Hash, M:RazMeta<E>+'static>{
 	tree: Option<tree::Tree<TreeData<E,M>>>
 }
 
-fn tree_meta<E,M>(t: Option<&tree::Tree<TreeData<E,M>>>) -> M where
+fn treetop_meta<E,M>(t: Option<&tree::Tree<TreeData<E,M>>>) -> M where
 	E:Debug+Clone+Eq+Hash+'static,
 	M:RazMeta<E>
 {
+	let fake_name = Some(name_of_string(String::from("unused")));
 	match t {
-		None => M::from_none(),
+		None => M::from_none(0,fake_name),
 		Some(t) => match t.peek() {
-			TreeData::Leaf(vec) => M::from_vec(&*vec),
-			TreeData::Branch(l,r) => M::from_meta(&l,&r,t.level(),t.name()),
+			TreeData::Dummy => unreachable!(),
+			TreeData::Leaf(vec) => M::from_vec(&*vec,0,fake_name),
+			TreeData::Branch(l,r) => M::from_meta(&l,&r,0,fake_name),
 		}
 	}
 }
@@ -188,13 +192,17 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 						TreeData::Leaf(Rc::new(mapped))
 					},
 					_ => {
-						let dummy = TreeData::Branch(N::from_none(),N::from_none());
-						TreeData::rebuild(l.map(|t|t.peek()).as_ref(),&dummy,lev,n,r.map(|t|t.peek()).as_ref())
+						TreeData::rebuild(
+							l.map(|t|t.peek()).as_ref(),
+							&TreeData::Dummy,
+							lev, n,
+							r.map(|t|t.peek()).as_ref(),
+						)
 					},
 				}
 			}))
 		});
-		RazTree{meta: tree_meta(tree.as_ref()), tree: tree}
+		RazTree{meta: treetop_meta(tree.as_ref()), tree: tree}
 	}
 
 
@@ -235,15 +243,15 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 				let mut r_astack = stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY);
 				let (l_cursor, tree, r_cursor) = cursor.split();
 				match tree {
-					None => unreachable!(),
 					Some(ref t) => match t.peek() {
-						TreeData::Branch{..} => unreachable!(),
 						TreeData::Leaf(ref vec_ref) => {
 							let (l_slice,r_slice) = M::split_vec(vec_ref, &index);
 							l_astack.extend(l_slice);
 							r_astack.extend_rev(r_slice);
-						}
-					}
+						},
+						_ => unreachable!(),
+					},
+					None => unreachable!(),
 				};
 				// step 3: integrate
 				Some(Raz{
@@ -276,13 +284,13 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 				let mut r_astack = stack::AStack::with_capacity(DEFAULT_SECTION_CAPACITY);
 				let (l_cursor, tree, r_cursor) = cursor.split();
 				match tree {
-					None => unreachable!(),
 					Some(ref t) => match t.peek() {
-						TreeData::Branch{..} => unreachable!(),
 						TreeData::Leaf(ref vec_ref) => {
 							r_astack.extend_rev(vec_ref);
-						}
-					}
+						},
+						_ => unreachable!(),
+					},
+					None => unreachable!(),
 				};
 				// step 3: integrate
 				Raz{
@@ -362,8 +370,7 @@ Raz<E,M> {
 			let mut next_nm = self.l_stack.name().map(|n|name_pair(n,nmtree.clone()));
 			while let Some((l_vec,next_lev)) = self.l_stack.next_archive() {
 				let l_curs = tree::Tree::new(0,None,TreeData::Leaf(Rc::new(l_vec)),None,None).unwrap().into();
-				let dummy = TreeData::Branch(M::from_none(),M::from_none());
-				cursor = tree::Cursor::join(l_curs,l_lev.unwrap(),l_nm,dummy,cursor);
+				cursor = tree::Cursor::join(l_curs,l_lev.unwrap(),l_nm,TreeData::Dummy,cursor);
 				l_lev = next_lev;
 				l_nm = next_nm;
 				next_nm = self.l_stack.name().map(|n|name_pair(n,nmtree.clone()));
@@ -372,8 +379,7 @@ Raz<E,M> {
 			while let Some((mut r_vec,next_lev)) = self.r_stack.next_archive() {
 				r_vec.reverse();
 				let r_curs = tree::Tree::new(0,None,TreeData::Leaf(Rc::new(r_vec)),None,None).unwrap().into();
-				let dummy = TreeData::Branch(M::from_none(),M::from_none());
-				cursor = tree::Cursor::join(cursor,r_lev.unwrap(),r_nm,dummy,r_curs);
+				cursor = tree::Cursor::join(cursor,r_lev.unwrap(),r_nm,TreeData::Dummy,r_curs);
 				r_lev = next_lev;
 				r_nm = next_nm;
 				next_nm = self.r_stack.name().map(|n|name_pair(n,nmtree.clone()));
@@ -383,7 +389,7 @@ Raz<E,M> {
 		} else {
 			if self.l_forest.up() == tree::UpResult::Fail {
 				if self.r_forest.up() == tree::UpResult::Fail {
-					return RazTree{ meta: M::from_none(), tree: None };
+					return RazTree{ meta: treetop_meta(None), tree: None };
 				} else {
 					self.r_forest.right_tree().unwrap()
 				}
@@ -397,20 +403,18 @@ Raz<E,M> {
 			let lev = self.l_forest.peek_level().unwrap();
 			let nm = self.l_forest.peek_name();
 			self.l_forest.down_left_force(tree::Force::Discard);
-			let dummy = TreeData::Branch(M::from_none(),M::from_none());
-			join_cursor = tree::Cursor::join(self.l_forest,lev,nm,dummy,join_cursor);
+			join_cursor = tree::Cursor::join(self.l_forest,lev,nm,TreeData::Dummy,join_cursor);
 		}
 		if self.r_forest.up() != tree::UpResult::Fail {
 			let lev = self.r_forest.peek_level().unwrap();
 			let nm = self.r_forest.peek_name();
 			self.r_forest.down_right_force(tree::Force::Discard);
-			let dummy = TreeData::Branch(M::from_none(),M::from_none());
-			join_cursor = tree::Cursor::join(join_cursor,lev,nm,dummy,self.r_forest);
+			join_cursor = tree::Cursor::join(join_cursor,lev,nm,TreeData::Dummy,self.r_forest);
 		}
 		// step 4: convert to final tree
 		while join_cursor.up() != tree::UpResult::Fail {}
 		let tree = join_cursor.at_tree();
-		RazTree{meta: tree_meta(tree.as_ref()), tree: tree}
+		RazTree{meta: treetop_meta(tree.as_ref()), tree: tree}
 	}
   
  //  /// creates two iterators, one for each side of the cursor
@@ -550,11 +554,14 @@ fn bin<E: Debug+Clone+Eq+Hash+'static,M:RazMeta<E>>(
 	n:  Option<Name>,
 	t2: ltree::Tree<TreeData<E,M>>
 ) -> ltree::Tree<TreeData<E,M>> {
+	let td = TreeData::rebuild(
+		Some(&t1.peek()),
+		&TreeData::Dummy,
+		l, n.clone(),
+		Some(&t2.peek()),
+	);
 	ltree::Tree::new(
-		l,n, TreeData::Branch(
-			tree_meta(Some(&t1)),
-			tree_meta(Some(&t2)),
-		),
+		l,n,td,
 		Some(t1), Some(t2),
 	).unwrap()
 }
@@ -611,15 +618,18 @@ for RazTree<E,M> {
 		let mut tailstack = tailstack.0.clone();
 		let name = tailstack.name();
 		let (level, first_tree) = match tailstack.next_archive() {
-			None => return RazTree{meta: M::from_none(), tree: None},
-			Some((vec,None)) => return RazTree{meta: M::from_vec(&vec), tree: Some(leaf(vec,None))},
+			None => return RazTree{meta: treetop_meta(None), tree: None},
+			Some((vec,None)) => {
+				let t = Some(leaf(vec,None));
+				return RazTree{meta: treetop_meta(t.as_ref()), tree: t}
+			},
 			Some((vec,Some(level))) => (level,leaf(vec,None))
 		};
 		let (t,l,n,s) = from_stack_memo(tailstack, level, name, first_tree, u32::max_value());
 		assert!(l.is_none());
 		assert!(n.is_none());
 		assert!(s.is_empty());
-		RazTree{meta: tree_meta(Some(&t)), tree: Some(t)}
+		RazTree{meta: treetop_meta(Some(&t)), tree: Some(t)}
 	}
 }
 
@@ -704,7 +714,7 @@ mod tests {
 		let five = bin(three,5,Some(name_of_usize(5)),four);
 
 		RazTree{
-			meta: tree_meta(Some(&five)),
+			meta: treetop_meta(Some(&five)),
 			tree: Some(five),
 		}
 	}
