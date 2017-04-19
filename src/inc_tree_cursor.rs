@@ -55,7 +55,10 @@ pub trait TreeUpdate where Self: Sized{
 	/// right branches of a tree node, along with the old data in that node.
 	/// For example, read size from left and right to get the new size of the branch,
 	/// or copy the old data without modification for the new branch.
-	fn rebuild(l_branch: Option<Self>, old_data: &Self, r_branch: Option<Self>) -> Self;
+	///
+	/// Names passed into this method are USED by the tree whose data is being
+	/// rebuilt and should not be used to name additional arts.
+	fn rebuild(l_branch: Option<&Self>, old_data: &Self, level: u32, name: Option<Name>, r_branch: Option<&Self>) -> Self;
 }
 /// marker that allows a default implementation of TreeUpdate if the data is also `Clone`
 ///
@@ -63,7 +66,7 @@ pub trait TreeUpdate where Self: Sized{
 pub trait DeriveTreeUpdate{}
 impl<E: DeriveTreeUpdate + Clone> TreeUpdate for E {
 	#[allow(unused_variables)]
-	fn rebuild(l_branch: Option<Self>, old_data: &Self, r_branch: Option<Self>) -> Self { old_data.clone() }
+	fn rebuild(l_branch: Option<&Self>, old_data: &Self, level: u32, name: Option<Name>, r_branch: Option<&Self>) -> Self { old_data.clone() }
 }
 
 /// cursor movement qualifier
@@ -230,8 +233,8 @@ impl<'a,E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 		}
 		// step 3: build center tree
 		let tree = Tree::new(
-			level, name,
-			E::rebuild(peek_op(&l_cursor.tree), &data, peek_op(&r_cursor.tree)),
+			level, name.clone(),
+			E::rebuild(peek_op(&l_cursor.tree).as_ref(), &data, level, name, peek_op(&r_cursor.tree).as_ref()),
 			l_cursor.tree.clone(),
 			r_cursor.tree.clone(),
 		);
@@ -357,7 +360,7 @@ impl<'a,E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 					let l_branch = upper_tree.l_tree();
 					self.tree = Tree::new(
 						upper_tree.level(), upper_tree.name(),
-						E::rebuild(peek_op(&l_branch), &upper_tree.peek(), peek_op(&self.tree)),
+						E::rebuild(peek_op(&l_branch).as_ref(), &upper_tree.peek(), upper_tree.level(), upper_tree.name(), peek_op(&self.tree).as_ref()),
 						l_branch,
 						self.tree.take(),
 					)
@@ -369,7 +372,7 @@ impl<'a,E: TreeUpdate+Debug+Clone+Eq+Hash+'static> Cursor<E> {
 					let r_branch = upper_tree.r_tree();
 					self.tree = Tree::new(
 						upper_tree.level(), upper_tree.name(),
-						E::rebuild(peek_op(&self.tree), &upper_tree.peek(), peek_op(&r_branch)),
+						E::rebuild(peek_op(&self.tree).as_ref(), &upper_tree.peek(), upper_tree.level(), upper_tree.name(), peek_op(&r_branch).as_ref()),
 						self.tree.take(),
 						r_branch,
 					)
