@@ -40,13 +40,13 @@ pub trait RazMeta<E>: Sized+Debug+Clone+Eq+Hash {
 	/// name arts
 	fn from_meta(l: &Self, r: &Self, lev: u32, n: Option<Name>) -> Self;
 	/// choose a branch and create an adjusted index for that branch
-	fn choose_side(l: &Self, r: &Self, index: &Self::Index) -> SideChoice<Self::Index>;
+	fn navigate(l: &Self, r: &Self, index: &Self::Index) -> Navigation<Self::Index>;
 	/// splits a vec into slices based on the index
 	fn split_vec<'a>(vec: &'a Vec<E>, index: &Self::Index) -> (&'a [E],&'a [E]);
 }
 
 /// A location and possibly an index for that location
-pub enum SideChoice<T> {
+pub enum Navigation<T> {
 	Left(T), Right(T), Here, Nowhere
 }
 
@@ -61,10 +61,10 @@ impl<E> RazMeta<E> for () {
 	fn from_none(_lev: u32, _n: Option<Name>) -> Self { () }
 	fn from_vec(_vec: &Vec<E>, _lev: u32, _n: Option<Name>) -> Self { () }
 	fn from_meta(_l: &Self, _r: &Self, _lev: u32, _n: Option<Name>) -> Self { () }
-	fn choose_side(_l: &Self, _r: &Self, index: &Self::Index) -> SideChoice<Self::Index> {
+	fn navigate(_l: &Self, _r: &Self, index: &Self::Index) -> Navigation<Self::Index> {
 		match *index {
-			OnlyEnds::First => SideChoice::Left(OnlyEnds::First),
-			OnlyEnds::Last => SideChoice::Right(OnlyEnds::Last),
+			OnlyEnds::First => Navigation::Left(OnlyEnds::First),
+			OnlyEnds::Last => Navigation::Right(OnlyEnds::Last),
 		}
 	}
 	fn split_vec<'a>(vec: &'a Vec<E>, index: &Self::Index) -> (&'a [E],&'a [E]) {
@@ -104,17 +104,17 @@ impl<E> RazMeta<E> for Count {
 	fn from_meta(&Count(l): &Self, &Count(r): &Self, _l: u32, _n: Option<Name>) -> Self {
 		Count(l+r)
 	}
-	fn choose_side(
+	fn navigate(
 		&Count(l): &Self,
 		&Count(r): &Self,
 		index: &Self::Index
-	) -> SideChoice<Self::Index> {
+	) -> Navigation<Self::Index> {
 		let i = *index;
-		if i == usize::max_value() { SideChoice::Right(i) }
-		else if i > l + r { SideChoice::Nowhere }
-		else if i > l { SideChoice::Right(i - l) }
-		else if i == l { SideChoice::Here }
-		else { SideChoice::Left(i) }
+		if i == usize::max_value() { Navigation::Right(i) }
+		else if i > l + r { Navigation::Nowhere }
+		else if i > l { Navigation::Right(i - l) }
+		else if i == l { Navigation::Here }
+		else { Navigation::Left(i) }
 	}
 	/// # Panics
 	/// Panics if the index is too high
@@ -180,16 +180,16 @@ impl<E> RazMeta<E> for Names {
 		match n {None=>{},Some(nm)=>{ h.insert(nm,()); }}
 		Names(h)
 	}
-	fn choose_side(l: &Self, r: &Self, index: &Self::Index) -> SideChoice<Self::Index> {
+	fn navigate(l: &Self, r: &Self, index: &Self::Index) -> Navigation<Self::Index> {
 		match *index {
-			NameIndex::FarLeft => SideChoice::Left(NameIndex::FarLeft),
-			NameIndex::FarRight => SideChoice::Right(NameIndex::FarRight),
+			NameIndex::FarLeft => Navigation::Left(NameIndex::FarLeft),
+			NameIndex::FarRight => Navigation::Right(NameIndex::FarRight),
 			NameIndex::Name(ref nm) => {
 				match (l.0.contains_key(nm),r.0.contains_key(nm)) {
-					(true,true) => SideChoice::Here,
-					(true,false) => SideChoice::Left(index.clone()),
-					(false,true) => SideChoice::Right(index.clone()),
-					(false,false) => SideChoice::Nowhere,
+					(true,true) => Navigation::Here,
+					(true,false) => Navigation::Left(index.clone()),
+					(false,true) => Navigation::Right(index.clone()),
+					(false,false) => Navigation::Nowhere,
 				}
 			}
 		}

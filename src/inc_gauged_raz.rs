@@ -14,7 +14,7 @@ use inc_level_tree::{Tree};
 use inc_tree_cursor as tree;
 use inc_tree_cursor::TreeUpdate;
 use inc_archive_stack as stack;
-use raz_meta::{RazMeta,SideChoice,Count,FirstLast};
+use raz_meta::{RazMeta,Navigation,Count,FirstLast};
 use memo::{MemoFrom};
 
 use adapton::macros::*;
@@ -222,21 +222,21 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 				// step 1: find location with cursor
 				let mut cursor = tree::Cursor::from(tree);
 				while let TreeData::Branch(l,r) = cursor.peek().unwrap() {
-					match M::choose_side(&l,&r,&index) {
-						SideChoice::Left(i) => {
+					match M::navigate(&l,&r,&index) {
+						Navigation::Left(i) => {
 							assert!(cursor.down_left());
 							index = i;
 						},
-						SideChoice::Right(i) => {
+						Navigation::Right(i) => {
 							assert!(cursor.down_right());
 							index = i;
 						},
-						SideChoice::Here => {
+						Navigation::Here => {
 							assert!(cursor.down_left());
 							while cursor.down_right() {}
 							index = M::Index::last();
 						},
-						SideChoice::Nowhere => { return None }, 
+						Navigation::Nowhere => { return None }, 
 					}
 				}
 				// step 2: extract and copy data
