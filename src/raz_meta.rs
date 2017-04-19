@@ -46,8 +46,8 @@ pub trait RazMeta<E>: Sized+Debug+Clone+Eq+Hash {
 }
 
 /// A location and possibly an index for that location
-pub enum Navigation<T> {
-	Left(T), Right(T), Here, Nowhere
+pub enum Navigation<I> {
+	Left(I), Right(I), Here, Nowhere
 }
 
 pub trait FirstLast {
@@ -55,35 +55,46 @@ pub trait FirstLast {
 	fn last() -> Self;
 }
 
+/// A common pattern for indexes
+///
+/// Exposes the common left and right
+/// cases necessary for meta indexes, with
+/// a center case that takes a more specific
+/// index.
+#[derive(Debug,Clone,Eq,PartialEq,Hash)]
+pub enum Position<I> {
+	Left, Right, Center(I)
+}
+
+impl<I> FirstLast for Position<I> {
+	fn first() -> Self {Position::Left}
+	fn last() -> Self {Position::Right}
+}
+
+impl<I> From<I> for Position<I> {
+	fn from(index: I) -> Self { Position::Center(index) }
+}
+
 impl<E> RazMeta<E> for () {
-	type Index = OnlyEnds;
+	type Index = Position<()>;
 
 	fn from_none(_lev: u32, _n: Option<Name>) -> Self { () }
 	fn from_vec(_vec: &Vec<E>, _lev: u32, _n: Option<Name>) -> Self { () }
 	fn from_meta(_l: &Self, _r: &Self, _lev: u32, _n: Option<Name>) -> Self { () }
 	fn navigate(_l: &Self, _r: &Self, index: &Self::Index) -> Navigation<Self::Index> {
 		match *index {
-			OnlyEnds::First => Navigation::Left(OnlyEnds::First),
-			OnlyEnds::Last => Navigation::Right(OnlyEnds::Last),
+			Position::Left => Navigation::Left(Position::Left),
+			Position::Right => Navigation::Right(Position::Right),
+			_ => panic!("Invalid position"),
 		}
 	}
 	fn split_vec<'a>(vec: &'a Vec<E>, index: &Self::Index) -> (&'a [E],&'a [E]) {
 		match *index {
-			OnlyEnds::First => vec.split_at(0),
-			OnlyEnds::Last => vec.split_at(vec.len()),
+			Position::Left => vec.split_at(0),
+			Position::Right => vec.split_at(vec.len()),
+			_ => panic!("Invalid position"),
 		}
 	}
-}
-
-#[derive(Debug,Clone,Eq,PartialEq,Hash)]
-pub enum OnlyEnds {
-	First,
-	Last,
-}
-
-impl FirstLast for OnlyEnds {
-	fn first() -> Self {OnlyEnds::First}
-	fn last() -> Self {OnlyEnds::Last}
 }
 
 /// Meta data for element count and positioning from the left
@@ -144,24 +155,8 @@ impl Hash for Names {
 	fn hash<H:Hasher>(&self, _state: &mut H) {}
 }
 
-#[derive(Clone,Debug)]
-pub enum NameIndex {
-	FarLeft,
-	FarRight,
-	Name(Name),
-}
-
-impl From<Name> for NameIndex {
-	fn from(nm: Name) -> Self { NameIndex::Name(nm) }
-}
-
-impl FirstLast for NameIndex {
-	fn first() -> Self { NameIndex::FarLeft }
-	fn last() -> Self { NameIndex::FarRight }
-}
-
 impl<E> RazMeta<E> for Names {
-	type Index = NameIndex;
+	type Index = Position<Name>;
 
 	fn from_none(_lev: u32, n: Option<Name>) -> Self {
 		let mut h = HashMap::new();
@@ -182,9 +177,9 @@ impl<E> RazMeta<E> for Names {
 	}
 	fn navigate(l: &Self, r: &Self, index: &Self::Index) -> Navigation<Self::Index> {
 		match *index {
-			NameIndex::FarLeft => Navigation::Left(NameIndex::FarLeft),
-			NameIndex::FarRight => Navigation::Right(NameIndex::FarRight),
-			NameIndex::Name(ref nm) => {
+			Position::Left => Navigation::Left(Position::Left),
+			Position::Right => Navigation::Right(Position::Right),
+			Position::Center(ref nm) => {
 				match (l.0.contains_key(nm),r.0.contains_key(nm)) {
 					(true,true) => Navigation::Here,
 					(true,false) => Navigation::Left(index.clone()),
@@ -198,8 +193,8 @@ impl<E> RazMeta<E> for Names {
 	/// Panics if a name is given as index 
 	fn split_vec<'a>(vec: &'a Vec<E>, index: &Self::Index) -> (&'a [E],&'a [E]) {
 		match *index {
-			NameIndex::FarLeft => vec.split_at(0),
-			NameIndex::FarRight => vec.split_at(vec.len()),
+			Position::Left => vec.split_at(0),
+			Position::Right => vec.split_at(vec.len()),
 			_ => panic!("There are no names in this region")
 		}
 	}
