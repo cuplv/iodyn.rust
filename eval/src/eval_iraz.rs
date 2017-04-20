@@ -21,8 +21,8 @@ pub struct EvalIRaz<E:Adapt,G:Rng> {
 	names: usize,
 	coord: G,
 	counter: usize, // for name/levels during edit
-	unitsize: usize,
-	namesize: usize,
+	datagauge: usize,
+	namegauge: usize,
 }
 // impl<E:Adapt,G:Rng> Debug for EvalIRaz<E,G> {
 // 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -40,8 +40,8 @@ impl<E:Adapt,G:Rng> EvalIRaz<E,G> {
 			names: 0,
 			coord: coord,
 			counter: 0,
-			unitsize: us,
-			namesize: ns,
+			datagauge: us,
+			namegauge: ns,
 		}
 	}
 	pub fn next_name(&mut self) -> Name {
@@ -54,8 +54,8 @@ impl<E:Adapt,G:Rng> EvalIRaz<E,G> {
 
 impl<E:Adapt,G:Rng+Clone>
 CreateEmpty<G> for EvalIRaz<E,G>{
-	fn inc_empty(unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
-		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+	fn inc_empty(datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
 			eval.raztree = Some(IRaz::new().unfocus());
 		});
@@ -65,8 +65,8 @@ CreateEmpty<G> for EvalIRaz<E,G>{
 
 impl<E:Adapt,G:Rng+Clone>
 CreateFrom<IRaz<E>,G> for EvalIRaz<E,G>{
-	fn inc_from(data: IRaz<E>, unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
-		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+	fn inc_from(data: IRaz<E>, datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
 			eval.raztree = Some(data.unfocus());
 		});
@@ -76,8 +76,8 @@ CreateFrom<IRaz<E>,G> for EvalIRaz<E,G>{
 
 impl<E:Adapt,G:Rng+Clone>
 CreateFrom<IRazTree<E>,G> for EvalIRaz<E,G>{
-	fn inc_from(data: IRazTree<E>, unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
-		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+	fn inc_from(data: IRazTree<E>, datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
 			eval.raztree = Some(data);
 		});
@@ -87,8 +87,8 @@ CreateFrom<IRazTree<E>,G> for EvalIRaz<E,G>{
 
 impl<E:Adapt,G:Rng+Clone>
 CreateFrom<AtTail<E,u32>,G> for EvalIRaz<E,G>{
-	fn inc_from(data: AtTail<E,u32>, unitgauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
-		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+	fn inc_from(data: AtTail<E,u32>, datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
 			eval.raztree = Some(IRazTree::memo_from(&data));
 		});
@@ -98,26 +98,26 @@ CreateFrom<AtTail<E,u32>,G> for EvalIRaz<E,G>{
 
 /// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
-// uses Params::{start,namesize,unitsize}
+// uses Params::{start,namegauge,datagauge}
 impl<E:Adapt+Rand,G:Rng+Clone>
 CreateInc<G> for EvalIRaz<E,G> {
-	fn inc_init(size: usize, unitgauge: usize, namegauge: usize, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)
+	fn inc_init(size: usize, datagauge: usize, namegauge: usize, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)
 	{
-		let mut eval = EvalIRaz::new(unitgauge, namegauge, (*coord).clone());
+		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
 		// measure stuff
-		let names = size/(eval.namesize*eval.unitsize); // integer division
-		let levels = size / eval.unitsize; 
-		let nonames = size - (names*eval.namesize*eval.unitsize);
-		let units = nonames / eval.unitsize; // integer division
-		let nounits = nonames - (units*eval.unitsize);
+		let names = size/(eval.namegauge*eval.datagauge); // integer division
+		let levels = size / eval.datagauge; 
+		let nonames = size - (names*eval.namegauge*eval.datagauge);
+		let units = nonames / eval.datagauge; // integer division
+		let nounits = nonames - (units*eval.datagauge);
 		// pregenerate data
 		let mut lev_vec = Vec::with_capacity(levels);
 		for _ in 0..levels {
 			lev_vec.push(gen_level(rng))
 		}
-		let mut name_vec = Vec::with_capacity(names*eval.namesize);
+		let mut name_vec = Vec::with_capacity(names*eval.namegauge);
 		for _ in 0..names {
-			for _ in 0..(eval.namesize-1){
+			for _ in 0..(eval.namegauge-1){
 				// no name with these levels
 				name_vec.push(None)
 			}
@@ -130,8 +130,8 @@ CreateInc<G> for EvalIRaz<E,G> {
 		let time = Duration::span(||{
 			let mut raz = IRaz::new();
 			for _ in 0..names {
-				for _ in 0..eval.namesize {
-					for _ in 0..eval.unitsize {
+				for _ in 0..eval.namegauge {
+					for _ in 0..eval.datagauge {
 						raz.push_left(data_iter.next().unwrap_or_else(||panic!("init")));
 					}
 					raz.archive_left(level_iter.next().unwrap_or_else(||panic!("init")), name_iter.next().unwrap_or_else(||panic!("init")));
@@ -139,7 +139,7 @@ CreateInc<G> for EvalIRaz<E,G> {
 				// name inserted above
 			}
 			for _ in 0..units {
-				for _ in 0..eval.unitsize {
+				for _ in 0..eval.datagauge {
 					raz.push_left(data_iter.next().unwrap_or_else(||panic!("init")));
 				}
 				raz.archive_left(level_iter.next().unwrap_or_else(||panic!("init")), None);
@@ -165,12 +165,12 @@ EditInsert for EvalIRaz<E,G> {
 		});
 		let mut raz = focus.unwrap_or_else(||panic!("bad edit location"));
 		// pregenerate data
-		let new_levels = batch_size / self.unitsize;
+		let new_levels = batch_size / self.datagauge;
 		let mut lev_vec = Vec::with_capacity(new_levels);
 		for _ in 0..(new_levels + 1) {
 			lev_vec.push(gen_level(rng))
 		}
-		let new_names = batch_size / (self.namesize*self.unitsize);
+		let new_names = batch_size / (self.namegauge*self.datagauge);
 		let mut name_vec = Vec::with_capacity(new_names);
 		for _ in 0..(new_names + 1) {
 			name_vec.push(Some(self.next_name()));
@@ -183,9 +183,9 @@ EditInsert for EvalIRaz<E,G> {
 			for data in data_iter {
 				raz.push_left(data);
 				self.counter += 1;
-				if self.counter % (self.namesize*self.unitsize) == 0 {
+				if self.counter % (self.namegauge*self.datagauge) == 0 {
 					raz.archive_left(lev_iter.next().expect("lev_name"),name_iter.next().expect("name"));
-				} else if self.counter % self.unitsize == 0 {
+				} else if self.counter % self.datagauge == 0 {
 					raz.archive_left(lev_iter.next().expect("lev"),None);
 				}
 			}
@@ -207,12 +207,12 @@ EditAppend for EvalIRaz<E,G> {
 		});
 		let mut raz = focus.unwrap_or_else(||panic!("bad edit location"));
 		// pregenerate data
-		let new_levels = batch_size / self.unitsize;
+		let new_levels = batch_size / self.datagauge;
 		let mut lev_vec = Vec::with_capacity(new_levels);
 		for _ in 0..(new_levels + 1) {
 			lev_vec.push(gen_level(rng))
 		}
-		let new_names = batch_size / (self.namesize*self.unitsize);
+		let new_names = batch_size / (self.namegauge*self.datagauge);
 		let mut name_vec = Vec::with_capacity(new_names);
 		for _ in 0..(new_names + 1) {
 			name_vec.push(Some(self.next_name()));
@@ -225,9 +225,9 @@ EditAppend for EvalIRaz<E,G> {
 			for data in data_iter {
 				raz.push_left(data);
 				self.counter += 1;
-				if self.counter % (self.namesize*self.unitsize) == 0 {
+				if self.counter % (self.namegauge*self.datagauge) == 0 {
 					raz.archive_left(lev_iter.next().expect("lev_name"),name_iter.next().expect("name"));
-				} else if self.counter % self.unitsize == 0 {
+				} else if self.counter % self.datagauge == 0 {
 					raz.archive_left(lev_iter.next().expect("lev"),None);
 				}
 			}

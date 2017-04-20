@@ -30,7 +30,7 @@ EvalIAStack<E,G> {
 
 impl<E:Adapt,G:Rng+Clone>
 CreateEmpty<G> for EvalIAStack<E,G>{
-	fn inc_empty(_unitgauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+	fn inc_empty(_datagauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
 		let mut eval = None;
 		let time = Duration::span(||{
 			eval = Some(EvalIAStack::new((*coord).clone()));

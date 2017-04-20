@@ -38,7 +38,7 @@ fn main() {
     .args_from_usage("\
       --dataseed=[dataseed]			'seed for random data'
       --editseed=[edit_seed]    'seed for random edits (and misc.)'
-      -u, --unitsize=[unitsize] 'initial elements per structure unit'
+      -g, --unitsize=[unitsize] 'initial elements per structure unit'
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -c, --count=[count]       'number of runs, by default each 2 is 10x larger'
       -e, --edits=[edits]       'number of edits'
@@ -60,7 +60,7 @@ fn main() {
   let mut test = BuildTest{
     init: IncrementalInit {
       size: 0, // set in test
-      unitgauge: unitsize,
+      datagauge: unitsize,
       namegauge: namesize,
       coord: StdRng::from_seed(&[dataseed]),
     },
@@ -147,7 +147,7 @@ fn main() {
   writeln!(plotscript,"set logscale xy").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
   write!(plotscript,"set title \"{}", "Time to Build and Edit a Sequence\\n").unwrap();
-  writeln!(plotscript,"(u)nit-gauge: {}, (n)ame-gauge: {}\"",unitsize,namesize).unwrap();
+  writeln!(plotscript,"(g)auge: {}, (n)ame-gauge: {}\"",unitsize,namesize).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "size").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();
