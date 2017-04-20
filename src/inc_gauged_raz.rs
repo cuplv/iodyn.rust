@@ -76,13 +76,12 @@ fn treetop_meta<E,M>(t: Option<&tree::Tree<TreeData<E,M>>>) -> M where
 	E:Debug+Clone+Eq+Hash+'static,
 	M:RazMeta<E>
 {
-	let fake_name = Some(name_of_string(String::from("unused")));
 	match t {
-		None => M::from_none(0,fake_name),
+		None => M::from_none(0,None),
 		Some(t) => match t.peek() {
 			TreeData::Dummy => unreachable!(),
-			TreeData::Leaf(vec) => M::from_vec(&*vec,0,fake_name),
-			TreeData::Branch(l,r) => M::from_meta(&l,&r,0,fake_name),
+			TreeData::Leaf(vec) => M::from_vec(&*vec,0,None),
+			TreeData::Branch(l,r) => M::from_meta(&l,&r,0,None),
 		}
 	}
 }
