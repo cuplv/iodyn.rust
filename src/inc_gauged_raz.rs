@@ -90,6 +90,24 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 	/// get the meta data
 	pub fn meta(&self) -> &M {&self.meta}
 
+	/// Combine two trees left to right
+	///
+	/// returns None if either tree is empty or the levels
+	/// are inappropriate. The level of the left side should
+	/// be lower than the given level, and the level of the
+	/// right side should be equal or lower than the given level.
+	pub fn join(ltree: Self, level: u32, name: Option<Name>, rtree: Self) -> Option<Self> {
+		let tree = match (ltree,rtree) {
+			(RazTree{tree:Some(lt),..},RazTree{tree:Some(rt),..}) => {
+				if lt.level() < level && rt.level() <= level {
+					bin(lt,level,name,rt)
+				} else { return None }
+			},
+			_ => return None
+		};
+		Some(RazTree{meta: treetop_meta(Some(&tree)), tree: Some(tree)})
+	}
+
 	/// Runs an binary function over the sequence data
 	///
 	/// This is calculated from data in leaves of a tree structure,
