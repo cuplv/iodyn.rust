@@ -266,6 +266,23 @@ CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
 	}
 }
 
+impl<E:Adapt,O:Adapt,I,B,M,G:Rng>
+CompTreeFoldNL<E,O,I,B,M> for EvalIRaz<E,G> where
+	I:'static + Fn(&E)->O,
+	B:'static + Fn(O,O)->O,
+	M:'static + Fn(O,u32,Option<Name>,O)->O,
+{
+	type Target = Option<O>;
+	fn comp_tfoldnl(&self, init:Rc<I>, bin:Rc<B>, binnl:Rc<M>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let clone = self.raztree.clone().unwrap();
+		let mut res = None;
+		let time = Duration::span(||{
+	    	res = Some(clone.fold_up_nl(init,bin,binnl))
+		});
+		(time,res.unwrap())
+	}
+}
+
 impl<E:Adapt,O:Adapt,F,G:Rng>
 CompMap<E,O,F> for EvalIRaz<E,G> where
 	F:'static + Fn(&E)->O

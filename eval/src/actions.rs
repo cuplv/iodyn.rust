@@ -162,6 +162,47 @@ Computor<Duration,D> for TreeFold<E,O,I,B> {
 	}
 }
 
+pub struct TreeFoldNL<
+	E,O,I:Fn(&E)->O,B:Fn(O,O)->O,M:Fn(O,u32,Option<Name>,O)->O
+>{
+	init: Rc<I>,
+	bin: Rc<B>,
+	binnl: Rc<M>,
+	elm: PhantomData<E>,
+	out: PhantomData<O>,
+}
+impl<E,O,I,B,M>
+TreeFoldNL<E,O,I,B,M> where
+	I:Fn(&E)->O,
+	B:Fn(O,O)->O,
+	M:Fn(O,u32,Option<Name>,O)->O,
+{
+	pub fn new(init:I,bin:B,binnl:M) -> Self {
+		TreeFoldNL{
+			init: Rc::new(init),
+			bin: Rc::new(bin),
+			binnl: Rc::new(binnl),
+			elm: PhantomData,
+			out: PhantomData,
+		}
+	}
+}
+impl<E,O,I,B,M,D>
+Computor<Duration,D>
+for TreeFoldNL<E,O,I,B,M> where
+	I:Fn(&E)->O,
+	B:Fn(O,O)->O,
+	M:Fn(O,u32,Option<Name>,O)->O,
+	D:CompTreeFoldNL<E,O,I,B,M>,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time, answer) = data.comp_tfoldnl(self.init.clone(),self.bin.clone(),self.binnl.clone(),rng);
+		#[allow(unused)]
+		let saver = Vec::new().push(answer); // don't let rust compile this away
+		time
+	}
+}
+
 pub struct Mapper<I,O,F:Fn(&I)->O>(Rc<F>,PhantomData<I>,PhantomData<O>);
 impl<I,O,F:Fn(&I)->O> Mapper<I,O,F> { pub fn new(f:F) -> Self {Mapper(Rc::new(f),PhantomData,PhantomData)}}
 impl<I,O,F:Fn(&I)->O,D:CompMap<I,O,F>>

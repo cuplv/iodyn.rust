@@ -121,6 +121,38 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		})
 	}
 
+	/// Runs an binary function over the sequence data, levels, and names
+	///
+	/// This is calculated from data in leaves of a tree structure,
+	/// so the operation must be associative. Returns None if there
+	/// are no elements.
+	pub fn fold_up_nl<I,R,B,N>(self, init: Rc<I>, bin: Rc<B>, binnl: Rc<N>) -> Option<R> where
+		R: 'static + Eq+Clone+Hash+Debug,
+		I: 'static + Fn(&E) -> R,
+		B: 'static + Fn(R,R) -> R,
+		N: 'static + Fn(R,u32,Option<Name>,R) -> R,
+	{
+		// TODO: memo! fold_up (only first rec call is not)
+		self.tree.map(|tree| {
+			tree.fold_up_meta(Rc::new(move |l,c,lv,n,r|{
+				match c {
+					TreeData::Leaf(ref vec) => {
+						let mut iter = vec.iter().map(|elm|init(elm));
+						let first = iter.next().expect("leaf with empty vec");
+						// eta expansion so that bin is moved into the FnMut
+						// and *bin is moved into the FnOnce
+						iter.fold(first, |x,y|{ (*bin)(x,y) })
+					},
+					_ => { match (l,r) {
+						(None, None) => panic!("branch with no data"),
+						(Some(r),None) | (None, Some(r)) => r,
+						(Some(lr),Some(rr)) => binnl(lr,lv,n,rr),
+					}},
+				}
+			}))
+		})
+	}
+
 	/// left-to-right memoized fold with levels and names
 	pub fn fold_lr_meta<A,B,N>(self, init: A, bin: Rc<B>, meta: Rc<N>) -> A where
 		A: 'static + Eq+Clone+Hash+Debug,

@@ -90,21 +90,28 @@ Tree<E> {
 	pub fn fold_up<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R where
 		F: 'static + Fn(Option<R>,E,Option<R>) -> R
 	{
+		self.fold_up_meta(Rc::new(move|r,d,_lv,_n,l|{node_calc(l,d,r)}))
+	}
+
+	/// memoized tree fold operation with levels and names
+	pub fn fold_up_meta<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R where
+		F: 'static + Fn(Option<R>,E,u32,Option<Name>,Option<R>) -> R
+	{
 		match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
-			let (l,r) = match self.name {
+			let (l,r) = match self.name.clone() {
 				None => {(
-					l_branch.map(|t| t.fold_up(node_calc.clone())),
-					r_branch.map(|t| t.fold_up(node_calc.clone())),
+					l_branch.map(|t| t.fold_up_meta(node_calc.clone())),
+					r_branch.map(|t| t.fold_up_meta(node_calc.clone())),
 				)},
 				Some(name) => {
 					let (n1, n2) = name_fork(name);
 					(
-						l_branch.map(|t| memo!( n1 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
-						r_branch.map(|t| memo!( n2 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
+						l_branch.map(|t| memo!( n1 =>> Self::fold_up_meta , t:t ;; f:node_calc.clone() )),
+						r_branch.map(|t| memo!( n2 =>> Self::fold_up_meta , t:t ;; f:node_calc.clone() )),
 					)
 				}
 			};
-			node_calc(l, data, r)
+			node_calc(l, data, self.level, self.name, r)
 		}}
 	}
 
