@@ -330,14 +330,41 @@ fn main2() {
 
   // post-process results
 
-
   let edit_non_inc = result_non_inc.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_inc = result_inc.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_non_inc = result_non_inc.computes.iter().map(|d|(d[0].num_nanoseconds().unwrap(),d[1].num_nanoseconds().unwrap())).collect::<Vec<_>>();
   let comp_inc = result_inc.computes.iter().map(|d|(d[0].num_nanoseconds().unwrap(),d[1].num_nanoseconds().unwrap())).collect::<Vec<_>>();
   
-  println!("computes_non_inc(tokenize,parse): {:?}", comp_non_inc);
-  println!("computes_inc(tokenize,parse): {:?}", comp_inc);
+  let mut adapton_changes = Vec::new();
+  let mut native_changes = Vec::new();
+  for i in 0..changes {
+    let nc = comp_non_inc[i].0 + comp_non_inc[i].1;
+    native_changes.push(nc as f64 / 1_000_000.0);
+    let ac = comp_inc[i].0 + comp_inc[i].1;
+    adapton_changes.push(ac as f64 / 1_000_000.0);
+  }
+  let adapton_init = adapton_changes[0];
+  let native_init = native_changes[0];
+  adapton_changes.remove(0);
+  native_changes.remove(0);
+
+  let update_time = adapton_changes.iter().sum::<f64>() / adapton_changes.len() as f64;
+  let crossover = native_changes.iter().zip(adapton_changes.iter()).enumerate()
+    .fold((native_init,adapton_init,0),|(n,a,cross),(c,(nt,at))|{
+      let new_n = n + nt;
+      let new_a = a + at;
+      let new_cross = if n < a && new_n >= new_a { c + 1 } else { cross };
+      (new_n,new_a,new_cross)
+    }).2;
+
+
+  println!("At input size: {}",start_size);
+  println!(" - Native initial run: {:.*} ms",2,native_init);
+  println!(" - Adapton initial run: {:.*} ms",2,adapton_init);
+  println!(" - Adapton overhead: {:.*} (Adapton initial time / Native initial time)",2,adapton_init/native_init);
+  println!(" - Adapton update time: {:.*} ms",2,update_time);
+  println!(" - Adapton cross over: {} changes  (When Adapton's update time overcomes its overhead)",crossover);
+  println!(" - Adapton speedup: {:.*} (Native initial time / Adapton update time)",2,native_init/update_time);
 
 
   // generate data file
