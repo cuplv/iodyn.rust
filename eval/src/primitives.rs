@@ -33,6 +33,12 @@ pub trait CompMax {
 	fn comp_max(&self, rng: &mut StdRng) -> (Duration,Self::Target);
 }
 
+/// for reversing a sequence
+pub trait CompRev {
+	type Target;
+	fn comp_rev(&self, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
 pub trait CompTreeFold<R,O,I:Fn(&R)->O,B:Fn(O,O)->O> {
 	type Target;
 	fn comp_tfold(&self, init:Rc<I>, bin:Rc<B>, rng: &mut StdRng) -> (Duration,Self::Target);

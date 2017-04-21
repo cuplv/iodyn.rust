@@ -66,7 +66,7 @@ tree::TreeUpdate for TreeData<E,M> {
 /// Tree form of a RAZ
 ///
 /// used between refocusing, and for running global algorithms
-#[derive(Clone,PartialEq,Eq,Debug)]
+#[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub struct RazTree<E:'static+Debug+Clone+Eq+Hash, M:RazMeta<E>+'static>{
 	meta: M,
 	tree: Option<tree::Tree<TreeData<E,M>>>
@@ -90,12 +90,17 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 	/// get the meta data
 	pub fn meta(&self) -> &M {&self.meta}
 
+	pub fn empty() -> Self {
+		RazTree{meta: treetop_meta(None), tree: None}
+	}
+
 	/// Combine two trees left to right
 	///
 	/// returns None if either tree is empty or the levels
 	/// are inappropriate. The level of the left side should
 	/// be lower than the given level, and the level of the
 	/// right side should be equal or lower than the given level.
+	// TODO: Deal with bad levels.
 	pub fn join(ltree: Self, level: u32, name: Option<Name>, rtree: Self) -> Option<Self> {
 		let tree = match (ltree,rtree) {
 			(RazTree{tree:Some(lt),..},RazTree{tree:Some(rt),..}) => {
@@ -105,6 +110,16 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 			},
 			_ => return None
 		};
+		Some(RazTree{meta: treetop_meta(Some(&tree)), tree: Some(tree)})
+	}
+
+	/// Make a RazTree from a Vec
+	///
+	/// This tree will contain no levels or names
+	/// Returns None if the Vec is empty
+	pub fn from_vec(vec: Vec<E>) -> Option<Self> {
+		if vec.is_empty() { return None };
+		let tree = leaf(vec,None);
 		Some(RazTree{meta: treetop_meta(Some(&tree)), tree: Some(tree)})
 	}
 

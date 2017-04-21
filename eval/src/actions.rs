@@ -150,6 +150,17 @@ Computor<(Duration,D::Target),D> for FindMax {
 	}
 }
 
+pub struct Reverse;
+impl<D: CompRev>
+Computor<Duration,D> for Reverse {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time,answer) = data.comp_rev(rng);
+		#[allow(unused)]
+		let saver = Vec::new().push(answer); // don't let rust compile this away
+		time
+	}
+}
+
 pub struct TreeFold<E,O,I:Fn(&E)->O,B:Fn(O,O)->O>(Rc<I>,Rc<B>,PhantomData<E>,PhantomData<O>);
 impl<E,O,I:Fn(&E)->O,B:Fn(O,O)->O> TreeFold<E,O,I,B> { pub fn new(init:I,bin:B) -> Self {TreeFold(Rc::new(init),Rc::new(bin),PhantomData,PhantomData)}}
 impl<E,O,I:Fn(&E)->O,B:Fn(O,O)->O,D: CompTreeFold<E,O,I,B>>

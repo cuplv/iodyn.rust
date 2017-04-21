@@ -250,6 +250,52 @@ CompMax for EvalIRaz<E,G> {
 	}
 }
 
+impl<E:Adapt,G:Rng>
+CompRev for EvalIRaz<E,G> {
+	type Target = IRazTree<E>;
+	fn comp_rev(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
+	  #[derive(Debug,Eq,PartialEq,Hash,Clone)]
+	  enum R<E:Adapt>{
+	    I(E),
+	    V(Vec<E>),
+	    T(IRazTree<E>)
+	  }
+		let clone = self.raztree.clone().unwrap();
+		let mut revraz = None;
+		let init = Rc::new(|a:&E|{R::I(a.clone())});
+		let to_vec = Rc::new(|l,r|{
+			match (l,r) {
+				(R::I(e1),R::I(e2)) => R::V(vec![e1,e2]),
+				(R::V(mut v),R::I(e)) => {v.push(e);R::V(v)},
+				_ => unreachable!(),
+			}
+		});
+		let to_tree = Rc::new(|l,lv,n:Option<Name>,r| {
+			let ltree = match l {
+				R::I(e) => IRazTree::from_vec(vec![e]).unwrap(),
+				R::V(mut v) => {v.reverse();IRazTree::from_vec(v).unwrap()},
+				R::T(r) => r,
+			};
+			let rtree = match r {
+				R::I(e) => IRazTree::from_vec(vec![e]).unwrap(),
+				R::V(mut v) => {v.reverse();IRazTree::from_vec(v).unwrap()},
+				R::T(r) => r,
+			};
+			let nm = n.map(|n|{name_pair(n,name_of_string(String::from("rev")))});
+			R::T(IRazTree::join(rtree,lv,nm,ltree).unwrap())
+		});
+		let time = Duration::span(||{
+	    	revraz = Some(match clone.fold_up_nl(init, to_vec, to_tree) {
+	    		None => IRazTree::empty(),
+	    		Some(R::I(e)) => IRazTree::from_vec(vec![e]).unwrap(),
+	    		Some(R::V(mut v)) => {v.reverse(); IRazTree::from_vec(v).unwrap()},
+	    		Some(R::T(t)) => t,
+	    	});
+		});
+		(time,revraz.unwrap())
+	}
+}
+
 impl<E:Adapt,O:Adapt,I,B,G:Rng>
 CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
 	I:'static + Fn(&E)->O,

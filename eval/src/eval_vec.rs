@@ -118,6 +118,20 @@ CompMax for EvalVec<E,G> {
 	}
 }
 
+impl<E:Clone,G:Rng>
+CompRev for EvalVec<E,G> {
+	type Target = Vec<E>;
+	fn comp_rev(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let mut rev = None;
+		let time = Duration::span(||{
+			let mut clone = self.vec.clone();
+			clone.reverse();
+			rev = Some(clone);
+		});
+		(time, rev.unwrap())
+	}
+}
+
 // TODO: implement tree fold as multiple pairwise passes?
 
 impl<E,O,F,G:Rng>

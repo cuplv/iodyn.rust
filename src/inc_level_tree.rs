@@ -90,7 +90,7 @@ Tree<E> {
 	pub fn fold_up<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R where
 		F: 'static + Fn(Option<R>,E,Option<R>) -> R
 	{
-		self.fold_up_meta(Rc::new(move|r,d,_lv,_n,l|{node_calc(l,d,r)}))
+		self.fold_up_meta(Rc::new(move|l,d,_lv,_n,r|{node_calc(l,d,r)}))
 	}
 
 	/// memoized tree fold operation with levels and names
