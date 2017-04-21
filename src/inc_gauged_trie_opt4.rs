@@ -90,7 +90,7 @@ struct ObsRes<K,V> {
     /// Its length depends on to what extent the search-key bits match
     /// those of the observed path.  There are two mutually-exclusive
     /// cases, each using an optional field below ('next' vs 'kvs').
-    paths: Vec<Art<Rc<Path<K,V>>>>,
+    paths: Vec<Option<Art<Rc<Path<K,V>>>>>,
     /// Case 1: The key_bits do _not_ fully match those of the
     /// observed `Path`; the trampoline uses this `Art`, observing it
     /// next.
@@ -103,24 +103,82 @@ struct ObsRes<K,V> {
 /// This is the 'generic' signature for an observation function; it
 /// receives the art, its full content of type `T` and returns some
 /// partial view of this content, of type `S`.
-fn generic_observe<T,S> (art: &Art<T>, full_content:T) -> S {  unimplemented!() }
+// fn generic_observe<T,S> (art: &Art<T>, full_content:T) -> S {  unimplemented!() }
 
-fn observe<K,V>
+
+fn build_path_step<K:Clone,V:Clone>
     (art:    &Art<Rc<Path<K,V>>>,
      path:   &Rc<Path<K,V>>,
      params: ObsParam) -> ObsRes<K,V>
 {
-    // Same algorithm as build_path, except that:
-    //
-    // 1. The `observe` fn is not recursive; rather, it trampolines
-    // using the `next` field of the `ObsRes`, and an external loop.
-    //
-    // 2. The `observe` fn does not call `force`; rather, it's the
-    // function that `force` uses to filter the forced observation
-    // (arg `path`) into a structure with strictly less information,
-    // of type `ObsRes`.
-    panic!("")
+    // Mutable copies of these bit strings
+    let mut key_bits = params.key_bits;
+    let mut hsh_bits = path.hash.0.clone();    
+    let mut cur_paths = vec![];
+    
+    // Discard bits that we've already "traversed"
+    key_bits >>= params.key_biti;
+    hsh_bits >>= params.key_biti;
+    
+    if hsh_bits == key_bits {
+        for i in params.key_biti..params.path_len { 
+            cur_paths.push(path.paths.get(i).unwrap().clone()) 
+        };
+        return ObsRes{
+            paths:cur_paths,
+            next: None,
+            kvs: Some(path.kvs.clone())
+        }
+    } else {    
+        let start_idx = params.key_biti;
+        'matching_bits: 
+        for i in start_idx..params.path_len {
+            let oap : &Option<Art<Rc<Path<K,V>>>> = path.paths.get(i).unwrap();
+            if (key_bits & 0x1) == (hsh_bits & 0x1) {
+                cur_paths.push(oap.clone());
+                key_bits >>= 1;
+                hsh_bits >>= 1;
+                continue 'matching_bits;
+            } else {
+                cur_paths.push(Some(art.clone()));
+                match * path.paths.get(i).unwrap() {
+                    None => {
+                        for _ in i..params.path_len {
+                            cur_paths.push(None)
+                        };
+                        return ObsRes{
+                            paths:cur_paths,
+                            next: None,
+                            kvs: None
+                        }
+                    }
+                    Some(ref a) => {
+                        return ObsRes{
+                            paths:cur_paths,
+                            next: Some(a.clone()),
+                            kvs: None
+                        }
+                    }
+                }
+            }
+        };
+        unreachable!("no more bits; this shouldn't happen")
+    }
 }
+
+fn build_path_rec
+    <K:'static+Hash+Eq+Debug+Clone,
+     V:'static+Hash+Eq+Debug+Clone> 
+    (path:&Rc<Path<K,V>>,
+     path_len:usize,
+     cur_art:Option<Art<Rc<Path<K,V>>>>,
+     cur:&mut Cursor<K,V>,
+     key_hash:HashVal) -> Option<Vec<(K,Option<V>)>> 
+{
+    panic!("TODO-Next")        
+}
+
+
 
 impl<K:'static+Hash+Eq+Debug+Clone,
      V:'static+Hash+Eq+Debug+Clone> Path<K,V> {
