@@ -4,6 +4,9 @@ use std::fmt::Debug;
 use adapton::engine::name_of_usize;
 use std::vec::Vec;
 use std::collections::vec_deque::VecDeque;
+use std::io::BufReader;
+use std::io::BufRead;
+use std::fs::File;
 
 pub trait FinMap<K, V> {
 	//first usize: total size, second: granularity
@@ -46,8 +49,11 @@ impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Ha
 	}
 	
 	fn contains(curr: Self, key: usize) -> bool {
+		println!("checking contains on {}", key);
 		let mut seq_view = RazTree::focus(curr, key).unwrap();
-		None != *Raz::peek_right(&mut seq_view).unwrap()
+		let val = (*Raz::peek_right(&mut seq_view).expect("WEIRD ERROR?")).clone();
+		println!("val found is {:?}", val);
+		(*Raz::peek_right(&mut seq_view).unwrap()).is_some()
 	}
 	
 	fn del(curr: Self, key: usize) -> (Option<V>, Self) {
@@ -67,10 +73,8 @@ pub trait Graph<NdId, Data> {
 	
 	fn del_node(Self, NdId) -> (Option<NdId>, Self);
 	
-	//semantics for add/del_edge on not existing node?
 	fn add_edge(Self, NdId, NdId) -> Self;
 	
-	//tuple return?
 	fn del_edge(Self, NdId, NdId) -> Self;
 	
 	fn adjacents(Self, NdId) -> Option<Vec<NdId>>;
@@ -98,11 +102,17 @@ impl<T, Data> Graph<usize, Data> for T
 		}
 	}
 	
-	//Currently assumes that both nodes exist. Semantics undefined if nodes don't exist.
 	fn add_edge(curr: Self, id1: usize, id2: usize) -> Self {
-		let (k, mut adjs) = FinMap::get(curr.clone(), id1).unwrap();
+		let mut ret = curr;
+		if !FinMap::contains(ret.clone(), id1) {
+			ret = Graph::add_node(ret.clone(), id1, None);
+		}
+		if !FinMap::contains(ret.clone(), id2) {
+			ret = Graph::add_node(ret.clone(), id2, None);
+		}
+		let (k, mut adjs) = FinMap::get(ret.clone(), id1).unwrap();
 		adjs.push(id2);
-		let mut ret = FinMap::put(curr, id1, (k, adjs));
+		ret = FinMap::put(ret, id1, (k, adjs));
 		let(k, mut adjs2) = FinMap::get(ret.clone(), id2).unwrap();
 		adjs2.push(id1);
 		ret = FinMap::put(ret, id2, (k, adjs2));
@@ -137,11 +147,10 @@ impl<T, Data> Graph<usize, Data> for T
 	//Question: want to keep graph size available (for size of visited map), best way to do this?
 	//action point: change return type to directed graph
 	fn bfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
-		println!("in bfs");
 		//setup
 		let mut q : VecDeque<usize> = VecDeque::new();
-		let mut v : RazTree<Option<bool>> = FinMap::new(100, 10);
-		let mut g : T = Graph::new(100, 10);
+		let mut v : RazTree<Option<bool>> = FinMap::new(10000, 10000);
+		let mut g : T = Graph::new(10000, 10000);
 		
 		q.push_back(root);
 		g = Self::add_node(g, root, Some(0));
@@ -156,11 +165,10 @@ impl<T, Data> Graph<usize, Data> for T
 			for n in adjs {
 				//if n is not yet visited
 				if !FinMap::contains(v.clone(), n) {
-					//TODO: this level is c's + 1
+					//this level is c's + 1
 					g = Graph::add_node(g, n, Some(c_lev + 1));
 					g = DirectedGraph::add_directed_edge(g, c, n);
 					v = FinMap::put(v, n, true);
-					//something to build the graph
 					q.push_back(n)
 				}
 			}
@@ -173,20 +181,91 @@ pub trait DirectedGraph<NdId, Data> : Graph<NdId, Data> {
 	fn add_directed_edge(Self, NdId, NdId) -> Self;
 	
 	fn successors(Self, NdId) -> Option<Vec<NdId>>;
+	
+	fn dfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
 }
 
 impl<T, Data> DirectedGraph<usize, Data> for T 
 	where T: FinMap<usize, (Option<Data>, Vec<usize>)> + Clone
 	{
 	fn add_directed_edge(curr: Self, src: usize, dst: usize) -> Self {
-		let (k, mut adjs) = FinMap::get(curr.clone(), src).unwrap();
+		let mut ret = curr;
+		if !FinMap::contains(ret.clone(), src) {
+			ret = Graph::add_node(ret.clone(), src, None);
+		}
+		if !FinMap::contains(ret.clone(), dst) {
+			ret = Graph::add_node(ret.clone(), dst, None);
+		}
+		let (k, mut adjs) = FinMap::get(ret.clone(), src).unwrap();
 		adjs.push(dst);
-		FinMap::put(curr, src, (k, adjs))
+		FinMap::put(ret, src, (k, adjs))
 	}
 	
 	fn successors(curr: Self, id: usize) -> Option<Vec<usize>> {
 		Graph::adjacents(curr, id)
 	}
+	
+	fn dfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
+		//setup
+		let mut v : RazTree<Option<bool>> = FinMap::new(100, 10);
+		let mut s : VecDeque<usize> = VecDeque::new();
+		let mut g : T = Graph::new(100, 10);
+		
+		//initialize DFS with the given root node
+		s.push_back(root);
+		g = Self::add_node(g, root, Some(0));
+		v = FinMap::put(v, root, true);
+		
+		//begin loop
+		while !s.is_empty() {
+			let c = s.pop_back().unwrap();
+			//if c hasn't yet been visited
+			if !FinMap::contains(v.clone(), c) {
+				//add c to the visited set
+				v = FinMap::put(v, c, true);
+				
+				let adjs = DirectedGraph::successors(curr.clone(), c).unwrap();
+				
+				for n in adjs {
+					s.push_back(n);
+					g = DirectedGraph::add_directed_edge(g, c, n);
+				}
+			}
+		}
+		g
+	}
+}
+	
+
+fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option<usize>, Vec<usize>)>>(path: String) -> T {
+	let f = File::open(path).unwrap();
+	let reader = BufReader::new(f);
+	let lines: Vec<_> = reader.lines().collect();
+	
+	let mut g: T = Graph::new(10000, 10000);
+	
+	for l in lines {
+		let line = match l {
+			Ok(inner) => inner,
+			Err(_) => break
+		};
+		let mut words = line.split_whitespace();
+		
+		if words.next() == Some("e") {
+			let v1: usize = match u32::from_str_radix(words.next().unwrap(), 10) {
+				Ok(k) => k as usize,
+				Err(_) => break
+			};
+			let v2: usize = match u32::from_str_radix(words.next().unwrap(), 10) {
+				Ok(k) => k as usize,
+				Err(_) => break
+			};
+			
+			g = DirectedGraph::add_directed_edge(g.clone(), v1, v2);
+		}
+	}
+	
+	g
 }
 
 #[cfg(test)]
@@ -243,5 +322,51 @@ mod tests {
   	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 2));
   	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 3));
   	assert_eq!(Some(2), Graph::get_data(bfs_tree.clone(), 4));
+  }
+  
+  #[test]
+  fn test_simple_parser() {
+  	use std::time::Instant;
+  	
+  	let path: String = "fpsol2_graph.txt".to_owned();
+  	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = dgraph_from_col(path);
+  	
+  	let start = Instant::now();
+  	
+  	let bfs_res = Graph::bfs(dt.clone(), 1);
+  	
+  	let end = start.elapsed();
+  	
+  	println!("bfs took {} seconds", end.as_secs());
+  	
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 30);
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 31);
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 32);
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 33);
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 34);
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 35);
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 36);
+  	
+  	let start2 = Instant::now();
+  	
+  	let bfs_res2 = Graph::bfs(dt.clone(), 1);
+  	
+  	let end2 = start.elapsed();
+  	
+  	println!("bfs2 took {} seconds", end2.as_secs());
+  	
+  	assert_eq!(true, FinMap::contains(dt.clone(), 416));
+  	assert_eq!(false, FinMap::contains(dt.clone(), 450));
+  }
+  
+  #[test]
+  fn test_gran() {
+  	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = Graph::new(100, 10);
+  	
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 2);
+  	let dt = DirectedGraph::add_directed_edge(dt, 10, 11);
+  	let dt = DirectedGraph::add_directed_edge(dt, 20, 21);
+  	let dt = DirectedGraph::add_directed_edge(dt, 30, 39);
+  	
   }
 }
