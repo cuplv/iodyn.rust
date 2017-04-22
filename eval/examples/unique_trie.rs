@@ -11,7 +11,7 @@ extern crate pmfp_collections;
 extern crate eval;
 extern crate adapton_lab;
 
-use std::fmt;
+//use std::fmt;
 use std::io::BufWriter;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -26,8 +26,7 @@ use adapton_lab::labviz::*;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::accum_lists::*;
-//use pmfp_collections::inc_gauged_trie::{FinMap,Trie};
-//use pmfp_collections::inc_gauged_trie_opt3::{FinMap,Skiplist};
+//use pmfp_collections::inc_gauged_trie_opt4::{FinMap,Skiplist};
 use pmfp_collections::inc_gauged_skiplist::{FinMap,Skiplist};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
@@ -42,7 +41,7 @@ const DEFAULT_UNITSIZE: usize = 100;
 const DEFAULT_NAMESIZE: usize = 1;
 const DEFAULT_EDITS: usize = 1;
 const DEFAULT_CHANGES: usize = 30;
-const DEFAULT_TRIALS: usize = 10;
+//const DEFAULT_TRIALS: usize = 10;
 const DEFAULT_PATHLEN: usize = 32;
 
 fn main () {
@@ -67,7 +66,6 @@ fn main2() {
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -e, --edits=[edits]       'edits per batch'
       -c, --changes=[changes]   'number of incremental changes'
-      -t, --trials=[trials]     'trials to average over'
       -o, --outfile=[outfile]   'name for output files (of different extensions)'
       -p, --pathlen=[pathlen]   'length of paths in the skiplist'
       --trace                   'trace the incremental run, producing counts'
@@ -80,15 +78,14 @@ fn main2() {
 	let namegauge = value_t!(args, "namesize", usize).unwrap_or(DEFAULT_NAMESIZE);
 	let edits = value_t!(args, "edits", usize).unwrap_or(DEFAULT_EDITS);
 	let changes = value_t!(args, "changes", usize).unwrap_or(DEFAULT_CHANGES);
-	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
   let pathlen = value_t!(args, "pathlen", usize).unwrap_or(DEFAULT_PATHLEN);
   let outfile = args.value_of("outfile");
   let do_trace = args.is_present("trace") || args.is_present("trace-html");
   let do_trace_html = args.is_present("trace-html");
   let coord = StdRng::from_seed(&[dataseed]);
 
-  //fold over raz, use trie as set to gather elements
-  let mut testtrie = EditComputeSequence{
+  //fold over raz, use skiplist as set to gather elements
+  let mut testskiplist = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
       unitgauge: unitgauge,
@@ -97,7 +94,7 @@ fn main2() {
     },
     edit: BatchInsert(edits),
     comp: HFolder::new(
-      name_of_string(String::from("filltrie")),
+      name_of_string(String::from("fillskiplist")),
       {let mut t = Skiplist::emp(pathlen, name_unit()); t.archive(name_unit()); t},
       |mut a,&GenSmall(e)|{ a.put(e, ()); a },
       |mut a,nm|{ match nm { None => a, Some(nm) => { a.archive(nm); a }}},
@@ -149,10 +146,10 @@ fn main2() {
   // for visual debugging
   if do_trace {reflect::dcg_reflect_begin()}
 
-  let result_trie: TestMResult<
+  let result_skiplist: TestMResult<
     EvalIRaz<GenSmall,StdRng>,
-    Skiplist<usize,()>,
-  > = testtrie.test(&mut rng);
+    Skiplist<Elm,()>,
+  > = testskiplist.test(&mut rng);
 
   if do_trace {
     let traces = reflect::dcg_reflect_end();
@@ -176,27 +173,27 @@ fn main2() {
 
   let result_hash: TestMResult<
     EvalVec<GenSmall,StdRng>,
-    HashMap<usize,()>,
+    HashMap<Elm,()>,
   > = ns(name_of_string(String::from("hashmap")),||{test_hashmap.test(&mut rng)});
 
   let inc_veclist: TestMResult<
     EvalIRaz<GenSmall,StdRng>,
-    VecList<usize>,
+    VecList<Elm>,
   > = ns(name_of_string(String::from("veclist")),||{test_vl.test(&mut rng)});
 
   // post-process results
   let comp_hash = result_hash.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let comp_trie = result_trie.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_skiplist = result_skiplist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_ivl = inc_veclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_hash = result_hash.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let edit_trie = result_trie.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let edit_skiplist = result_skiplist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_ivl = inc_veclist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
 
   println!("----------------------------------------------------------------------------------");
   println!("Computation time (ms): (initial run, first incremental run); Note:do_trace={:?}", do_trace);
-  println!("hash_set: ({:8.3}, {:8.3})", comp_hash[0] as f32 / 1000000.0, comp_hash[1] as f32 / 1000000.0);
-  println!("trie_set: ({:8.3}, {:8.3})", comp_trie[0] as f32 / 1000000.0, comp_trie[1] as f32 / 1000000.0);
+  println!("hashmap:  ({:8.3}, {:8.3})", comp_hash[0] as f32 / 1000000.0, comp_hash[1] as f32 / 1000000.0);
+  println!("skiplist: ({:8.3}, {:8.3})", comp_skiplist[0] as f32 / 1000000.0, comp_skiplist[1] as f32 / 1000000.0);
   println!("vec_list: ({:8.3}, {:8.3})", comp_ivl[0]  as f32 / 1000000.0, comp_ivl[1]  as f32 / 1000000.0);
 
   ///////
@@ -231,8 +228,8 @@ fn main2() {
   writeln!(dat,"").unwrap();
   e = 0.0; c = 0.0;
   for i in 0..changes {
-    e += edit_trie[i] as f64 / 1_000_000.0;
-    c += comp_trie[i] as f64 / 1_000_000.0;
+    e += edit_skiplist[i] as f64 / 1_000_000.0;
+    c += comp_skiplist[i] as f64 / 1_000_000.0;
     writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
   }
   writeln!(dat,"").unwrap();
@@ -258,7 +255,7 @@ fn main2() {
 
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
-  write!(plotscript,"set title \"{}", "Accumulating time to insert element(s) and build a set/list\\n").unwrap();
+  write!(plotscript,"set title \"{}", "Cumulative edit/compute times vs Number of edits/updates\\n").unwrap();
   writeln!(plotscript,"(s)ize: {}, (u)nit-gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,unitgauge,namegauge,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
@@ -275,9 +272,9 @@ fn main2() {
   writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Skiplist edit").unwrap();
   writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist compute").unwrap();
   writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist total").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc List (store all) edit").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List (store all) compute").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List (store all) total").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc List edit").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List compute").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List total").unwrap();
 
   ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
 
