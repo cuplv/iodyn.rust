@@ -1,8 +1,9 @@
-IODyn: Collections for *Dynamic Input and Output*
-==================================================
+IODyn: Collections for **Dynamic Input and Output**
+====================================================
 
-*IODyn* is collections library for programs that use [Adapton], a
-general-purpose framework for incremental computing.
+**IODyn** is collections library for programs that use
+[Adapton](http://rust.adapton.org), a general-purpose framework for
+incremental computing.
 
 IODyn consists of collections for sequences, finite maps, sets and graphs.
 
