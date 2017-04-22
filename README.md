@@ -1,5 +1,5 @@
-IODyn: _Dynamic Input and Output_ Collections
-==============================================
+IODyn: Collections for *Dynamic Input and Output*
+==================================================
 
 *IODyn* is collections library for programs that use [Adapton], a
 general-purpose framework for incremental computing.
