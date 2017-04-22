@@ -187,7 +187,7 @@ fn build_path_rec
     cursor.paths.append(&mut res.paths);
     match res.kvs {
         Some(kvs) => {
-            println!("Found: {:?}", cursor);
+            // Key's hash is present; return all key-value pairs with matching hash
             assert_eq!(cursor.paths.len(), path_len);
             Some(kvs)
         },
@@ -196,7 +196,7 @@ fn build_path_rec
                 Some(ref next_art) =>
                     build_path_rec(path_len, key_hash, next_art, cursor),
                 None => {
-                    println!("Not found: {:?}", cursor);
+                    // Key's hash is not present:
                     assert_eq!(cursor.paths.len(), path_len);
                     return None
                 }
