@@ -1,5 +1,10 @@
-IODyn: Collections library for computing with _dynamic input and output_
-========================================================================
+IODyn: _Dynamic Input and Output_ Collections
+==============================================
+
+*IODyn* is collections library for programs that use [Adapton], a
+general-purpose framework for incremental computing.
+
+IODyn consists of collections for sequences, finite maps, sets and graphs.
 
 Sequences
 -------------
@@ -14,4 +19,6 @@ Finite Maps, Sets
 In progress
 ============
 - Queue (first in first out): push, pop
-- Trie: put, get, remove, union, intersect
+- Trie (persistent sets): put, get, remove, union, intersect
+- Directed graph: XXX
+- Undirected graph: XXX
