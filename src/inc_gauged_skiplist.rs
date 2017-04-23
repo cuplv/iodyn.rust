@@ -17,8 +17,6 @@ struct HashVal(usize);
 /// A contiguous block of skiplist paths/keys/values
 #[derive(Debug,Clone,Hash,Eq,PartialEq)]
 struct Path<K,V> {
-    //name:   Name,  // TODO-Soon: Want/need this here?
-    //cntr:   usize, // TODO-Soon: Want/need this here?
     hash:   HashVal,
     kvs:    Vec<(K,Option<V>)>,
     paths:  Vec<Option<Art<Rc<Path<K,V>>>>>,
@@ -83,11 +81,13 @@ struct ObsParam {
 }
 #[derive(Debug,Clone,Hash,Eq,PartialEq)]
 struct ObsRes<K,V> {
-    /// The paths that we observe; this is some sub-interval (a
-    /// 'slice'?) of the full vector of paths in the observed `Path`.
-    /// Its length depends on to what extent the search-key bits match
-    /// those of the observed path.  There are two mutually-exclusive
-    /// cases, each using an optional field below ('next' vs 'kvs').
+    /// The paths that we observe; this is some sub-interval of the
+    /// full vector of paths in the observed `Path`.  Its length
+    /// depends on to what extent the search-key bits match those of
+    /// the observed path.  There are three mutually-exclusive cases,
+    /// no match at all (both `next` and `kvs` are None), and two
+    /// remaining cases, each using an optional field below ('next' vs
+    /// 'kvs' being Some(_) and the other None).
     paths: Vec<Option<Art<Rc<Path<K,V>>>>>,
     /// Case 1: The key_bits do _not_ fully match those of the
     /// observed `Path`; the trampoline uses this `Art`, observing it
@@ -95,14 +95,8 @@ struct ObsRes<K,V> {
     next:  Option<Art<Rc<Path<K,V>>>>,
     /// Case 2: The key_bits _do_ fully match those of the observed
     /// `Path`; in this case, we also observe the key-value pairs.
-    kvs:   Option<Vec<(K,Option<V>)>>,
+    kvs:   Option<Vec<(K,Option<V>)>>,    
 }
-
-/// This is the 'generic' signature for an observation function; it
-/// receives the art, its full content of type `T` and returns some
-/// partial view of this content, of type `S`.
-// fn generic_observe<T,S> (art: &Art<T>, full_content:T) -> S {  unimplemented!() }
-
 
 fn build_path_step<K:Clone,V:Clone>
     (art:    &Art<Rc<Path<K,V>>>,
@@ -122,12 +116,8 @@ fn build_path_step<K:Clone,V:Clone>
         for i in params.key_biti..params.path_len { 
             cur_paths.push(path.paths.get(i).unwrap().clone()) 
         };
-        return ObsRes{
-            paths:cur_paths,
-            next: None,
-            kvs: Some(path.kvs.clone())
-        }
-    } else {    
+        return ObsRes{ paths:cur_paths, next: None, kvs: Some(path.kvs.clone()) }
+    } else {
         'matching_bits: 
         for i in params.key_biti..params.path_len {
             let oap : &Option<Art<Rc<Path<K,V>>>> = path.paths.get(i).unwrap();
@@ -143,18 +133,10 @@ fn build_path_step<K:Clone,V:Clone>
                         for _ in (i+1)..params.path_len {
                             cur_paths.push(None)
                         };
-                        return ObsRes{
-                            paths:cur_paths,
-                            next: None,
-                            kvs: None
-                        }
+                        return ObsRes{ paths:cur_paths, next: None, kvs: None }
                     }
                     Some(ref a) => {
-                        return ObsRes{
-                            paths:cur_paths,
-                            next: Some(a.clone()),
-                            kvs: None
-                        }
+                        return ObsRes{ paths:cur_paths, next: Some(a.clone()), kvs: None }
                     }
                 }
             }
@@ -175,28 +157,22 @@ fn build_path_rec
     let key_bits : usize = key_hash.0;
     let key_biti : usize = cursor.paths.len();
     let mut res =
-        force_map(&cur_art,
-                  move |art,path| 
-                  build_path_step
-                  (art, path, ObsParam{
-                      path_len:path_len,
-                      key_bits:key_bits,
-                      key_biti:key_biti})
-
-        ) ;
+        force_map(&cur_art, move |art,path|
+                  build_path_step (art, path, ObsParam{ path_len:path_len, key_bits:key_bits, key_biti:key_biti})) ;
     cursor.paths.append(&mut res.paths);
     match res.kvs {
         Some(kvs) => {
-            // Key's hash is present; return all key-value pairs with matching hash
+            // Case: Key's hash _is_ present; return all key-value pairs with matching hash
             assert_eq!(cursor.paths.len(), path_len);
             Some(kvs)
         },
         None => {
             match res.next {
                 Some(ref next_art) =>
+                    // Case: Key's hash _may or may not_ be present; need to search further to determine this question.
                     build_path_rec(path_len, key_hash, next_art, cursor),
                 None => {
-                    // Key's hash is not present:
+                    // Case: Key's hash _is not_ present:
                     assert_eq!(cursor.paths.len(), path_len);
                     return None
                 }
@@ -204,61 +180,6 @@ fn build_path_rec
         }
     }
 }
-
-
-
-// impl<K:'static+Hash+Eq+Debug+Clone,
-//      V:'static+Hash+Eq+Debug+Clone> Path<K,V> {
-   
-//     fn build_path
-//         (&self,                    
-//          path_len:usize,
-//          cur_art:Option<Art<Rc<Path<K,V>>>>, 
-//          cur:&mut Cursor<K,V>, 
-//          key_hash:HashVal) -> Option<Vec<(K,Option<V>)>>
-//     {
-//         // Mutable copies of these bit strings
-//         let mut key_bits = key_hash.0;
-//         let mut hsh_bits = self.hash.0.clone();
-        
-//         // Discard bits that we've already "traversed"
-//         key_bits >>= cur.bit_idx;
-//         hsh_bits >>= cur.bit_idx;
-
-//         if hsh_bits == key_bits {
-//             for i in cur.bit_idx..path_len { 
-//                 cur.paths.push(self.paths.get(i).unwrap().clone()) 
-//             };
-//             return Some(self.kvs.clone());
-//         } else {    
-//             let start_idx = cur.bit_idx;
-//             'matching_bits: 
-//             for i in start_idx..path_len {
-//                 let oap : &Option<Art<Rc<Path<K,V>>>> = self.paths.get(i).unwrap();
-//                 if (key_bits & 0x1) == (hsh_bits & 0x1) {
-//                     cur.paths.push(oap.clone());
-//                     key_bits >>= 1;
-//                     hsh_bits >>= 1;
-//                     continue 'matching_bits;
-//                 } else {
-//                     cur.bit_idx = i+1;
-//                     cur.paths.push(cur_art);
-//                     match * self.paths.get(i).unwrap() {
-//                         None => {
-//                             cur.fill_empty(path_len);
-//                             return None
-//                         }
-//                         Some(ref a) => {
-//                             return (force(a)).build_path(path_len, Some(a.clone()), cur, key_hash)
-//                         }
-//                     }
-//                 }
-//             };
-//             unreachable!("no more bits; this shouldn't happen")
-//         }
-//     }       
-// }
-
 
 /// Abstract, finite map interface implemented by the incremental Skiplist.
 pub trait FinMap<K,V>
@@ -306,7 +227,6 @@ impl<K:'static+Eq+Clone+Debug+Hash,
         let old_kvs = match self.head {
             None => None,
             Some(ref path) =>
-                //force(path).build_path(self.path_len, Some(path.clone()), &mut cur, k_hash.clone()),
                 build_path_rec(self.path_len, k_hash.clone(), path, &mut cur),
         };
         let mut new_kvs = vec![];
@@ -359,8 +279,7 @@ impl<K:'static+Eq+Clone+Debug+Hash,
         let mut cur = Cursor::new();
         let res = match self.head {
             None => None,
-            //Some(ref path) => force(path).build_path(self.path_len, None, &mut cur, k_hash),
-            Some(ref path) => 
+            Some(ref path) =>
                 build_path_rec(self.path_len, k_hash, path, &mut cur),
         };            
         match res {
@@ -384,7 +303,7 @@ fn skiplist_vs_hashmap () {
     let numops = 10000;
     let numkeys = 100;
     let gauged = true;
-    let gauge = 1;
+    let gauge = 10;
     
     manage::init_dcg();
     
