@@ -8,9 +8,20 @@ use std::io::BufReader;
 use std::io::BufRead;
 use std::fs::File;
 
+#[derive(Debug, Clone)]
+struct SizedMap<V> where V: Clone + Debug + Eq + Hash + 'static {
+	size: usize,
+	gran: usize,
+	map: RazTree<Option<V>>
+}
+
 pub trait FinMap<K, V> {
 	//first usize: total size, second: granularity
 	fn new(usize, usize) -> Self;
+	
+	fn size(Self) -> usize;
+	
+	fn gran(Self) -> usize;
 	
 	fn put(Self, K, V) -> Self;
 	
@@ -22,7 +33,7 @@ pub trait FinMap<K, V> {
 	fn del(Self, K) -> (Option<V>, Self);
 }
 
-impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Hash {
+impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 	fn new(size: usize, gran: usize) -> Self {
 		let mut store: Raz<Option<V>> = Raz::new();
 		
@@ -33,34 +44,39 @@ impl<V> FinMap<usize, V> for RazTree<Option<V>> where V: Clone + Debug + Eq + Ha
 			}
 		}
 		
-		Raz::unfocus(store)
+		SizedMap { size: size, gran: gran, map: Raz::unfocus(store) }
+	}
+	
+	fn size(curr: Self) -> usize {
+		curr.size
+	}
+	
+	fn gran(curr: Self) -> usize {
+		curr.gran
 	}
 	
 	fn put(curr: Self, key: usize, val: V) -> Self {
-		let mut seq_view = RazTree::focus(curr, key).unwrap();
+		let mut seq_view = RazTree::focus(curr.map, key).unwrap();
 		Raz::pop_right(&mut seq_view);
 		Raz::push_right(&mut seq_view, Some(val));
-		Raz::unfocus(seq_view)
+		SizedMap { size: curr.size, gran: curr.gran, map: Raz::unfocus(seq_view) }
 	}
 	
 	fn get(curr: Self, key: usize) -> Option<V> {
-		let mut seq_view = RazTree::focus(curr, key).unwrap();
+		let mut seq_view = RazTree::focus(curr.map, key).unwrap();
 		Raz::peek_right(&mut seq_view).unwrap().clone().take()
 	}
 	
 	fn contains(curr: Self, key: usize) -> bool {
-		println!("checking contains on {}", key);
-		let mut seq_view = RazTree::focus(curr, key).unwrap();
-		let val = (*Raz::peek_right(&mut seq_view).expect("WEIRD ERROR?")).clone();
-		println!("val found is {:?}", val);
+		let mut seq_view = RazTree::focus(curr.map, key).unwrap();
 		(*Raz::peek_right(&mut seq_view).unwrap()).is_some()
 	}
 	
 	fn del(curr: Self, key: usize) -> (Option<V>, Self) {
-		let mut seq_view = RazTree::focus(curr, key).unwrap();
+		let mut seq_view = RazTree::focus(curr.map, key).unwrap();
 		let ret = Raz::pop_right(&mut seq_view).unwrap();
 		Raz::push_right(&mut seq_view, None);
-		(ret, Raz::unfocus(seq_view))
+		(ret, SizedMap { size: curr.size, gran: curr.gran, map: Raz::unfocus(seq_view) })
 	}
 }
 
@@ -149,8 +165,8 @@ impl<T, Data> Graph<usize, Data> for T
 	fn bfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
 		//setup
 		let mut q : VecDeque<usize> = VecDeque::new();
-		let mut v : RazTree<Option<bool>> = FinMap::new(10000, 10000);
-		let mut g : T = Graph::new(10000, 10000);
+		let mut v : SizedMap<bool> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
+		let mut g : T = Graph::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		
 		q.push_back(root);
 		g = Self::add_node(g, root, Some(0));
@@ -164,7 +180,7 @@ impl<T, Data> Graph<usize, Data> for T
 			//iterate over nodes adjacent to c
 			for n in adjs {
 				//if n is not yet visited
-				if !FinMap::contains(v.clone(), n) {
+				if !FinMap::contains(SizedMap { size: v.size, gran: v.gran, map: v.map.clone() }, n) {
 					//this level is c's + 1
 					g = Graph::add_node(g, n, Some(c_lev + 1));
 					g = DirectedGraph::add_directed_edge(g, c, n);
@@ -207,9 +223,9 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 	
 	fn dfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
 		//setup
-		let mut v : RazTree<Option<bool>> = FinMap::new(100, 10);
+		let mut v : SizedMap<bool> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		let mut s : VecDeque<usize> = VecDeque::new();
-		let mut g : T = Graph::new(100, 10);
+		let mut g : T = Graph::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		
 		//initialize DFS with the given root node
 		s.push_back(root);
@@ -220,7 +236,7 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		while !s.is_empty() {
 			let c = s.pop_back().unwrap();
 			//if c hasn't yet been visited
-			if !FinMap::contains(v.clone(), c) {
+			if !FinMap::contains(SizedMap{ size: v.size, gran: v.gran, map: v.map.clone() }, c) {
 				//add c to the visited set
 				v = FinMap::put(v, c, true);
 				
@@ -274,7 +290,7 @@ mod tests {
 	
 	#[test]
   fn test_fin_map() {
-  	let mut dt: RazTree<Option<usize>> = FinMap::new(100, 10);
+  	let mut dt: SizedMap<usize> = FinMap::new(100, 10);
   	dt = FinMap::put(dt, 10, 10);
   	dt = FinMap::put(dt, 11, 11);
   	dt = FinMap::put(dt, 12, 12);
@@ -288,7 +304,7 @@ mod tests {
   
   #[test]
   fn test_graph() {
-  	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = Graph::new(100, 10);
+  	let mut dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
   	dt = Graph::add_node(dt, 1, Some(1));
   	dt = Graph::add_node(dt, 2, Some(2));
   	dt = Graph::add_node(dt, 3, Some(3));
@@ -302,7 +318,7 @@ mod tests {
   
   #[test]
   fn test_bfs() {
-  	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = Graph::new(100, 10);
+  	let mut dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
   	dt = Graph::add_node(dt, 1, Some(1));
   	dt = Graph::add_node(dt, 2, Some(2));
   	dt = Graph::add_node(dt, 3, Some(3));
@@ -329,7 +345,7 @@ mod tests {
   	use std::time::Instant;
   	
   	let path: String = "fpsol2_graph.txt".to_owned();
-  	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = dgraph_from_col(path);
+  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(path);
   	
   	let start = Instant::now();
   	
@@ -337,7 +353,7 @@ mod tests {
   	
   	let end = start.elapsed();
   	
-  	println!("bfs took {} seconds", end.as_secs());
+  	println!("bfs took {} nanoseconds", end.subsec_nanos());
   	
   	let dt = DirectedGraph::add_directed_edge(dt, 1, 30);
   	let dt = DirectedGraph::add_directed_edge(dt, 1, 31);
@@ -351,22 +367,22 @@ mod tests {
   	
   	let bfs_res2 = Graph::bfs(dt.clone(), 1);
   	
-  	let end2 = start.elapsed();
+  	let end2 = start2.elapsed();
   	
-  	println!("bfs2 took {} seconds", end2.as_secs());
+  	println!("bfs2 took {} nanoseconds", end2.subsec_nanos());
   	
   	assert_eq!(true, FinMap::contains(dt.clone(), 416));
   	assert_eq!(false, FinMap::contains(dt.clone(), 450));
   }
   
   #[test]
+  #[should_panic]
   fn test_gran() {
-  	let mut dt: RazTree<Option<(Option<usize>, Vec<usize>)>> = Graph::new(100, 10);
+  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
   	
   	let dt = DirectedGraph::add_directed_edge(dt, 1, 2);
   	let dt = DirectedGraph::add_directed_edge(dt, 10, 11);
   	let dt = DirectedGraph::add_directed_edge(dt, 20, 21);
   	let dt = DirectedGraph::add_directed_edge(dt, 30, 39);
-  	
   }
 }
