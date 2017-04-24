@@ -2,7 +2,7 @@ extern crate time;
 extern crate rand;
 extern crate adapton;
 extern crate adapton_lab;
-extern crate pmfp_collections;
+extern crate iodyn;
 
 pub mod actions;
 pub mod primitives;

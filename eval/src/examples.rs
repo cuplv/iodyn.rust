@@ -5,7 +5,7 @@
 //! - Level: (1)
 //! - Data as arrays: [1,2,3]
 
-use pmfp_collections::{IRaz, IRazTree};
+use iodyn::{IRaz, IRazTree};
 use interface::Adapt;
 use adapton::engine::*;
 

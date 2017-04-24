@@ -4,10 +4,10 @@ use std::rc::Rc;
 use rand::{Rng,StdRng,Rand};
 use time::Duration;
 use adapton::engine::*;
-use pmfp_collections::memo::MemoFrom;
-use pmfp_collections::{IRaz, IRazTree};
-use pmfp_collections::inc_archive_stack::{AtTail};
-use pmfp_collections::inc_tree_cursor::gen_level;
+use iodyn::memo::MemoFrom;
+use iodyn::{IRaz, IRazTree};
+use iodyn::inc_archive_stack::{AtTail};
+use iodyn::inc_tree_cursor::gen_level;
 use primitives::*;
 use interface::{Adapt};
 

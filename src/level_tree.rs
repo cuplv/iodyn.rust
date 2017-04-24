@@ -107,8 +107,8 @@ impl<L: Level, E> BinTree<E> for Tree<L,E> {
 /// This is an O(n) operation, so it shouldn't be used in release mode
 ///
 /// ```
-/// use pmfp_collections::level_tree::{self,Tree};
-/// use pmfp_collections::trees::NegBin;
+/// use iodyn::level_tree::{self,Tree};
+/// use iodyn::trees::NegBin;
 ///
 /// let tree = Tree::new(NegBin(4),(),None,Tree::new(NegBin(1),(),None,None)).unwrap();
 /// debug_assert!(level_tree::good_levels(&tree),"this section of code has a problem");

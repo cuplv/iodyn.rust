@@ -5,7 +5,7 @@ extern crate time;
 #[macro_use] extern crate clap;
 extern crate stats;
 extern crate adapton;
-extern crate pmfp_collections;
+extern crate iodyn;
 extern crate eval;
 
 use std::fs::OpenOptions;

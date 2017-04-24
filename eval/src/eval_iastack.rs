@@ -1,7 +1,7 @@
 use std::fmt::{self,Debug};
 use rand::{StdRng,Rng};
 use time::Duration;
-use pmfp_collections::inc_archive_stack::AStack as IAStack;
+use iodyn::inc_archive_stack::AStack as IAStack;
 use primitives::*;
 use interface::{Adapt};
 

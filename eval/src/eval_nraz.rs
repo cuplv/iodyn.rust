@@ -3,8 +3,8 @@
 use rand::{Rng,StdRng,Rand};
 //use adapton::engine::*;
 use time::Duration;
-use pmfp_collections::{Raz, RazTree};
-use pmfp_collections::trees::NegBin;
+use iodyn::{Raz, RazTree};
+use iodyn::trees::NegBin;
 use primitives::*;
 use interface::{Adapt};
 
