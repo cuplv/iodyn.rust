@@ -4,11 +4,11 @@ use std::rc::Rc;
 use rand::{Rng,StdRng,Rand};
 use time::Duration;
 use adapton::engine::*;
-use pmfp_collections::memo::MemoFrom;
-use pmfp_collections::raz_meta::{RazMeta,Names,FirstLast};
-use pmfp_collections::inc_gauged_raz::{Raz, RazTree};
-use pmfp_collections::inc_archive_stack::{AtTail};
-use pmfp_collections::inc_tree_cursor::gen_level;
+use iodyn::memo::MemoFrom;
+use iodyn::raz_meta::{RazMeta,Names,FirstLast};
+use iodyn::inc_gauged_raz::{Raz, RazTree};
+use iodyn::inc_archive_stack::{AtTail};
+use iodyn::inc_tree_cursor::gen_level;
 use primitives::*;
 use interface::{Adapt};
 
