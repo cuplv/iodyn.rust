@@ -104,9 +104,10 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 	pub fn join(ltree: Self, level: u32, name: Option<Name>, rtree: Self) -> Option<Self> {
 		let tree = match (ltree,rtree) {
 			(RazTree{tree:Some(lt),..},RazTree{tree:Some(rt),..}) => {
-				if lt.level() < level && rt.level() <= level {
+				// if lt.level() < level && rt.level() <= level {
+					// there's a level check through bin in Tree::new()
 					bin(lt,level,name,rt)
-				} else { return None }
+				// } else { return None }
 			},
 			_ => return None
 		};
