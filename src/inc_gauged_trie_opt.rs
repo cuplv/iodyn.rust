@@ -4,7 +4,7 @@
 //! Concretely, they consist of skip-list-like structures.
 
 use std::mem;
-use std::fmt;
+//use std::fmt;
 use std::rc::Rc;
 use std::fmt::Debug;
 use std::hash::{Hash,Hasher};

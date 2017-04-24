@@ -90,21 +90,28 @@ Tree<E> {
 	pub fn fold_up<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R where
 		F: 'static + Fn(Option<R>,E,Option<R>) -> R
 	{
+		self.fold_up_meta(Rc::new(move|r,d,_lv,_n,l|{node_calc(l,d,r)}))
+	}
+
+	/// memoized tree fold operation with levels and names
+	pub fn fold_up_meta<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R where
+		F: 'static + Fn(Option<R>,E,u32,Option<Name>,Option<R>) -> R
+	{
 		match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
-			let (l,r) = match self.name {
+			let (l,r) = match self.name.clone() {
 				None => {(
-					l_branch.map(|t| t.fold_up(node_calc.clone())),
-					r_branch.map(|t| t.fold_up(node_calc.clone())),
+					l_branch.map(|t| t.fold_up_meta(node_calc.clone())),
+					r_branch.map(|t| t.fold_up_meta(node_calc.clone())),
 				)},
 				Some(name) => {
 					let (n1, n2) = name_fork(name);
 					(
-						l_branch.map(|t| memo!( n1 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
-						r_branch.map(|t| memo!( n2 =>> Self::fold_up , t:t ;; f:node_calc.clone() )),
+						l_branch.map(|t| memo!( n1 =>> Self::fold_up_meta , t:t ;; f:node_calc.clone() )),
+						r_branch.map(|t| memo!( n2 =>> Self::fold_up_meta , t:t ;; f:node_calc.clone() )),
 					)
 				}
 			};
-			node_calc(l, data, r)
+			node_calc(l, data, self.level, self.name, r)
 		}}
 	}
 
@@ -156,9 +163,14 @@ Tree<E> {
 	}
 
   /// memoized map operation
+  ///
+  /// because of the possibility of meta data in tree nodes, the
+  /// mapping function takes all the data of a tree, including refs
+  /// to subtrees. Names passed to the mapping function are USED in the
+  /// resulting tree and should not be reused for the creation of arts.
   pub fn map<R:Eq+Clone+Hash+Debug+'static,F>(self, map_val: Rc<F>) -> Tree<R>
   where
-  	F: 'static + Fn(E) -> R
+  	F: 'static + Fn(E,u32,Option<Name>,Option<&Tree<R>>,Option<&Tree<R>>) -> R
   {
 		// TODO: use the branch's name to memoize its mapping
     match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
@@ -175,17 +187,18 @@ Tree<E> {
       		)
       	}
       };
-      Tree::new(self.level, self.name, map_val(data), l, r).unwrap()
+      let new_data = map_val(data, self.level, self.name.clone(), l.as_ref(), r.as_ref());
+      Tree::new(self.level, self.name, new_data, l, r).unwrap()
     }}
   }
 }
 
-/// Use good_levels to verify level consistancy when debugging
+/// Use good_levels to verify level consistency when debugging
 ///
 /// This is an O(n) operation, so it shouldn't be used in release mode
 ///
 /// ```
-/// use pmfp_collections::inc_level_tree::{good_levels,Tree};
+/// use iodyn::inc_level_tree::{good_levels,Tree};
 ///
 /// let tree = Tree::new(4,None,(),None,Tree::new(1,None,(),None,None)).unwrap();
 /// debug_assert!(good_levels(&tree),"this section of code has a problem");
@@ -195,7 +208,7 @@ Tree<E> {
 /// of non-increasing to the left branch and decreasing to the
 /// right branch
 ///
-/// also prints the levels of the failing trees and branchs
+/// also prints the levels of the failing trees and branches
 pub fn good_levels<E: Debug+Clone+Eq+Hash+'static>(tree: &Tree<E>) -> bool {
 	let mut good = true;
 	if let Some(ref t) = force(&tree.link).l_branch {
@@ -296,7 +309,7 @@ mod tests {
 				Tree::new(0,None,Some(6),None,None),
 			)
 		).unwrap();
-		let tree_plus1 = t.clone().map(Rc::new(|d: Option<usize>| {
+		let tree_plus1 = t.clone().map(Rc::new(|d: Option<usize>,_l,_n,_t1:Option<&_>,_t2:Option<&_>| {
 			d.map(|n|n+1)
 		}));
 		let leaf = tree_plus1.l_tree().unwrap().r_tree().unwrap().l_tree().unwrap().r_tree().unwrap();

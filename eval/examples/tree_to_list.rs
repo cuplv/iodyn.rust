@@ -27,7 +27,7 @@ extern crate rand;
 #[macro_use] extern crate clap;
 extern crate adapton;
 extern crate adapton_lab;
-extern crate pmfp_collections;
+extern crate iodyn;
 extern crate eval;
 
 use std::io::BufWriter;
@@ -38,8 +38,8 @@ use rand::{StdRng,SeedableRng};
 use adapton::engine::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
-#[allow(unused)] use pmfp_collections::{IRaz,IRazTree};
-#[allow(unused)] use pmfp_collections::inc_archive_stack::AStack as IAStack;
+#[allow(unused)] use iodyn::{IRaz,IRazTree};
+#[allow(unused)] use iodyn::inc_archive_stack::AStack as IAStack;
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
@@ -70,20 +70,20 @@ fn main2() {
     .author("Kyle Headley <kyle.headley@colorado.edu>")
     .about("Simple conversion test")
     .args_from_usage("\
-      --dataseed=[dataseed]			'seed for random data'
-      --editseed=[edit_seed]    'seed for random edits (and misc.)'
-      -s, --start=[start]       'starting sequence length'
-      -u, --unitsize=[unitsize] 'initial elements per structure unit'
-      -n, --namesize=[namesize] 'initial tree nodes between each art'
-      -e, --edits=[edits]       'edits per batch'
-      -c, --changes=[changes]   'number of incremental changes'
-      -o, --outfile=[outfile]   'name for output files (of different extensions)'
-      --trace                   'perform dcg debugging trace of stack output' ")
+      --dataseed=[dataseed]			  'seed for random data'
+      --editseed=[edit_seed]      'seed for random edits (and misc.)'
+      -s, --start=[start]         'starting sequence length'
+      -g, --datagauge=[datagauge] 'initial elements per structure unit'
+      -n, --namesize=[namesize]   'initial tree nodes between each art'
+      -e, --edits=[edits]         'edits per batch'
+      -c, --changes=[changes]     'number of incremental changes'
+      -o, --outfile=[outfile]     'name for output files (of different extensions)'
+      --trace                     'perform dcg debugging trace of stack output' ")
     .get_matches();
   let dataseed = value_t!(args, "data_seed", usize).unwrap_or(0);
   let editseed = value_t!(args, "edit_seed", usize).unwrap_or(0);
 	let start_size = value_t!(args, "start", usize).unwrap_or(1_000_000);
-	let unitgauge = value_t!(args, "unitsize", usize).unwrap_or(1_000);
+	let datagauge = value_t!(args, "datagauge", usize).unwrap_or(1_000);
 	let namegauge = value_t!(args, "namesize", usize).unwrap_or(1);
 	let edits = value_t!(args, "edits", usize).unwrap_or(1);
 	let changes = value_t!(args, "changes", usize).unwrap_or(30);
@@ -106,7 +106,7 @@ fn main2() {
   let mut test_s = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -123,7 +123,7 @@ fn main2() {
   let mut test_l = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -140,7 +140,7 @@ fn main2() {
   let mut test_rl = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -157,7 +157,7 @@ fn main2() {
   let mut test_vl = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -174,7 +174,7 @@ fn main2() {
   let mut test_rvl = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -191,7 +191,7 @@ fn main2() {
   let mut test_v = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -413,8 +413,8 @@ fn main2() {
 
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
-  write!(plotscript,"set title \"{}", "Accumulating time to insert element(s) and build list/stack\\n").unwrap();
-  writeln!(plotscript,"(s)ize: {}, (u)nit-gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,unitgauge,namegauge,edits).unwrap();
+  write!(plotscript,"set title \"{}", "Cumulative time to insert element(s) and build list/stack\\n").unwrap();
+  writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,datagauge,namegauge,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();

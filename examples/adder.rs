@@ -11,7 +11,7 @@ extern crate rand;
 #[macro_use] extern crate clap;
 extern crate adapton;
 extern crate adapton_lab;
-extern crate pmfp_collections;
+extern crate iodyn;
 extern crate eval;
 
 use std::io::BufWriter;
@@ -22,8 +22,8 @@ use rand::{Rand,Rng,StdRng,SeedableRng};
 use adapton::engine::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
-#[allow(unused)] use pmfp_collections::IRaz;
-#[allow(unused)] use pmfp_collections::inc_archive_stack::{AtTail,AStack as IAStack};
+#[allow(unused)] use iodyn::IRaz;
+#[allow(unused)] use iodyn::inc_archive_stack::{AtTail,AStack as IAStack};
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
@@ -136,21 +136,21 @@ fn main2() {
     .author("Kyle Headley <kyle.headley@colorado.edu>")
     .about("Parsing Example")
     .args_from_usage("\
-      --dataseed=[dataseed]			'seed for random data'
-      --editseed=[edit_seed]    'seed for random edits (and misc.)'
-      -s, --start=[start]       'starting sequence length'
-      -u, --unitsize=[unitsize] 'initial elements per structure unit'
-      -n, --namesize=[namesize] 'initial tree nodes between each art'
-      -e, --edits=[edits]       'edits per batch'
-      -c, --changes=[changes]   'number of incremental changes'
-      -o, --outfile=[outfile]   'name for output files (of different extensions)'
-      --trace                   'produce an output trace of the incremental run' ")
+      --dataseed=[dataseed]			  'seed for random data'
+      --editseed=[edit_seed]      'seed for random edits (and misc.)'
+      -s, --start=[start]         'starting sequence length'
+      -g, --datagauge=[datagauge] 'initial elements per structure unit'
+      -n, --namegauge=[namegauge] 'initial tree nodes between each art'
+      -e, --edits=[edits]         'edits per batch'
+      -c, --changes=[changes]     'number of incremental changes'
+      -o, --outfile=[outfile]     'name for output files (of different extensions)'
+      --trace                     'produce an output trace of the incremental run' ")
     .get_matches();
   let dataseed = value_t!(args, "data_seed", usize).unwrap_or(0);
   let editseed = value_t!(args, "edit_seed", usize).unwrap_or(0);
 	let start_size = value_t!(args, "start", usize).unwrap_or(1_000_000);
-	let unitgauge = value_t!(args, "unitsize", usize).unwrap_or(1_000);
-	let namegauge = value_t!(args, "namesize", usize).unwrap_or(1);
+	let datagauge = value_t!(args, "datagauge", usize).unwrap_or(1_000);
+	let namegauge = value_t!(args, "namegauge", usize).unwrap_or(1);
 	let edits = value_t!(args, "edits", usize).unwrap_or(1);
 	let changes = value_t!(args, "changes", usize).unwrap_or(30);
   let outfile = args.value_of("outfile");
@@ -218,7 +218,7 @@ fn main2() {
   let mut test_inc = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -238,7 +238,7 @@ fn main2() {
 					let ts = tokenize_final(a);
 					ns(name_to_tree.clone(),||{IncrementalFrom{
 						data: AtTail(ts), // This determines the accumulator type
-			      unitgauge: unitgauge,
+			      datagauge: datagauge,
 			      namegauge: namegauge,
 			      coord: coord.clone(),
 					}.create(&mut StdRng::new().unwrap()).1})
@@ -257,7 +257,7 @@ fn main2() {
   let mut test_non_inc = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -277,7 +277,7 @@ fn main2() {
 					let ts = tokenize_final(a);
 					ns(name_to_tree.clone(),||{IncrementalFrom{
 						data: ts, // This determines the accumulator type
-			      unitgauge: unitgauge,
+			      datagauge: datagauge,
 			      namegauge: namegauge,
 			      coord: coord.clone(),
 					}.create(&mut StdRng::new().unwrap()).1})
@@ -330,14 +330,41 @@ fn main2() {
 
   // post-process results
 
-
   let edit_non_inc = result_non_inc.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_inc = result_inc.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_non_inc = result_non_inc.computes.iter().map(|d|(d[0].num_nanoseconds().unwrap(),d[1].num_nanoseconds().unwrap())).collect::<Vec<_>>();
   let comp_inc = result_inc.computes.iter().map(|d|(d[0].num_nanoseconds().unwrap(),d[1].num_nanoseconds().unwrap())).collect::<Vec<_>>();
   
-  println!("computes_non_inc(tokenize,parse): {:?}", comp_non_inc);
-  println!("computes_inc(tokenize,parse): {:?}", comp_inc);
+  let mut adapton_changes = Vec::new();
+  let mut native_changes = Vec::new();
+  for i in 0..changes {
+    let nc = comp_non_inc[i].0 + comp_non_inc[i].1;
+    native_changes.push(nc as f64 / 1_000_000.0);
+    let ac = comp_inc[i].0 + comp_inc[i].1;
+    adapton_changes.push(ac as f64 / 1_000_000.0);
+  }
+  let adapton_init = adapton_changes[0];
+  let native_init = native_changes[0];
+  adapton_changes.remove(0);
+  native_changes.remove(0);
+
+  let update_time = adapton_changes.iter().sum::<f64>() / adapton_changes.len() as f64;
+  let crossover = native_changes.iter().zip(adapton_changes.iter()).enumerate()
+    .fold((native_init,adapton_init,0),|(n,a,cross),(c,(nt,at))|{
+      let new_n = n + nt;
+      let new_a = a + at;
+      let new_cross = if n < a && new_n >= new_a { c + 1 } else { cross };
+      (new_n,new_a,new_cross)
+    }).2;
+
+
+  println!("At input size: {}",start_size);
+  println!(" - Native initial run: {:.*} ms",2,native_init);
+  println!(" - Adapton initial run: {:.*} ms",2,adapton_init);
+  println!(" - Adapton overhead: {:.*} (Adapton initial time / Native initial time)",2,adapton_init/native_init);
+  println!(" - Adapton update time: {:.*} ms",2,update_time);
+  println!(" - Adapton cross over: {} changes  (When Adapton's update time overcomes its overhead)",crossover);
+  println!(" - Adapton speedup: {:.*} (Native initial time / Adapton update time)",2,native_init/update_time);
 
 
   // generate data file
@@ -387,8 +414,8 @@ fn main2() {
 
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
-  write!(plotscript,"set title \"{}", "Accumulating time to insert element(s) and parse\\n").unwrap();
-  writeln!(plotscript,"(s)ize: {}, (u)nit-gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,unitgauge,namegauge,edits).unwrap();
+  write!(plotscript,"set title \"{}", "Cumulative time to insert element(s) and parse\\n").unwrap();
+  writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,datagauge,namegauge,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();

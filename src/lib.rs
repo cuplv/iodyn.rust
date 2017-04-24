@@ -1,3 +1,14 @@
+//! This is a collection of persistent-like data structures
+//!
+//! Many of the structures have an exposed mutable head for fast
+//! updates, and an `archive` function to move the current head
+//! past a pointer. For the incremental structures, this pointer is
+//! mutable in some way, so that the changes can propagate to later
+//! computations
+//!
+//! Currently, the incremental structures are under development, with
+//! features surpassing the structures that were worked on previously
+
 extern crate rand;
 #[macro_use] extern crate adapton;
 
@@ -23,25 +34,31 @@ pub mod inc_archive_stack;
 pub mod inc_level_tree;
 pub mod inc_tree_cursor;
 pub mod inc_gauged_raz;
+<<<<<<< HEAD
 //pub mod inc_gauged_trie;
 //pub mod inc_gauged_trie_opt;
 //pub mod inc_gauged_trie_opt2;
 //pub mod inc_gauged_trie_opt3;
 pub mod inc_gauged_trie_opt4;
 pub mod inc_gauged_skiplist;
+=======
+pub mod raz_meta;
+// pub mod inc_gauged_trie;
+pub mod inc_gauged_trie_opt;
+>>>>>>> 4cfe55d0766253ed7bd33f955ec84aaa2839271e
 
 /// Persistent Raz - original design, simple but works
 pub type PRaz<E> = persist_raz::Raz<E>;
 /// Unfocused `PRaz`
 pub type PRazTree<E> = persist_raz::RazSeq<E>;
-/// Raz - Sequence editing. Vectorized leaves, manualy defined
+/// Raz - Sequence editing. Vectorized leaves, manually defined
 pub type Raz<E> = gauged_raz::Raz<trees::NegBin,E>;
 /// Unfocused `Raz`
 pub type RazTree<E> = gauged_raz::RazTree<trees::NegBin,E>;
 /// Incremental Raz - Experimental for use with Adapton
-pub type IRaz<E> = inc_gauged_raz::Raz<E>;
+pub type IRaz<E> = inc_gauged_raz::Raz<E,raz_meta::Count>;
 /// Unfocused `IRaz`
-pub type IRazTree<E> = inc_gauged_raz::RazTree<E>;
+pub type IRazTree<E> = inc_gauged_raz::RazTree<E,raz_meta::Count>;
 /// Stack-based sequence editing
 pub type Zipper<E> = zip::Stacks<E>;
 /// Functional programming's common list, persistent

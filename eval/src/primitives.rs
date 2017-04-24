@@ -5,15 +5,15 @@ use adapton::engine::*;
 
 /// empty initialization of an incremental collection test harness
 pub trait CreateEmpty<G:Rng> {
-	fn inc_empty(unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration, Self);
+	fn inc_empty(datagauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration, Self);
 }
 /// initialization of test harness from provided data
 pub trait CreateFrom<T,G:Rng> {
-	fn inc_from(data: T, unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration, Self);
+	fn inc_from(data: T, datagauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration, Self);
 }
 /// for building a test harness from randomized data
 pub trait CreateInc<G:Rng> {
-	fn inc_init(size: usize, unitgauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration,Self);
+	fn inc_init(size: usize, datagauge: usize, namegauge: usize, coord: &G, rng: &mut StdRng) -> (Duration,Self);
 }
 /// for adding elements as if initialization was longer
 pub trait EditExtend {
@@ -36,6 +36,11 @@ pub trait CompMax {
 pub trait CompTreeFold<R,O,I:Fn(&R)->O,B:Fn(O,O)->O> {
 	type Target;
 	fn comp_tfold(&self, init:Rc<I>, bin:Rc<B>, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
+pub trait CompTreeFoldNL<R,O,I:Fn(&R)->O,B:Fn(O,O)->O,M:Fn(O,u32,Option<Name>,O)->O> {
+	type Target;
+	fn comp_tfoldnl(&self, init:Rc<I>, bin:Rc<B>, binnl:Rc<M>, rng: &mut StdRng) -> (Duration,Self::Target);
 }
 
 /// changes every value to another based on function

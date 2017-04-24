@@ -7,7 +7,7 @@ extern crate time;
 #[macro_use] extern crate clap;
 extern crate stats;
 extern crate adapton;
-extern crate pmfp_collections;
+extern crate iodyn;
 extern crate eval;
 extern crate adapton_lab;
 
@@ -26,8 +26,9 @@ use adapton_lab::labviz::*;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::accum_lists::*;
-//use pmfp_collections::inc_gauged_trie_opt4::{FinMap,Skiplist};
-use pmfp_collections::inc_gauged_skiplist::{FinMap,Skiplist};
+
+//use iodyn::inc_gauged_trie::{FinMap,Trie};
+use iodyn::inc_gauged_skiplist::{FinMap,Trie};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;
@@ -62,7 +63,7 @@ fn main2() {
       --dataseed=[dataseed]			'seed for random data'
       --editseed=[edit_seed]    'seed for random edits (and misc.)'
       -s, --start=[start]       'starting sequence length'
-      -u, --unitsize=[unitsize] 'initial elements per structure unit'
+      -g, --unitsize=[unitsize] 'initial elements per structure unit'
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -e, --edits=[edits]       'edits per batch'
       -c, --changes=[changes]   'number of incremental changes'
@@ -74,7 +75,7 @@ fn main2() {
   let dataseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_DATASEED);
   let editseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_EDITSEED);
 	let start_size = value_t!(args, "start", usize).unwrap_or(DEFAULT_START);
-	let unitgauge = value_t!(args, "unitsize", usize).unwrap_or(DEFAULT_UNITSIZE);
+	let datagauge = value_t!(args, "unitsize", usize).unwrap_or(DEFAULT_UNITSIZE);
 	let namegauge = value_t!(args, "namesize", usize).unwrap_or(DEFAULT_NAMESIZE);
 	let edits = value_t!(args, "edits", usize).unwrap_or(DEFAULT_EDITS);
 	let changes = value_t!(args, "changes", usize).unwrap_or(DEFAULT_CHANGES);
@@ -88,7 +89,7 @@ fn main2() {
   let mut testskiplist = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -107,7 +108,7 @@ fn main2() {
   let mut test_hashmap = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -125,7 +126,7 @@ fn main2() {
   let mut test_vl = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      unitgauge: unitgauge,
+      datagauge: datagauge,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -256,7 +257,7 @@ fn main2() {
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
   write!(plotscript,"set title \"{}", "Cumulative edit/compute times vs Number of edits/updates\\n").unwrap();
-  writeln!(plotscript,"(s)ize: {}, (u)nit-gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,unitgauge,namegauge,edits).unwrap();
+  writeln!(plotscript,"(s)ize: {}, (g)gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,unitgauge,namegauge,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();

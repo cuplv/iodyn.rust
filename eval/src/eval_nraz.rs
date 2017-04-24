@@ -3,8 +3,8 @@
 use rand::{Rng,StdRng,Rand};
 //use adapton::engine::*;
 use time::Duration;
-use pmfp_collections::{Raz, RazTree};
-use pmfp_collections::trees::NegBin;
+use iodyn::{Raz, RazTree};
+use iodyn::trees::NegBin;
 use primitives::*;
 use interface::{Adapt};
 
@@ -17,7 +17,7 @@ pub struct EvalNRaz<E:Adapt,G:Rng> {
 	raztree: Option<RazTree<E>>,
 	coord: G,
 	counter: usize, // for name/levels during edit
-	unitsize: usize,
+	datagauge: usize,
 }
 
 impl<E: Adapt,G:Rng> EvalNRaz<E,G> {
@@ -26,7 +26,7 @@ impl<E: Adapt,G:Rng> EvalNRaz<E,G> {
 			raztree: None,
 			coord: coord,
 			counter: 0,
-			unitsize: us,
+			datagauge: us,
 		}
 	}
 }
@@ -36,13 +36,13 @@ impl<E: Adapt,G:Rng> EvalNRaz<E,G> {
 impl<E:Adapt+Rand,G:Rng+Clone>
 CreateInc<G>
 for EvalNRaz<E,G> {
-	fn inc_init(size: usize, unitgauge: usize, _namegauge: usize, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)
+	fn inc_init(size: usize, datagauge: usize, _namegauge: usize, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)
 	{
-		let mut eval = EvalNRaz::new(unitgauge, (*coord).clone());
+		let mut eval = EvalNRaz::new(datagauge, (*coord).clone());
 		let mut raz = Raz::new();
 		// measure stuff
-		let levels = size / eval.unitsize; 
-		let nolevs = size - (levels*eval.unitsize);
+		let levels = size / eval.datagauge; 
+		let nolevs = size - (levels*eval.datagauge);
 		// pregenerate data
 		let mut lev_vec = Vec::with_capacity(levels);
 		for _ in 0..levels {
@@ -53,7 +53,7 @@ for EvalNRaz<E,G> {
 		// time the creation (insert and unfocus)
 		let time = Duration::span(||{
 			for _ in 0..levels {
-				for _ in 0..eval.unitsize {
+				for _ in 0..eval.datagauge {
 					raz.push_left(data_iter.next().unwrap_or_else(||panic!("init")));
 				}
 				raz.archive_left(level_iter.next().unwrap_or_else(||panic!("init")));
@@ -79,7 +79,7 @@ EditInsert for EvalNRaz<E,G> {
 		});
 		let mut raz = focus.unwrap_or_else(||panic!("bad edit location"));
 		// pregenerate data
-		let new_levels = batch_size / self.unitsize;
+		let new_levels = batch_size / self.datagauge;
 		let mut lev_vec = Vec::with_capacity(new_levels);
 		for _ in 0..(new_levels + 1) {
 			lev_vec.push(rng.gen())
@@ -91,7 +91,7 @@ EditInsert for EvalNRaz<E,G> {
 			for data in data_iter {
 				raz.push_left(data);
 				self.counter += 1;
-				if self.counter % self.unitsize == 0 {
+				if self.counter % self.datagauge == 0 {
 					raz.archive_left(lev_iter.next().expect("lev"));
 				}
 			}

@@ -5,7 +5,7 @@ extern crate time;
 #[macro_use] extern crate clap;
 extern crate stats;
 extern crate adapton;
-extern crate pmfp_collections;
+extern crate iodyn;
 extern crate eval;
 
 use std::fs::OpenOptions;
@@ -47,7 +47,7 @@ fn main2() {
       --dataseed=[dataseed]			'seed for random data'
       --editseed=[edit_seed]    'seed for random edits (and misc.)'
       -s, --start=[start]       'starting sequence length'
-      -u, --unitsize=[unitsize] 'initial elements per structure unit'
+      -g, --unitsize=[unitsize] 'initial elements per structure unit'
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -e, --edits=[edits]       'edits per batch'
       -c, --changes=[changes]   'number of incremental changes'
@@ -67,7 +67,7 @@ fn main2() {
   let mut testtree = EditComputeSequence{
     init: IncrementalInit {
       size: start,
-      unitgauge: unitsize,
+      datagauge: unitsize,
       namegauge: namesize,
       coord: StdRng::from_seed(&[dataseed]),
     },
@@ -86,7 +86,7 @@ fn main2() {
   let mut testlr = EditComputeSequence{
     init: IncrementalInit {
       size: start,
-      unitgauge: unitsize,
+      datagauge: unitsize,
       namegauge: namesize,
       coord: StdRng::from_seed(&[dataseed]),
     },
@@ -166,8 +166,8 @@ fn main2() {
 
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
-  write!(plotscript,"set title \"{}", "Accumulating time to insert element(s) and build a set\\n").unwrap();
-  writeln!(plotscript,"(s)ize: {}, (u)nit-gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start,unitsize,namesize,edits).unwrap();
+  write!(plotscript,"set title \"{}", "Cumulative time to insert element(s) and build a set\\n").unwrap();
+  writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start,unitsize,namesize,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();

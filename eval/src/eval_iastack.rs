@@ -1,7 +1,7 @@
 use std::fmt::{self,Debug};
 use rand::{StdRng,Rng};
 use time::Duration;
-use pmfp_collections::inc_archive_stack::AStack as IAStack;
+use iodyn::inc_archive_stack::AStack as IAStack;
 use primitives::*;
 use interface::{Adapt};
 
@@ -30,7 +30,7 @@ EvalIAStack<E,G> {
 
 impl<E:Adapt,G:Rng+Clone>
 CreateEmpty<G> for EvalIAStack<E,G>{
-	fn inc_empty(_unitgauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+	fn inc_empty(_datagauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
 		let mut eval = None;
 		let time = Duration::span(||{
 			eval = Some(EvalIAStack::new((*coord).clone()));

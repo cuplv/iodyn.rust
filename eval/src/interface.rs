@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::hash::Hash;
-use pmfp_collections::{IRaz};
-use pmfp_collections::inc_archive_stack::AStack as IAStack;
+use iodyn::{IRaz};
+use iodyn::inc_archive_stack::AStack as IAStack;
 use adapton::engine::Name;
 
 /// convenience trait for incremental test data

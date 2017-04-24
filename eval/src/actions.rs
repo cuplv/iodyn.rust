@@ -22,28 +22,28 @@ pub trait Testor<R> {
 
 #[derive(Clone)]
 pub struct IncrementalEmpty<G:Rng> {
-	pub unitgauge: usize,
+	pub datagauge: usize,
 	pub namegauge: usize,
 	pub coord: G,
 }
 impl<D:CreateEmpty<G>,G:Rng>
 Creator<Duration,D> for IncrementalEmpty<G> {
 	fn create(&mut self, rng: &mut StdRng) -> (Duration,D){
-		D::inc_empty(self.unitgauge, self.namegauge, &self.coord, rng)
+		D::inc_empty(self.datagauge, self.namegauge, &self.coord, rng)
 	}
 }
 
 #[derive(Clone)]
 pub struct IncrementalFrom<T,G:Rng> {
 	pub data: T,
-	pub unitgauge: usize,
+	pub datagauge: usize,
 	pub namegauge: usize,
 	pub coord: G,
 }
 impl<D:CreateFrom<T,G>,T:Clone,G:Rng>
 Creator<Duration,D> for IncrementalFrom<T,G> {
 	fn create(&mut self, rng: &mut StdRng) -> (Duration,D){
-		D::inc_from(self.data.clone(), self.unitgauge, self.namegauge, &self.coord, rng)
+		D::inc_from(self.data.clone(), self.datagauge, self.namegauge, &self.coord, rng)
 	}
 }
 
@@ -51,14 +51,14 @@ Creator<Duration,D> for IncrementalFrom<T,G> {
 #[derive(Clone)]
 pub struct IncrementalInit<G:Rng> {
 	pub size: usize,
-	pub unitgauge: usize,
+	pub datagauge: usize,
 	pub namegauge: usize,
 	pub coord: G,
 }
 impl<D:CreateInc<G>,G:Rng>
 Creator<Duration,D> for IncrementalInit<G> {
 	fn create(&mut self, rng: &mut StdRng) -> (Duration,D){
-		D::inc_init(self.size, self.unitgauge, self.namegauge, &self.coord, rng)
+		D::inc_init(self.size, self.datagauge, self.namegauge, &self.coord, rng)
 	}
 }
 
@@ -156,6 +156,47 @@ impl<E,O,I:Fn(&E)->O,B:Fn(O,O)->O,D: CompTreeFold<E,O,I,B>>
 Computor<Duration,D> for TreeFold<E,O,I,B> {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
 		let (time, answer) = data.comp_tfold(self.0.clone(),self.1.clone(),rng);
+		#[allow(unused)]
+		let saver = Vec::new().push(answer); // don't let rust compile this away
+		time
+	}
+}
+
+pub struct TreeFoldNL<
+	E,O,I:Fn(&E)->O,B:Fn(O,O)->O,M:Fn(O,u32,Option<Name>,O)->O
+>{
+	init: Rc<I>,
+	bin: Rc<B>,
+	binnl: Rc<M>,
+	elm: PhantomData<E>,
+	out: PhantomData<O>,
+}
+impl<E,O,I,B,M>
+TreeFoldNL<E,O,I,B,M> where
+	I:Fn(&E)->O,
+	B:Fn(O,O)->O,
+	M:Fn(O,u32,Option<Name>,O)->O,
+{
+	pub fn new(init:I,bin:B,binnl:M) -> Self {
+		TreeFoldNL{
+			init: Rc::new(init),
+			bin: Rc::new(bin),
+			binnl: Rc::new(binnl),
+			elm: PhantomData,
+			out: PhantomData,
+		}
+	}
+}
+impl<E,O,I,B,M,D>
+Computor<Duration,D>
+for TreeFoldNL<E,O,I,B,M> where
+	I:Fn(&E)->O,
+	B:Fn(O,O)->O,
+	M:Fn(O,u32,Option<Name>,O)->O,
+	D:CompTreeFoldNL<E,O,I,B,M>,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time, answer) = data.comp_tfoldnl(self.init.clone(),self.bin.clone(),self.binnl.clone(),rng);
 		#[allow(unused)]
 		let saver = Vec::new().push(answer); // don't let rust compile this away
 		time

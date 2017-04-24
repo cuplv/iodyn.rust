@@ -29,7 +29,7 @@ EvalVec<E,G> {
 
 impl<E,G:Rng+Clone>
 CreateEmpty<G> for EvalVec<E,G>{
-	fn inc_empty(_unitgauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+	fn inc_empty(_datagauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
 		let mut eval = None;
 		let time = Duration::span(||{
 			eval = Some(EvalVec::new((*coord).clone()));
@@ -40,7 +40,7 @@ CreateEmpty<G> for EvalVec<E,G>{
 
 impl<E,G:Rng+Clone>
 CreateFrom<Vec<E>,G> for EvalVec<E,G>{
-	fn inc_from(data: Vec<E>, _unitgauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+	fn inc_from(data: Vec<E>, _datagauge: usize, _namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
 		let mut eval = None;
 		let time = Duration::span(||{
 			eval = Some(EvalVec{vec:data,coord:(*coord).clone()});
@@ -54,7 +54,7 @@ CreateFrom<Vec<E>,G> for EvalVec<E,G>{
 impl<E:Rand,G:Rng+Clone>
 CreateInc<G>
 for EvalVec<E,G> {
-	fn inc_init(size: usize, _unigauge: usize, _namegauge: usize, coord: &G, mut _rng: &mut StdRng) -> (Duration,Self) {
+	fn inc_init(size: usize, _datagauge: usize, _namegauge: usize, coord: &G, mut _rng: &mut StdRng) -> (Duration,Self) {
 		let mut eval = EvalVec::new((*coord).clone());
 		let data_iter = eval.coord.gen_iter::<E>().take(size).collect::<Vec<_>>().into_iter();
 		let time = Duration::span(||{

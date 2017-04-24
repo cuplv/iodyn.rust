@@ -5,7 +5,8 @@ use rand::{Rng,StdRng,Rand};
 use time::Duration;
 use adapton::engine::*;
 use iodyn::memo::MemoFrom;
-use iodyn::{IRaz, IRazTree};
+use iodyn::raz_meta::{RazMeta,Names,FirstLast};
+use iodyn::inc_gauged_raz::{Raz, RazTree};
 use iodyn::inc_archive_stack::{AtTail};
 use iodyn::inc_tree_cursor::gen_level;
 use primitives::*;
@@ -15,27 +16,19 @@ use interface::{Adapt};
 ///
 /// Coorinates elements, insertion location, gen'ed levels
 #[derive(Clone,Debug)]
-pub struct EvalIRaz<E:Adapt,G:Rng> {
+pub struct EvalRazNameIndex<E:Adapt,G:Rng> {
 	// Option for cleaner code, None means uninitialized
-	raztree: Option<IRazTree<E>>,
+	raztree: Option<RazTree<E,Names>>,
 	names: usize,
 	coord: G,
 	counter: usize, // for name/levels during edit
 	datagauge: usize,
 	namegauge: usize,
 }
-// impl<E:Adapt,G:Rng> Debug for EvalIRaz<E,G> {
-// 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-// 		let tree = self.raztree.clone();
-// 		let size = self.raztree.clone().unwrap().meta().0;
-// 		let content = tree.unwrap().into_iter().collect::<Vec<_>>();
-// 		write!(f,"EvalIRaz {{ size:{}, data:{:?} }}",size,content)
-// 	}
-// }
 
-impl<E:Adapt,G:Rng> EvalIRaz<E,G> {
+impl<E:Adapt,G:Rng> EvalRazNameIndex<E,G> {
 	pub fn new(us: usize, ns: usize, coord:G) -> Self {
-		EvalIRaz {
+		EvalRazNameIndex {
 			raztree: None,
 			names: 0,
 			coord: coord,
@@ -53,20 +46,20 @@ impl<E:Adapt,G:Rng> EvalIRaz<E,G> {
 
 
 impl<E:Adapt,G:Rng+Clone>
-CreateEmpty<G> for EvalIRaz<E,G>{
+CreateEmpty<G> for EvalRazNameIndex<E,G>{
 	fn inc_empty(datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
-		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
+		let mut eval = EvalRazNameIndex::new(datagauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
-			eval.raztree = Some(IRaz::new().unfocus());
+			eval.raztree = Some(Raz::new().unfocus());
 		});
 		(time,eval)
 	}
 }
 
 impl<E:Adapt,G:Rng+Clone>
-CreateFrom<IRaz<E>,G> for EvalIRaz<E,G>{
-	fn inc_from(data: IRaz<E>, datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
-		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
+CreateFrom<Raz<E,Names>,G> for EvalRazNameIndex<E,G>{
+	fn inc_from(data: Raz<E,Names>, datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalRazNameIndex::new(datagauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
 			eval.raztree = Some(data.unfocus());
 		});
@@ -75,9 +68,9 @@ CreateFrom<IRaz<E>,G> for EvalIRaz<E,G>{
 }
 
 impl<E:Adapt,G:Rng+Clone>
-CreateFrom<IRazTree<E>,G> for EvalIRaz<E,G>{
-	fn inc_from(data: IRazTree<E>, datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
-		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
+CreateFrom<RazTree<E,Names>,G> for EvalRazNameIndex<E,G>{
+	fn inc_from(data: RazTree<E,Names>, datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
+		let mut eval = EvalRazNameIndex::new(datagauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
 			eval.raztree = Some(data);
 		});
@@ -86,24 +79,24 @@ CreateFrom<IRazTree<E>,G> for EvalIRaz<E,G>{
 }
 
 impl<E:Adapt,G:Rng+Clone>
-CreateFrom<AtTail<E,u32>,G> for EvalIRaz<E,G>{
+CreateFrom<AtTail<E,u32>,G> for EvalRazNameIndex<E,G>{
 	fn inc_from(data: AtTail<E,u32>, datagauge: usize, namegauge: usize, coord: &G, _rng: &mut StdRng) -> (Duration, Self) {
-		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
+		let mut eval = EvalRazNameIndex::new(datagauge, namegauge, (*coord).clone());
 		let time = Duration::span(||{
-			eval.raztree = Some(IRazTree::memo_from(&data));
+			eval.raztree = Some(RazTree::memo_from(&data));
 		});
 		(time,eval)
 	}
 }
 
-/// Creates a `IRazTree` buy inserting elements, levels, and names (pregenerated)
+/// Creates a `RazTree` buy inserting elements, levels, and names (pregenerated)
 /// into an initially unallocated `IRaz`, and then unfocusing
 // uses Params::{start,namegauge,datagauge}
 impl<E:Adapt+Rand,G:Rng+Clone>
-CreateInc<G> for EvalIRaz<E,G> {
+CreateInc<G> for EvalRazNameIndex<E,G> {
 	fn inc_init(size: usize, datagauge: usize, namegauge: usize, coord: &G, mut rng: &mut StdRng) -> (Duration,Self)
 	{
-		let mut eval = EvalIRaz::new(datagauge, namegauge, (*coord).clone());
+		let mut eval = EvalRazNameIndex::new(datagauge, namegauge, (*coord).clone());
 		// measure stuff
 		let names = size/(eval.namegauge*eval.datagauge); // integer division
 		let levels = size / eval.datagauge; 
@@ -128,7 +121,7 @@ CreateInc<G> for EvalIRaz<E,G> {
 		let mut level_iter = lev_vec.into_iter();
 		// time the creation (insert and unfocus)
 		let time = Duration::span(||{
-			let mut raz = IRaz::new();
+			let mut raz = Raz::new();
 			for _ in 0..names {
 				for _ in 0..eval.namegauge {
 					for _ in 0..eval.datagauge {
@@ -155,10 +148,14 @@ CreateInc<G> for EvalIRaz<E,G> {
 
 // TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
 impl<E:Adapt+Rand,G:Rng>
-EditInsert for EvalIRaz<E,G> {
+EditInsert for EvalRazNameIndex<E,G> {
 	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
-		let loc = self.coord.gen::<usize>() % tree.meta().0;
+		let loc = {
+			let mut names = tree.meta().0.keys();
+			let name_count = names.len();
+			names.nth(self.coord.gen::<usize>() % name_count).unwrap().clone()
+		};
 		let mut focus = None;
 		let focus_time = Duration::span(||{
 			focus = tree.focus(loc);
@@ -197,13 +194,12 @@ EditInsert for EvalIRaz<E,G> {
 
 // TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
 impl<E:Adapt+Rand,G:Rng>
-EditAppend for EvalIRaz<E,G> {
+EditAppend for EvalRazNameIndex<E,G> {
 	fn append(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
-		let len = tree.meta().0;
 		let mut focus = None;
 		let focus_time = Duration::span(||{
-			focus = tree.focus(len);
+			focus = tree.focus(<Names as RazMeta<E>>::Index::last());
 		});
 		let mut raz = focus.unwrap_or_else(||panic!("bad edit location"));
 		// pregenerate data
@@ -238,7 +234,7 @@ EditAppend for EvalIRaz<E,G> {
 }
 
 impl<E:Adapt+Ord,G:Rng>
-CompMax for EvalIRaz<E,G> {
+CompMax for EvalRazNameIndex<E,G> {
 	type Target = Option<E>;
 	fn comp_max(&self, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let clone = self.raztree.clone().unwrap();
@@ -251,7 +247,7 @@ CompMax for EvalIRaz<E,G> {
 }
 
 impl<E:Adapt,O:Adapt,I,B,G:Rng>
-CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
+CompTreeFold<E,O,I,B> for EvalRazNameIndex<E,G> where
 	I:'static + Fn(&E)->O,
 	B:'static + Fn(O,O)->O,
 {
@@ -266,28 +262,11 @@ CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
 	}
 }
 
-impl<E:Adapt,O:Adapt,I,B,M,G:Rng>
-CompTreeFoldNL<E,O,I,B,M> for EvalIRaz<E,G> where
-	I:'static + Fn(&E)->O,
-	B:'static + Fn(O,O)->O,
-	M:'static + Fn(O,u32,Option<Name>,O)->O,
-{
-	type Target = Option<O>;
-	fn comp_tfoldnl(&self, init:Rc<I>, bin:Rc<B>, binnl:Rc<M>, _rng: &mut StdRng) -> (Duration,Self::Target) {
-		let clone = self.raztree.clone().unwrap();
-		let mut res = None;
-		let time = Duration::span(||{
-	    	res = Some(clone.fold_up_nl(init,bin,binnl))
-		});
-		(time,res.unwrap())
-	}
-}
-
 impl<E:Adapt,O:Adapt,F,G:Rng>
-CompMap<E,O,F> for EvalIRaz<E,G> where
+CompMap<E,O,F> for EvalRazNameIndex<E,G> where
 	F:'static + Fn(&E)->O
 {
-	type Target = IRazTree<O>;
+	type Target = RazTree<O,Names>;
 	fn comp_map(&self, f:Rc<F>, _rng: &mut StdRng) -> (Duration,Self::Target) {
 		let clone = self.raztree.clone().unwrap();
 		let mut mapped = None;
@@ -300,7 +279,7 @@ CompMap<E,O,F> for EvalIRaz<E,G> where
 }
 
 impl<E:Adapt,O:Adapt,F,G:Rng>
-CompFold<E,O,F> for EvalIRaz<E,G> where
+CompFold<E,O,F> for EvalRazNameIndex<E,G> where
 	F:'static + Fn(O,&E)->O,
 {
 	type Target = O;
@@ -315,7 +294,7 @@ CompFold<E,O,F> for EvalIRaz<E,G> where
 }
 
 impl<E:Adapt,O:Adapt,F,N,G:Rng>
-CompFoldMeta<E,O,(u32,Option<Name>),F,N> for EvalIRaz<E,G> where
+CompFoldMeta<E,O,(u32,Option<Name>),F,N> for EvalRazNameIndex<E,G> where
 	F:'static + Fn(O,&E)->O,
 	N:'static + Fn(O,(u32,Option<Name>))->O,
 {
@@ -331,7 +310,7 @@ CompFoldMeta<E,O,(u32,Option<Name>),F,N> for EvalIRaz<E,G> where
 }
 
 impl<E:Adapt,O:Adapt,F,FF,N,G:Rng>
-CompFoldArchive<E,O,(u32,Option<Name>),F,FF,N> for EvalIRaz<E,G> where
+CompFoldArchive<E,O,(u32,Option<Name>),F,FF,N> for EvalRazNameIndex<E,G> where
 	F:'static + Fn(O,&E)->O,
 	FF:'static + Fn(O,Option<Name>)->O,
 	N:'static + Fn(O,(u32,Option<Name>))->O,
