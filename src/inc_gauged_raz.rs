@@ -89,6 +89,7 @@ fn treetop_meta<E,M>(t: Option<&tree::Tree<TreeData<E,M>>>) -> M where
 impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 	/// get the meta data
 	pub fn meta(&self) -> &M {&self.meta}
+	pub fn is_empty(&self) -> bool {self.tree.is_none()}
 
 	pub fn empty() -> Self {
 		RazTree{meta: treetop_meta(None), tree: None}
@@ -181,6 +182,28 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 						(None, None) => panic!("branch with no data"),
 						(Some(r),None) | (None, Some(r)) => r,
 						(Some(lr),Some(rr)) => binnl(lr,lv,n,rr),
+					}},
+				}
+			}))
+		})
+	}
+
+	pub fn fold_up_gauged<I,R,B>(self, init: Rc<I>, bin: Rc<B>) -> Option<R> where
+		R: 'static + Eq+Clone+Hash+Debug,
+		I: 'static + Fn(&Vec<E>) -> R,
+		B: 'static + Fn(R,u32,Option<Name>,R) -> R,
+	{
+		// TODO: memo! fold_up (only first rec call is not)
+		self.tree.map(|tree| {
+			tree.fold_up_meta(Rc::new(move |l,c,lv,n,r|{
+				match c {
+					TreeData::Leaf(ref vec) => {
+						init(vec)
+					},
+					_ => { match (l,r) {
+						(None, None) => panic!("branch with no data"),
+						(Some(r),None) | (None, Some(r)) => r,
+						(Some(lr),Some(rr)) => bin(lr,lv,n,rr),
 					}},
 				}
 			}))

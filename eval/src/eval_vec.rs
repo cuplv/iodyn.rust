@@ -132,6 +132,20 @@ CompRev for EvalVec<E,G> {
 	}
 }
 
+impl<E:Clone,O,G:Rng>
+CompNative<O> for EvalVec<E,G> {
+	type Input = Vec<E>;
+	fn comp_native<F>(&self, f:Rc<F>, _rng: &mut StdRng) -> (Duration,O) where
+		F:Fn(&Self::Input)->O,
+	{
+		let mut nat = None;
+		let time = Duration::span(||{
+			nat = Some(f(&self.vec));
+		});
+		(time, nat.unwrap())
+	}
+}
+
 // TODO: implement tree fold as multiple pairwise passes?
 
 impl<E,O,F,G:Rng>

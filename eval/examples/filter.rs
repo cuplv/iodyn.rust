@@ -13,7 +13,7 @@ use rand::{StdRng,SeedableRng};
 use adapton::engine::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
-#[allow(unused)] use iodyn::IRaz;
+#[allow(unused)] use iodyn::{IRaz,IRazTree};
 #[allow(unused)] use iodyn::inc_archive_stack::{AtTail,AStack as IAStack};
 #[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
@@ -36,7 +36,7 @@ fn main2() {
 // end provide additional stack memory
 
   //command-line
-  let args = clap::App::new("reverse")
+  let args = clap::App::new("filter")
     .version("0.1")
     .author("Kyle Headley <kyle.headley@colorado.edu>")
     .args_from_usage("\
@@ -61,7 +61,9 @@ fn main2() {
   let do_trace = args.is_present("trace");
 	let coord = StdRng::from_seed(&[dataseed]);
 
-  let mut test = EditComputeSequence{
+  let name_filter = name_of_string(String::from("filter"));
+
+  let mut test_inc = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
       datagauge: datagauge,
@@ -69,7 +71,46 @@ fn main2() {
       coord: coord.clone(),
     },
     edit: BatchInsert(edits),
-    comp: Reverse,
+    comp: TreeFoldG::new(
+      |v|{
+        let mut c = v.clone();
+        c.retain(|e|{*e % 2 == 0});
+        match IRazTree::from_vec(c) {
+          None => IRazTree::empty(),
+          Some(t) => t,
+        }
+      },
+      move|t1,lev,nm,t2|{
+        match (t1.is_empty(),t2.is_empty()) {
+          (true,true) => IRazTree::empty(),
+          (false,true) => t1,
+          (true,false) => t2,
+          (false,false) => {
+            ns(name_filter.clone(),||{
+              IRazTree::join(t1,lev,nm,t2).unwrap()     
+            })
+          },
+        }
+      },
+    ),
+    changes: changes,
+  };
+
+  let mut test_non_inc = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+      datagauge: datagauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: Native::new(
+      |v:&Vec<_>|{
+        let mut c = v.clone();
+        c.retain(|e|{*e % 2 == 0});
+        c
+      },
+    ),
     changes: changes,
   };
 
@@ -79,12 +120,12 @@ fn main2() {
 
   let mut rng = StdRng::from_seed(&[editseed]);
 
-  let result_non_inc: TestResult<EvalVec<u32,StdRng>> = test.test(&mut rng);
+  let result_non_inc: TestResult<EvalVec<u32,StdRng>> = test_non_inc.test(&mut rng);
 
   // for visual debugging
   if do_trace {reflect::dcg_reflect_begin()}
 
-  let result_inc: TestResult<EvalIRaz<u32,StdRng>> = test.test(&mut rng);
+  let result_inc: TestResult<EvalIRaz<u32,StdRng>> = test_inc.test(&mut rng);
 
   if do_trace {
 	  let traces = reflect::dcg_reflect_end();
@@ -129,13 +170,16 @@ fn main2() {
       (new_n,new_a,new_cross)
     }).2;
 
-
   println!("At input size: {}",start_size);
   println!(" - Native initial run: {:.*} ms",2,native_init);
   println!(" - Adapton initial run: {:.*} ms",2,adapton_init);
   println!(" - Adapton overhead: {:.*} (Adapton initial time / Native initial time)",2,adapton_init/native_init);
-  println!(" - Adapton update time: {:.*} ms",2,update_time);
-  println!(" - Adapton cross over: {} changes  (When Adapton's update time overcomes its overhead)",crossover);
+  println!(" - Adapton update time: {:.*} ms avg over the first {} changes",2,update_time,changes);
+  if crossover > 0 {
+    println!(" - Adapton cross over: {} changes  (When Adapton's update time overcomes its overhead)",crossover);
+  }  else {
+    println!(" - Adapton cross over off chart  (When Adapton's update time overcomes its overhead)");
+  }
   println!(" - Adapton speedup: {:.*} (Native initial time / Adapton update time)",2,native_init/update_time);
 
 
@@ -157,7 +201,7 @@ fn main2() {
   ;
 
   let (mut en,mut rn,mut ei,mut ri) = (0f64,0f64,0f64,0f64);
-  writeln!(dat,"'{}'\t'{}'\t'{}'","Changes","Edit Time","Reverse Time").unwrap();
+  writeln!(dat,"'{}'\t'{}'\t'{}'","Changes","Edit Time","Filter Time").unwrap();
   for i in 0..changes {
     en += edit_non_inc[i] as f64 / 1_000_000.0;
     rn += comp_non_inc[i] as f64 / 1_000_000.0;
@@ -184,7 +228,7 @@ fn main2() {
 
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
-  write!(plotscript,"set title \"{}", "Cumulative time to insert element(s) and reverse\\n").unwrap();
+  write!(plotscript,"set title \"{}", "Cumulative time to insert element(s) and filter\\n").unwrap();
   writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,datagauge,namegauge,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();

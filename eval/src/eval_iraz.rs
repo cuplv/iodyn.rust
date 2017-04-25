@@ -158,12 +158,13 @@ impl<E:Adapt+Rand,G:Rng>
 EditInsert for EvalIRaz<E,G> {
 	fn insert(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {
 		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
-		let loc = self.coord.gen::<usize>() % tree.meta().0;
+		let len = tree.meta().0;
+		let loc = self.coord.gen::<usize>() % len;
 		let mut focus = None;
 		let focus_time = Duration::span(||{
 			focus = tree.focus(loc);
 		});
-		let mut raz = focus.unwrap_or_else(||panic!("bad edit location"));
+		let mut raz = focus.unwrap_or_else(||panic!("bad edit location: {}/{}",loc,len));
 		// pregenerate data
 		let new_levels = batch_size / self.datagauge;
 		let mut lev_vec = Vec::with_capacity(new_levels);
@@ -260,6 +261,7 @@ CompRev for EvalIRaz<E,G> {
 	    V(Vec<E>),
 	    T(IRazTree<E>)
 	  }
+	  let name_rev = name_of_string(String::from("reverse"));
 		let clone = self.raztree.clone().unwrap();
 		let mut revraz = None;
 		let init = Rc::new(|a:&E|{R::I(a.clone())});
@@ -270,7 +272,7 @@ CompRev for EvalIRaz<E,G> {
 				_ => unreachable!(),
 			}
 		});
-		let to_tree = Rc::new(|l,lv,n:Option<Name>,r| {
+		let to_tree = Rc::new(move|l,lv,n:Option<Name>,r| {
 			let ltree = match l {
 				R::I(e) => IRazTree::from_vec(vec![e]).unwrap(),
 				R::V(mut v) => {v.reverse();IRazTree::from_vec(v).unwrap()},
@@ -281,8 +283,7 @@ CompRev for EvalIRaz<E,G> {
 				R::V(mut v) => {v.reverse();IRazTree::from_vec(v).unwrap()},
 				R::T(r) => r,
 			};
-			let nm = n.map(|n|{name_pair(n,name_of_string(String::from("rev")))});
-			R::T(IRazTree::join(rtree,lv,nm,ltree).unwrap())
+			R::T(ns(name_rev.clone(),||{IRazTree::join(rtree,lv,n,ltree).unwrap()}))
 		});
 		let time = Duration::span(||{
 	    	revraz = Some(match clone.fold_up_nl(init, to_vec, to_tree) {
@@ -324,6 +325,22 @@ CompTreeFoldNL<E,O,I,B,M> for EvalIRaz<E,G> where
 		let mut res = None;
 		let time = Duration::span(||{
 	    	res = Some(clone.fold_up_nl(init,bin,binnl))
+		});
+		(time,res.unwrap())
+	}
+}
+
+impl<E:Adapt,O:Adapt,I,B,G:Rng>
+CompTreeFoldG<E,O,I,B> for EvalIRaz<E,G> where
+	I:'static + Fn(&Vec<E>)->O,
+	B:'static + Fn(O,u32,Option<Name>,O)->O,
+{
+	type Target = Option<O>;
+	fn comp_tfoldg(&self, init:Rc<I>, bin:Rc<B>, _rng: &mut StdRng) -> (Duration,Self::Target) {
+		let clone = self.raztree.clone().unwrap();
+		let mut res = None;
+		let time = Duration::span(||{
+	    	res = Some(clone.fold_up_gauged(init,bin))
 		});
 		(time,res.unwrap())
 	}
