@@ -98,6 +98,8 @@ pub trait Graph<NdId, Data> {
 	fn get_data(Self, NdId) -> Option<Data>;
 	
 	fn bfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
+	
+	fn dfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
 }
 
 impl<T, Data> Graph<usize, Data> for T 
@@ -191,35 +193,6 @@ impl<T, Data> Graph<usize, Data> for T
 		}
 		g
 	}
-}
-
-pub trait DirectedGraph<NdId, Data> : Graph<NdId, Data> {
-	fn add_directed_edge(Self, NdId, NdId) -> Self;
-	
-	fn successors(Self, NdId) -> Option<Vec<NdId>>;
-	
-	fn dfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
-}
-
-impl<T, Data> DirectedGraph<usize, Data> for T 
-	where T: FinMap<usize, (Option<Data>, Vec<usize>)> + Clone
-	{
-	fn add_directed_edge(curr: Self, src: usize, dst: usize) -> Self {
-		let mut ret = curr;
-		if !FinMap::contains(ret.clone(), src) {
-			ret = Graph::add_node(ret.clone(), src, None);
-		}
-		if !FinMap::contains(ret.clone(), dst) {
-			ret = Graph::add_node(ret.clone(), dst, None);
-		}
-		let (k, mut adjs) = FinMap::get(ret.clone(), src).unwrap();
-		adjs.push(dst);
-		FinMap::put(ret, src, (k, adjs))
-	}
-	
-	fn successors(curr: Self, id: usize) -> Option<Vec<usize>> {
-		Graph::adjacents(curr, id)
-	}
 	
 	fn dfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
 		//setup
@@ -251,6 +224,33 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		g
 	}
 }
+
+pub trait DirectedGraph<NdId, Data> : Graph<NdId, Data> {
+	fn add_directed_edge(Self, NdId, NdId) -> Self;
+	
+	fn successors(Self, NdId) -> Option<Vec<NdId>>;
+}
+
+impl<T, Data> DirectedGraph<usize, Data> for T 
+	where T: FinMap<usize, (Option<Data>, Vec<usize>)> + Clone
+	{
+	fn add_directed_edge(curr: Self, src: usize, dst: usize) -> Self {
+		let mut ret = curr;
+		if !FinMap::contains(ret.clone(), src) {
+			ret = Graph::add_node(ret.clone(), src, None);
+		}
+		if !FinMap::contains(ret.clone(), dst) {
+			ret = Graph::add_node(ret.clone(), dst, None);
+		}
+		let (k, mut adjs) = FinMap::get(ret.clone(), src).unwrap();
+		adjs.push(dst);
+		FinMap::put(ret, src, (k, adjs))
+	}
+	
+	fn successors(curr: Self, id: usize) -> Option<Vec<usize>> {
+		Graph::adjacents(curr, id)
+	}
+}
 	
 
 fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option<usize>, Vec<usize>)>>(path: String) -> T {
@@ -280,7 +280,6 @@ fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option
 			g = DirectedGraph::add_directed_edge(g.clone(), v1, v2);
 		}
 	}
-	
 	g
 }
 
