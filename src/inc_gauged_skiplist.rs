@@ -38,6 +38,16 @@ struct Cursor<K,V> {
     paths: Vec<Option<Art<Rc<Path<K,V>>>>>,
 }
 
+// enum Trie<K,V> {
+//     Atomic(HashMap<K,V>),
+//     Bin(TrieBin<K,V>),    
+// }
+// struct TrieBin {
+//     suffix: HashVal,
+//     left:   Art<Trie<K,V>>,
+//     right:  Art<Trie<K,V>>,
+// }
+
 /// TODO-Someday: Do this more efficiently
 fn make_mask(len:usize) -> usize {
     assert!(len > 0);
