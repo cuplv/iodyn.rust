@@ -32,7 +32,7 @@ struct TreeNode<E: 'static+Debug+Clone+Eq+Hash>{
 
 impl<E: Debug+Clone+Eq+Hash+'static>
 Tree<E> {
-	/// build a new tree from components, return None if levels are inconsistent
+	/// build a new tree from components, always succeeds //return None if levels are inconsistent
 	pub fn new(
 		level: u32,
 		name: Option<Name>,
@@ -40,14 +40,17 @@ Tree<E> {
 		l_branch: Option<Tree<E>>,
 		r_branch: Option<Tree<E>>
 	) -> Option<Tree<E>> {
-		let target_level = level;
-		//check level
-		if let Some(Tree{level, ..}) = l_branch {
-			if level >= target_level { return None }
-		}
-		if let Some(Tree{level, ..}) = r_branch {
-			if level > target_level { return None }
-		}
+		// poor levels will possibly mean a non-cannonical tree
+		// but should not otherwise affect correctness
+		//
+		// check level
+		// let target_level = level;
+		// if let Some(Tree{level, ..}) = l_branch {
+		// 	if level >= target_level { return None }
+		// }
+		// if let Some(Tree{level, ..}) = r_branch {
+		// 	if level > target_level { return None }
+		// }
 		// structure the data
 		match name {
 			Some(name) => Some(Tree{
