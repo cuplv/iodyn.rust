@@ -337,7 +337,7 @@ fn main2() {
   
   let mut adapton_changes = Vec::new();
   let mut native_changes = Vec::new();
-  for i in 0..changes {
+  for i in 0..(changes+1) {
     let nc = comp_non_inc[i].0 + comp_non_inc[i].1;
     native_changes.push(nc as f64 / 1_000_000.0);
     let ac = comp_inc[i].0 + comp_inc[i].1;

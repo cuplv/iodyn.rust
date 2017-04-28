@@ -66,7 +66,7 @@ tree::TreeUpdate for TreeData<E,M> {
 /// Tree form of a RAZ
 ///
 /// used between refocusing, and for running global algorithms
-#[derive(Clone,PartialEq,Eq,Debug)]
+#[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub struct RazTree<E:'static+Debug+Clone+Eq+Hash, M:RazMeta<E>+'static>{
 	meta: M,
 	tree: Option<tree::Tree<TreeData<E,M>>>
@@ -89,6 +89,11 @@ fn treetop_meta<E,M>(t: Option<&tree::Tree<TreeData<E,M>>>) -> M where
 impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 	/// get the meta data
 	pub fn meta(&self) -> &M {&self.meta}
+	pub fn is_empty(&self) -> bool {self.tree.is_none()}
+
+	pub fn empty() -> Self {
+		RazTree{meta: treetop_meta(None), tree: None}
+	}
 
 	/// Combine two trees left to right
 	///
@@ -96,15 +101,27 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 	/// are inappropriate. The level of the left side should
 	/// be lower than the given level, and the level of the
 	/// right side should be equal or lower than the given level.
+	// TODO: Deal with bad levels.
 	pub fn join(ltree: Self, level: u32, name: Option<Name>, rtree: Self) -> Option<Self> {
 		let tree = match (ltree,rtree) {
 			(RazTree{tree:Some(lt),..},RazTree{tree:Some(rt),..}) => {
-				if lt.level() < level && rt.level() <= level {
+				// if lt.level() < level && rt.level() <= level {
+					// there's a level check through bin in Tree::new()
 					bin(lt,level,name,rt)
-				} else { return None }
+				// } else { return None }
 			},
 			_ => return None
 		};
+		Some(RazTree{meta: treetop_meta(Some(&tree)), tree: Some(tree)})
+	}
+
+	/// Make a RazTree from a Vec
+	///
+	/// This tree will contain no levels or names
+	/// Returns None if the Vec is empty
+	pub fn from_vec(vec: Vec<E>) -> Option<Self> {
+		if vec.is_empty() { return None };
+		let tree = leaf(vec,None);
 		Some(RazTree{meta: treetop_meta(Some(&tree)), tree: Some(tree)})
 	}
 
@@ -165,6 +182,28 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 						(None, None) => panic!("branch with no data"),
 						(Some(r),None) | (None, Some(r)) => r,
 						(Some(lr),Some(rr)) => binnl(lr,lv,n,rr),
+					}},
+				}
+			}))
+		})
+	}
+
+	pub fn fold_up_gauged<I,R,B>(self, init: Rc<I>, bin: Rc<B>) -> Option<R> where
+		R: 'static + Eq+Clone+Hash+Debug,
+		I: 'static + Fn(&Vec<E>) -> R,
+		B: 'static + Fn(R,u32,Option<Name>,R) -> R,
+	{
+		// TODO: memo! fold_up (only first rec call is not)
+		self.tree.map(|tree| {
+			tree.fold_up_meta(Rc::new(move |l,c,lv,n,r|{
+				match c {
+					TreeData::Leaf(ref vec) => {
+						init(vec)
+					},
+					_ => { match (l,r) {
+						(None, None) => panic!("branch with no data"),
+						(Some(r),None) | (None, Some(r)) => r,
+						(Some(lr),Some(rr)) => bin(lr,lv,n,rr),
 					}},
 				}
 			}))
@@ -627,11 +666,11 @@ for RazTree<E,M> {
 		// memoize from_stack
 		fn from_stack_memo<E: Debug+Clone+Eq+Hash+'static,M:RazMeta<E>>(
 			s:stack::AStack<E,u32>, l:u32, n:Option<Name>, t: Tree<TreeData<E,M>>, m:u32
-		) -> (Tree<TreeData<E,M>>, Option<u32>, Option<Name>, stack::AStack<E,u32>) {
+		) -> (stack::AStack<E,u32>, Option<u32>, Option<Name>, Tree<TreeData<E,M>>) {
 			match n.clone() {
 				None => return from_stack(s,l,n,t,m),
 				Some(nm) => {
-					let nm = name_pair(nm,name_unit());
+					let (nm,_) = name_fork(nm);
 					return memo!(nm =>> from_stack, s:s, l:l, n:n, t:t, m:m)
 				},
 			}
@@ -643,26 +682,30 @@ for RazTree<E,M> {
 			first_name: Option<Name>,
 			accum_tree: Tree<TreeData<E,M>>,
 			max_level: u32,
-		) -> (Tree<TreeData<E,M>>, Option<u32>, Option<Name>, stack::AStack<E,u32>) {
+		) -> (stack::AStack<E,u32>, Option<u32>, Option<Name>, Tree<TreeData<E,M>>) {
 			assert!(accum_tree.level() <= first_level);
-			if first_level < max_level {
-				let next_name = stack.name();
-				let (vec,next_level) = stack.next_archive().unwrap_or_else(||{panic!("stack was unexpectedly empty")});
-				let leaf_tree = leaf(vec,None);
-				let (small_tree, final_level,final_name,shorter_stack) = match next_level {
-					None => (leaf_tree,None,None,stack::AStack::new()),
-					Some(lev) => from_stack_memo(stack,lev,next_name,leaf_tree,first_level),
-				};
-				let new_tree = bin(small_tree, first_level, first_name, accum_tree);
-				match final_level {
-					None => return (new_tree, None, None, stack::AStack::new()),
-					Some(lev) => from_stack_memo(shorter_stack,lev,final_name,new_tree,max_level),
-				}
-			} else {
-				// hack to avoid name collisions
-				// TODO: make sure every bin() gets an input name, and memo's get forked names
-				let nm = first_name.map(|n|{name_fork(n).1});
-				return (accum_tree, Some(first_level), nm, stack);
+			assert!(first_level < max_level);
+			let next_name = stack.name();
+			let (vec,next_level) = stack.next_archive().unwrap_or_else(||{panic!("stack was unexpectedly empty")});
+			let leaf_tree = leaf(vec,None);
+			let (shorter_stack, final_level,final_name,small_tree) = match next_level {
+				None =>
+					(stack::AStack::new(),None,None,leaf_tree),
+				Some(lev) => if lev < first_level {
+					from_stack_memo(stack,lev,next_name,leaf_tree,first_level)
+				} else {
+					(stack,Some(lev),next_name,leaf_tree)
+				},
+			};
+			let new_tree = bin(small_tree, first_level, first_name, accum_tree);
+			match final_level {
+				None =>
+					(stack::AStack::new(), None, None, new_tree),
+				Some(lev) => if lev < max_level {
+					from_stack_memo(shorter_stack,lev,final_name,new_tree,max_level)
+				} else {
+					(shorter_stack,Some(lev),final_name,new_tree)
+				},
 			}
 		}
 		let mut tailstack = tailstack.0.clone();
@@ -675,7 +718,87 @@ for RazTree<E,M> {
 			},
 			Some((vec,Some(level))) => (level,leaf(vec,None))
 		};
-		let (t,l,n,s) = from_stack_memo(tailstack, level, name, first_tree, u32::max_value());
+		let (s,l,n,t) = from_stack_memo(tailstack, level, name, first_tree, u32::max_value());
+		assert!(l.is_none());
+		assert!(n.is_none());
+		assert!(s.is_empty());
+		RazTree{meta: treetop_meta(Some(&t)), tree: Some(t)}
+	}
+}
+
+impl<E:Debug+Clone+Eq+Hash+'static, M:RazMeta<E>>
+MemoFrom<stack::AtHead<E,u32>>
+for RazTree<E,M> {
+	// we build this tree left to right
+	// note that the left branch _cannot_ have
+	// the same level as its parent
+	// while the right branch can.
+	//
+	// vecs from the data are reversed, because Vec pushes
+	// to the tail, but this stack was used as if pushing
+	// to head. The head of a Raz in on the left.
+	fn memo_from(headstack: &stack::AtHead<E,u32>) -> Self {
+		// memoize from_stack
+		fn from_stack_memo<E: Debug+Clone+Eq+Hash+'static,M:RazMeta<E>>(
+			s:stack::AStack<E,u32>, l:u32, n:Option<Name>, t: Tree<TreeData<E,M>>, m:u32
+		) -> (stack::AStack<E,u32>, Option<u32>, Option<Name>, Tree<TreeData<E,M>>) {
+			match n.clone() {
+				None => return from_stack(s,l,n,t,m),
+				Some(nm) => {
+					let (nm,_) = name_fork(nm);
+					return memo!(nm =>> from_stack, s:s, l:l, n:n, t:t, m:m)
+				},
+			}
+		}
+		// main function, uses memoized recursive calls from previous function
+		fn from_stack<E: Debug+Clone+Eq+Hash+'static,M:RazMeta<E>>(
+			mut stack: stack::AStack<E,u32>,
+			first_level: u32,
+			first_name: Option<Name>,
+			accum_tree: Tree<TreeData<E,M>>,
+			max_level: u32,
+		) -> (stack::AStack<E,u32>, Option<u32>, Option<Name>, Tree<TreeData<E,M>>) {
+			assert!(accum_tree.level() < first_level);
+			assert!(first_level <= max_level);
+			let next_name = stack.name();
+			let (mut vec,next_level) = stack.next_archive().unwrap_or_else(||{panic!("stack was unexpectedly empty")});
+			vec.reverse();
+			let leaf_tree = leaf(vec,None);
+			let (shorter_stack, final_level,final_name,small_tree) = match next_level {
+				None =>
+					(stack::AStack::new(),None,None,leaf_tree),
+				Some(lev) => if lev <= first_level {
+					from_stack_memo(stack,lev,next_name,leaf_tree,first_level)
+				} else {
+					(stack,Some(lev),next_name,leaf_tree)
+				},
+			};
+			let new_tree = bin(accum_tree, first_level, first_name, small_tree);
+			match final_level {
+				None =>
+					(stack::AStack::new(), None, None, new_tree),
+				Some(lev) => if lev <= max_level {
+					from_stack_memo(shorter_stack,lev,final_name,new_tree,max_level)
+				} else {
+					(shorter_stack,Some(lev),final_name,new_tree)
+				},
+			}
+		}
+		let mut headstack = headstack.0.clone();
+		let name = headstack.name();
+		let (level, first_tree) = match headstack.next_archive() {
+			None => return RazTree{meta: treetop_meta(None), tree: None},
+			Some((mut vec,None)) => {
+				vec.reverse();
+				let t = Some(leaf(vec,None));
+				return RazTree{meta: treetop_meta(t.as_ref()), tree: t}
+			},
+			Some((mut vec,Some(level))) => {
+				vec.reverse();
+				(level,leaf(vec,None))
+			}
+		};
+		let (s,l,n,t) = from_stack_memo(headstack, level, name, first_tree, u32::max_value());
 		assert!(l.is_none());
 		assert!(n.is_none());
 		assert!(s.is_empty());
@@ -921,7 +1044,7 @@ mod tests {
   }
 
   #[test]
-  fn test_from_stack() {
+  fn test_from_tail_stack() {
   	let mut stack = stack::AStack::new();
   	stack.push(1);
   	stack.push(2);
@@ -1008,6 +1131,96 @@ mod tests {
   	}
 
   }
+
+	#[test]
+	fn test_from_head_stack() {
+		// reverse the construction of tail_stack test
+		let mut stack = stack::AStack::new();
+		stack.push(12);
+		stack.push(11);
+		stack.archive(Some(name_of_usize(4)),4);
+		stack.push(10);
+		stack.push(9);
+		stack.archive(Some(name_of_usize(5)),5);
+		stack.push(8);
+		stack.push(7);
+		stack.archive(Some(name_of_usize(2)),2);
+		stack.push(6);
+		stack.push(5);
+		stack.archive(Some(name_of_usize(1)),1);
+		stack.push(4);
+		stack.push(3);
+		stack.archive(Some(name_of_usize(3)),3);
+		stack.push(2);
+		stack.push(1);
+		let raz: RazTree<_,Count> = RazTree::memo_from(&stack::AtHead(stack));
+
+		// check that levels are high-to-low
+		assert!(good_levels(raz.tree.as_ref().unwrap()));
+
+		// check that all elements are represented
+		let sum = raz.clone().fold_up(Rc::new(|e:&usize|*e),Rc::new(|e1:usize,e2:usize|e1+e2)).unwrap_or(0);
+		let iter_sum: usize = (1..13).sum();
+		assert_eq!(iter_sum, sum);
+
+		// check the structure
+		let mut cursor = tree::Cursor::from(raz.tree.unwrap());
+		assert!(cursor.down_left());
+		assert!(cursor.down_left());
+		match cursor.peek() {
+			Some(TreeData::Leaf(ref v)) => {
+				assert_eq!(vec![1,2], **v);
+			},
+			_ => panic!("Wrong data")
+		}
+		assert!(cursor.up() != tree::UpResult::Fail);
+		assert!(cursor.down_right());
+		assert!(cursor.down_left());
+		assert!(cursor.down_left());
+		match cursor.peek() {
+			Some(TreeData::Leaf(ref v)) => {
+				assert_eq!(vec![3,4], **v);
+			},
+			_ => panic!("Wrong data")
+		}
+		assert!(cursor.up() != tree::UpResult::Fail);
+		assert!(cursor.down_right());
+		match cursor.peek() {
+			Some(TreeData::Leaf(ref v)) => {
+				assert_eq!(vec![5,6], **v);
+			},
+			_ => panic!("Wrong data")
+		}
+		assert!(cursor.up() != tree::UpResult::Fail);
+		assert!(cursor.up() != tree::UpResult::Fail);
+		assert!(cursor.down_right());
+		match cursor.peek() {
+			Some(TreeData::Leaf(ref v)) => {
+				assert_eq!(vec![7,8], **v);
+			},
+			_ => panic!("Wrong data")
+		}
+		assert!(cursor.up() != tree::UpResult::Fail);
+		assert!(cursor.up() != tree::UpResult::Fail);
+		assert!(cursor.up() != tree::UpResult::Fail);
+		assert!(cursor.down_right());
+		assert!(cursor.down_right());
+		match cursor.peek() {
+			Some(TreeData::Leaf(ref v)) => {
+				assert_eq!(vec![11,12], **v);
+			},
+			_ => panic!("Wrong data")
+		}
+		assert!(cursor.up() != tree::UpResult::Fail);
+		assert!(cursor.down_left());
+		match cursor.peek() {
+			Some(TreeData::Leaf(ref v)) => {
+				assert_eq!(vec![9,10], **v);
+			},
+			_ => panic!("Wrong data")
+		}
+
+	}
 
   // iters need to be updated
   // #[test]

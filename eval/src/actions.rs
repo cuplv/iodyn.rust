@@ -150,6 +150,33 @@ Computor<(Duration,D::Target),D> for FindMax {
 	}
 }
 
+pub struct Native<I,O,F:Fn(&I)->O>(Rc<F>,PhantomData<I>,PhantomData<O>);
+impl<I,O,F:Fn(&I)->O> Native<I,O,F> { pub fn new(f:F)->Self{Native(Rc::new(f),PhantomData,PhantomData)}}
+impl<O,F,D>
+Computor<Duration,D>
+for Native<D::Input,O,F> where
+	D:CompNative<O>,
+	F:Fn(&D::Input)->O,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time,answer) = data.comp_native(self.0.clone(),rng);
+		#[allow(unused)]
+		let saver = Vec::new().push(answer); // don't let rust compile this away
+		time
+	}
+}
+
+pub struct Reverse;
+impl<D: CompRev>
+Computor<Duration,D> for Reverse {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time,answer) = data.comp_rev(rng);
+		#[allow(unused)]
+		let saver = Vec::new().push(answer); // don't let rust compile this away
+		time
+	}
+}
+
 pub struct TreeFold<E,O,I:Fn(&E)->O,B:Fn(O,O)->O>(Rc<I>,Rc<B>,PhantomData<E>,PhantomData<O>);
 impl<E,O,I:Fn(&E)->O,B:Fn(O,O)->O> TreeFold<E,O,I,B> { pub fn new(init:I,bin:B) -> Self {TreeFold(Rc::new(init),Rc::new(bin),PhantomData,PhantomData)}}
 impl<E,O,I:Fn(&E)->O,B:Fn(O,O)->O,D: CompTreeFold<E,O,I,B>>
@@ -197,6 +224,43 @@ for TreeFoldNL<E,O,I,B,M> where
 {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
 		let (time, answer) = data.comp_tfoldnl(self.init.clone(),self.bin.clone(),self.binnl.clone(),rng);
+		#[allow(unused)]
+		let saver = Vec::new().push(answer); // don't let rust compile this away
+		time
+	}
+}
+
+pub struct TreeFoldG<
+	E,O,I:Fn(&Vec<E>)->O,B:Fn(O,u32,Option<Name>,O)->O
+>{
+	init: Rc<I>,
+	bin: Rc<B>,
+	elm: PhantomData<E>,
+	out: PhantomData<O>,
+}
+impl<E,O,I,B>
+TreeFoldG<E,O,I,B> where
+	I:Fn(&Vec<E>)->O,
+	B:Fn(O,u32,Option<Name>,O)->O,
+{
+	pub fn new(init:I,bin:B) -> Self {
+		TreeFoldG{
+			init: Rc::new(init),
+			bin: Rc::new(bin),
+			elm: PhantomData,
+			out: PhantomData,
+		}
+	}
+}
+impl<E,O,I,B,D>
+Computor<Duration,D>
+for TreeFoldG<E,O,I,B> where
+	I:Fn(&Vec<E>)->O,
+	B:Fn(O,u32,Option<Name>,O)->O,
+	D:CompTreeFoldG<E,O,I,B>,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
+		let (time, answer) = data.comp_tfoldg(self.init.clone(),self.bin.clone(),rng);
 		#[allow(unused)]
 		let saver = Vec::new().push(answer); // don't let rust compile this away
 		time

@@ -33,6 +33,17 @@ pub trait CompMax {
 	fn comp_max(&self, rng: &mut StdRng) -> (Duration,Self::Target);
 }
 
+/// for reversing a sequence
+pub trait CompRev {
+	type Target;
+	fn comp_rev(&self, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
+pub trait CompNative<O> {
+	type Input;
+	fn comp_native<F:Fn(&Self::Input)->O>(&self, f:Rc<F>, rng: &mut StdRng) -> (Duration,O);
+}
+
 pub trait CompTreeFold<R,O,I:Fn(&R)->O,B:Fn(O,O)->O> {
 	type Target;
 	fn comp_tfold(&self, init:Rc<I>, bin:Rc<B>, rng: &mut StdRng) -> (Duration,Self::Target);
@@ -41,6 +52,11 @@ pub trait CompTreeFold<R,O,I:Fn(&R)->O,B:Fn(O,O)->O> {
 pub trait CompTreeFoldNL<R,O,I:Fn(&R)->O,B:Fn(O,O)->O,M:Fn(O,u32,Option<Name>,O)->O> {
 	type Target;
 	fn comp_tfoldnl(&self, init:Rc<I>, bin:Rc<B>, binnl:Rc<M>, rng: &mut StdRng) -> (Duration,Self::Target);
+}
+
+pub trait CompTreeFoldG<R,O,I:Fn(&Vec<R>)->O,B:Fn(O,u32,Option<Name>,O)->O> {
+	type Target;
+	fn comp_tfoldg(&self, init:Rc<I>, bin:Rc<B>, rng: &mut StdRng) -> (Duration,Self::Target);
 }
 
 /// changes every value to another based on function
