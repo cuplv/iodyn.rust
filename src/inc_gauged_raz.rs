@@ -666,11 +666,11 @@ for RazTree<E,M> {
 		// memoize from_stack
 		fn from_stack_memo<E: Debug+Clone+Eq+Hash+'static,M:RazMeta<E>>(
 			s:stack::AStack<E,u32>, l:u32, n:Option<Name>, t: Tree<TreeData<E,M>>, m:u32
-		) -> (Tree<TreeData<E,M>>, Option<u32>, Option<Name>, stack::AStack<E,u32>) {
+		) -> (stack::AStack<E,u32>, Option<u32>, Option<Name>, Tree<TreeData<E,M>>) {
 			match n.clone() {
 				None => return from_stack(s,l,n,t,m),
 				Some(nm) => {
-					let nm = name_pair(nm,name_unit());
+					let (nm,_) = name_fork(nm);
 					return memo!(nm =>> from_stack, s:s, l:l, n:n, t:t, m:m)
 				},
 			}
@@ -682,26 +682,30 @@ for RazTree<E,M> {
 			first_name: Option<Name>,
 			accum_tree: Tree<TreeData<E,M>>,
 			max_level: u32,
-		) -> (Tree<TreeData<E,M>>, Option<u32>, Option<Name>, stack::AStack<E,u32>) {
+		) -> (stack::AStack<E,u32>, Option<u32>, Option<Name>, Tree<TreeData<E,M>>) {
 			assert!(accum_tree.level() <= first_level);
-			if first_level < max_level {
-				let next_name = stack.name();
-				let (vec,next_level) = stack.next_archive().unwrap_or_else(||{panic!("stack was unexpectedly empty")});
-				let leaf_tree = leaf(vec,None);
-				let (small_tree, final_level,final_name,shorter_stack) = match next_level {
-					None => (leaf_tree,None,None,stack::AStack::new()),
-					Some(lev) => from_stack_memo(stack,lev,next_name,leaf_tree,first_level),
-				};
-				let new_tree = bin(small_tree, first_level, first_name, accum_tree);
-				match final_level {
-					None => return (new_tree, None, None, stack::AStack::new()),
-					Some(lev) => from_stack_memo(shorter_stack,lev,final_name,new_tree,max_level),
-				}
-			} else {
-				// hack to avoid name collisions
-				// TODO: make sure every bin() gets an input name, and memo's get forked names
-				let nm = first_name.map(|n|{name_fork(n).1});
-				return (accum_tree, Some(first_level), nm, stack);
+			assert!(first_level < max_level);
+			let next_name = stack.name();
+			let (vec,next_level) = stack.next_archive().unwrap_or_else(||{panic!("stack was unexpectedly empty")});
+			let leaf_tree = leaf(vec,None);
+			let (shorter_stack, final_level,final_name,small_tree) = match next_level {
+				None =>
+					(stack::AStack::new(),None,None,leaf_tree),
+				Some(lev) => if lev < first_level {
+					from_stack_memo(stack,lev,next_name,leaf_tree,first_level)
+				} else {
+					(stack,Some(lev),next_name,leaf_tree)
+				},
+			};
+			let new_tree = bin(small_tree, first_level, first_name, accum_tree);
+			match final_level {
+				None =>
+					(stack::AStack::new(), None, None, new_tree),
+				Some(lev) => if lev < max_level {
+					from_stack_memo(shorter_stack,lev,final_name,new_tree,max_level)
+				} else {
+					(shorter_stack,Some(lev),final_name,new_tree)
+				},
 			}
 		}
 		let mut tailstack = tailstack.0.clone();
@@ -714,7 +718,7 @@ for RazTree<E,M> {
 			},
 			Some((vec,Some(level))) => (level,leaf(vec,None))
 		};
-		let (t,l,n,s) = from_stack_memo(tailstack, level, name, first_tree, u32::max_value());
+		let (s,l,n,t) = from_stack_memo(tailstack, level, name, first_tree, u32::max_value());
 		assert!(l.is_none());
 		assert!(n.is_none());
 		assert!(s.is_empty());
