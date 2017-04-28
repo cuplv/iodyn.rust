@@ -1,4 +1,7 @@
-//! Binary Hash Tries, for use by the Archivist in Adapton.
+//! Binary Hash Tries, for representing sets and finite maps.
+//!
+//! Suitable for the Archivist role in Adapton.
+//!
 //! Matthew Hammer <Matthew.Hammer@Colorado.edu>
 
 //use std::rc::Rc;

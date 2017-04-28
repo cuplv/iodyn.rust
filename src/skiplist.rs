@@ -1,4 +1,7 @@
-//! Skiplists, for use by the Archivist in Adapton.
+//! Skip-lists, for representing finite maps.
+//!
+//! Suitable for the Archivist role in Adapton.
+//!
 //! Matthew Hammer <Matthew.Hammer@Colorado.edu>
 
 use std::rc::Rc;
