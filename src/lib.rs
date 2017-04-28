@@ -34,13 +34,10 @@ pub mod inc_archive_stack;
 pub mod inc_level_tree;
 pub mod inc_tree_cursor;
 pub mod inc_gauged_raz;
-//pub mod inc_gauged_trie;
-//pub mod inc_gauged_trie_opt;
-//pub mod inc_gauged_trie_opt2;
-//pub mod inc_gauged_trie_opt3;
-pub mod inc_gauged_trie_opt4;
-pub mod inc_gauged_skiplist;
 pub mod raz_meta;
+
+pub mod skiplist;
+pub mod trie;
 
 /// Persistent Raz - original design, simple but works
 pub type PRaz<E> = persist_raz::Raz<E>;

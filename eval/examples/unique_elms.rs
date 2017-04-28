@@ -28,7 +28,7 @@ use adapton_lab::labviz::*;
 #[allow(unused)] use eval::accum_lists::*;
 
 //use iodyn::inc_gauged_trie::{FinMap,Trie};
-use iodyn::inc_gauged_skiplist::{FinMap,Trie};
+use iodyn::skiplist::{FinMap,Skiplist};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;
@@ -97,7 +97,7 @@ fn main2() {
     comp: HFolder::new(
       name_of_string(String::from("fillskiplist")),
       {let mut t = Skiplist::emp(pathlen, name_unit()); t.archive(name_unit()); t},
-      |mut a,&GenSmall(e)|{ a.put(e, ()); a },
+      |mut a,&GenSetElm(e)|{ a.put(e, ()); a },
       |mut a,nm|{ match nm { None => a, Some(nm) => { a.archive(nm); a }}},
       |a,(_lev,_nmopt)|{ a },
       |a|{a},
@@ -116,7 +116,7 @@ fn main2() {
     comp: MFolder::<_,_,(),_,_,_,_,_>::new(
       name_of_string(String::from("fillhashmap")),
       HashMap::new(),
-      |mut m,&GenSmall(e)|{m.insert(e,());m},
+      |mut m,&GenSetElm(e)|{m.insert(e,());m},
       |m,_|{m},
       |a|{a},
     ),
@@ -134,7 +134,7 @@ fn main2() {
     comp: MFolder::new(
       name_of_string(String::from("to_list")),
       VecList::new(),
-      |a,&GenSmall(e)|{a.seq_push(e)},
+      |a,&GenSetElm(e)|{a.seq_push(e)},
       |a,(m,n)|{a.archive((m,n))},
       |a|{a},
     ),
@@ -148,7 +148,7 @@ fn main2() {
   if do_trace {reflect::dcg_reflect_begin()}
 
   let result_skiplist: TestMResult<
-    EvalIRaz<GenSmall,StdRng>,
+    EvalIRaz<GenSetElm,StdRng>,
     Skiplist<Elm,()>,
   > = testskiplist.test(&mut rng);
 
@@ -173,12 +173,12 @@ fn main2() {
   }
 
   let result_hash: TestMResult<
-    EvalVec<GenSmall,StdRng>,
+    EvalVec<GenSetElm,StdRng>,
     HashMap<Elm,()>,
   > = ns(name_of_string(String::from("hashmap")),||{test_hashmap.test(&mut rng)});
 
   let inc_veclist: TestMResult<
-    EvalIRaz<GenSmall,StdRng>,
+    EvalIRaz<GenSetElm,StdRng>,
     VecList<Elm>,
   > = ns(name_of_string(String::from("veclist")),||{test_vl.test(&mut rng)});
 
@@ -257,7 +257,7 @@ fn main2() {
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
   write!(plotscript,"set title \"{}", "Cumulative edit/compute times vs Number of edits/updates\\n").unwrap();
-  writeln!(plotscript,"(s)ize: {}, (g)gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,unitgauge,namegauge,edits).unwrap();
+  writeln!(plotscript,"(s)ize: {}, (g)gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,datagauge,namegauge,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();

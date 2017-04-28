@@ -1,18 +1,16 @@
-//! Incremental, high-gauge finite maps, for use by the Archivist in Adapton.
-//!
-//! Conceptually, these finite maps are tries.
-//! Concretely, they consist of skip-list-like structures.
+//! Skiplists, for use by the Archivist in Adapton.
+//! Matthew Hammer <Matthew.Hammer@Colorado.edu>
 
 use std::rc::Rc;
 use std::fmt;
 use std::fmt::Debug;
 use std::hash::{Hash};
-use adapton::engine::{cell,force,force_map,Art,Name,name_pair,name_of_usize};
+use adapton::engine::{cell,force_map,Art,Name,name_pair,name_of_usize};
 use adapton::macros::{my_hash};
 
 /// A hash value -- We define a custom Debug impl for this type.
 #[derive(Clone,Hash,Eq,PartialEq)]
-struct HashVal(usize);
+pub struct HashVal(usize);
 
 /// A contiguous block of skiplist paths/keys/values
 #[derive(Debug,Clone,Hash,Eq,PartialEq)]
@@ -37,16 +35,6 @@ pub struct Skiplist<K,V> {
 struct Cursor<K,V> {
     paths: Vec<Option<Art<Rc<Path<K,V>>>>>,
 }
-
-// enum Trie<K,V> {
-//     Atomic(HashMap<K,V>),
-//     Bin(TrieBin<K,V>),    
-// }
-// struct TrieBin {
-//     suffix: HashVal,
-//     left:   Art<Trie<K,V>>,
-//     right:  Art<Trie<K,V>>,
-// }
 
 /// TODO-Someday: Do this more efficiently
 fn make_mask(len:usize) -> usize {
@@ -370,3 +358,5 @@ fn skiplist_tiny () {
     assert_eq!(c.get(5), Some(5));
     assert_eq!(c.get(6), Some(6));
 }
+
+
