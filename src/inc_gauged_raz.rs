@@ -210,6 +210,11 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		})
 	}
 
+	pub fn fold_lr<A,B>(self, init: A, bin: Rc<B>) -> A where
+		A: 'static + Eq+Clone+Hash+Debug,
+		B: 'static + Fn(A,&E) -> A,
+	{ self.fold_lr_meta(init,bin,Rc::new(|a,_|{a})) }
+
 	/// left-to-right memoized fold with levels and names
 	pub fn fold_lr_meta<A,B,N>(self, init: A, bin: Rc<B>, meta: Rc<N>) -> A where
 		A: 'static + Eq+Clone+Hash+Debug,
