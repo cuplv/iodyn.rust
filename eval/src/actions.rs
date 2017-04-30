@@ -267,12 +267,26 @@ for TreeFoldG<E,O,I,B> where
 	}
 }
 
-pub struct Mapper<I,O,F:Fn(&I)->O>(Rc<F>,PhantomData<I>,PhantomData<O>);
-impl<I,O,F:Fn(&I)->O> Mapper<I,O,F> { pub fn new(f:F) -> Self {Mapper(Rc::new(f),PhantomData,PhantomData)}}
+pub struct Mapper<I,O,F:Fn(&I)->O>{
+	name: Name,
+	mapfn: Rc<F>,
+	elm: PhantomData<I>,
+	out: PhantomData<O>,
+}
+impl<I,O,F:Fn(&I)->O> Mapper<I,O,F> {
+	pub fn new(n:Name,f:F) -> Self {Mapper{
+		name: n,
+		mapfn: Rc::new(f),
+		elm: PhantomData,
+		out: PhantomData,
+	}}
+}
 impl<I,O,F:Fn(&I)->O,D:CompMap<I,O,F>>
 Computor<Duration,D> for Mapper<I,O,F> {
 	fn compute(&mut self, data: &D, rng: &mut StdRng) -> Duration {
-		let (time,answer) = data.comp_map(self.0.clone(),rng);
+		let (time,answer) = ns(self.name.clone(),||{
+			data.comp_map(self.mapfn.clone(),rng)
+		});
 		#[allow(unused)]
 		let saver = Vec::new().push(answer); // don't let rust compile this away
 		time
