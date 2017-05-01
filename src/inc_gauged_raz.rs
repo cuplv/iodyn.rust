@@ -548,7 +548,17 @@ Raz<E,M> {
 	}
 	/// peek at the element to the left of the cursor
 	pub fn peek_left(&self) -> Option<E> {
-		self.l_stack.peek()
+		if self.l_stack.is_empty() {
+			let mut peek_forest = self.l_forest.clone();
+			if peek_forest.up() == tree::UpResult::Fail { return None } else {
+				peek_forest.down_left();
+				while peek_forest.down_right() {}
+				match peek_forest.peek() {
+					Some(TreeData::Leaf(ref data)) => data.last().map(|e|e.clone()),
+					_ => panic!("peek_left: no left tree leaf"),
+				}
+			}
+		} else { self.l_stack.peek() }
 	}
 	/// peek at the element to the left of the cursor
 	pub fn peek_right(&self) -> Option<E> {
