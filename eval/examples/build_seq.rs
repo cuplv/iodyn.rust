@@ -5,7 +5,7 @@
 extern crate rand;
 extern crate time;
 #[macro_use] extern crate clap;
-extern crate stats;
+//extern crate stats;
 extern crate adapton;
 extern crate iodyn;
 extern crate eval;
@@ -27,7 +27,7 @@ const DEFAULT_UNITSIZE: usize = 1000;
 const DEFAULT_NAMESIZE: usize = 1;
 const DEFAULT_COUNT: usize = 15;
 const DEFAULT_EDITS: usize = 1;
-const DEFAULT_TRIALS: usize = 10;
+//const DEFAULT_TRIALS: usize = 10;
 
 fn main() {
   //command-line
@@ -42,7 +42,7 @@ fn main() {
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -c, --count=[count]       'number of runs, by default each 2 is 10x larger'
       -e, --edits=[edits]       'number of edits'
-      -t, --trials=[trials]     'trials to average over'
+      -t, --trials=[trials]     'trials to average over (unused)'
       -o, --outfile=[outfile]   'name for output files (of different extensions)' ")
     .get_matches();
   let dataseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_DATASEED);
@@ -51,7 +51,7 @@ fn main() {
 	let namesize = value_t!(args, "namesize", usize).unwrap_or(DEFAULT_NAMESIZE);
   let count = value_t!(args, "count", usize).unwrap_or(DEFAULT_COUNT);
   let edits = value_t!(args, "edits", usize).unwrap_or(DEFAULT_EDITS);
-	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
+	//let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
   let outfile = args.value_of("outfile");
 
   let multiplier = f32::sqrt(10.0);

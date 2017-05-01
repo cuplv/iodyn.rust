@@ -5,7 +5,7 @@
 extern crate rand;
 extern crate time;
 #[macro_use] extern crate clap;
-extern crate stats;
+//extern crate stats;
 extern crate adapton;
 extern crate iodyn;
 extern crate eval;
@@ -52,7 +52,7 @@ fn main2() {
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -e, --edits=[edits]       'edits per batch'
       -c, --changes=[changes]   'number of incremental changes'
-      -t, --trials=[trials]     'trials to average over'
+      -t, --trials=[trials]     'trials to average over (unused)'
       -o, --outfile=[outfile]   'name for output files (of different extensions)' ")
     .get_matches();
   let dataseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_DATASEED);
@@ -62,7 +62,7 @@ fn main2() {
 	let namesize = value_t!(args, "namesize", usize).unwrap_or(DEFAULT_NAMESIZE);
 	let edits = value_t!(args, "edits", usize).unwrap_or(DEFAULT_EDITS);
 	let changes = value_t!(args, "changes", usize).unwrap_or(DEFAULT_CHANGES);
-	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
+	//let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
   let outfile = args.value_of("outfile");
 
   //setup test

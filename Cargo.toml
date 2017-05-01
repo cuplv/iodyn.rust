@@ -1,20 +1,8 @@
 [package]
 name = "iodyn"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["kyleheadley <kyle.headley@colorado.edu>"]
 
 [dependencies]
 rand = "0.3"
-
-[dependencies.adapton]
-git = "https://github.com/cuplv/adapton.rust"
-branch = "master"
-
-[dev-dependencies]
-time = "0.1"
-clap = "2"
-
-[dev-dependencies.adapton-lab]
-git = "https://github.com/cuplv/adapton-lab.rust"
-branch = "master"
-
+adapton = "0.2"

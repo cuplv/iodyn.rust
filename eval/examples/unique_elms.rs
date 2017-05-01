@@ -5,7 +5,7 @@
 extern crate rand;
 extern crate time;
 #[macro_use] extern crate clap;
-extern crate stats;
+//extern crate stats;
 extern crate adapton;
 extern crate iodyn;
 extern crate eval;

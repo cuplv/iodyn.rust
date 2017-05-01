@@ -5,14 +5,13 @@ authors = ["kyleheadley <kyle.headley@colorado.edu>"]
 
 [dependencies]
 iodyn = { path = "../" }
-rand = "0.3"
-clap = "2"
+adapton = "0.2"
 time = "0.1"
+rand = "0.3"
 #streaming-stats = "0.1"
 
-[dependencies.adapton]
-git = "https://github.com/cuplv/adapton.rust"
-branch = "master"
+[dev-dependencies]
+clap = "2"
 
 [dependencies.adapton-lab]
 git = "https://github.com/cuplv/adapton-lab.rust"
