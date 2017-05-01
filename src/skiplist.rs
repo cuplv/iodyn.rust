@@ -2,14 +2,22 @@
 //!
 //! Suitable for the Archivist role in Adapton.
 //!
-//! Matthew Hammer <Matthew.Hammer@Colorado.edu>
+// Matthew Hammer <Matthew.Hammer@Colorado.edu>
 
 use std::rc::Rc;
 use std::fmt;
 use std::fmt::Debug;
-use std::hash::{Hash};
+use std::hash::{Hash,Hasher};
+use std::collections::hash_map::{DefaultHasher};
 use adapton::engine::{cell,force_map,Art,Name,name_pair,name_of_usize};
-use adapton::macros::{my_hash};
+
+fn my_hash<T>(obj: T) -> u64
+  where T: Hash
+{
+  let mut hasher = DefaultHasher::new();
+  obj.hash(&mut hasher);
+  hasher.finish()
+}
 
 /// A hash value -- We define a custom Debug impl for this type.
 #[derive(Clone,Hash,Eq,PartialEq)]
