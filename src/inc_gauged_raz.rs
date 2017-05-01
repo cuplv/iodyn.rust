@@ -560,7 +560,17 @@ Raz<E,M> {
 	}
 	/// peek at the element to the left of the cursor
 	pub fn peek_right(&self) -> Option<E> {
-		self.r_stack.peek()
+		if self.r_stack.is_empty() {
+			let mut peek_forest = self.r_forest.clone();
+			if peek_forest.up() == tree::UpResult::Fail { return None } else {
+				peek_forest.down_right();
+				while peek_forest.down_left() {}
+				match peek_forest.peek() {
+					Some(TreeData::Leaf(ref data)) => data.first().map(|e|e.clone()),
+					_ => panic!("peek_right: no right tree leaf"),
+				}
+			}
+		} else { self.r_stack.peek() }
 	}
 	/// mark the data at the left to be shared
 	pub fn archive_left(&mut self, level: u32, name: Option<Name>) {
@@ -1462,5 +1472,27 @@ mod tests {
 			let r = t.clone().focus(tree_name).unwrap();
 			assert_eq!(Some(val), r.peek_left());
 		}
+	}
+
+	#[test]
+	fn test_peek_pop() {
+		let tree = example_tree();
+
+		let mut raz = tree.focus(6usize).unwrap();
+
+		let mut count = 0;
+		while let Some(peek) = raz.peek_left() {
+			let pop = raz.pop_left().unwrap();
+			count += 1;
+			assert_eq!(peek, pop);
+		}
+		assert!(count == 6);
+		count = 0;
+		while let Some(peek) = raz.peek_right() {
+			let pop = raz.pop_right().unwrap();
+			count += 1;
+			assert_eq!(peek, pop);
+		}
+		assert!(count == 6);
 	}
 }
