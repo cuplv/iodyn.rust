@@ -8,11 +8,11 @@ iodyn = { path = "../" }
 rand = "0.3"
 clap = "2"
 time = "0.1"
-streaming-stats = "0.1"
+#streaming-stats = "0.1"
 
 [dependencies.adapton]
-git = "https://github.com/cuplv/adapton.rust.git"
-branch = "dev"
+git = "https://github.com/cuplv/adapton.rust"
+branch = "master"
 
 [dependencies.adapton-lab]
 git = "https://github.com/cuplv/adapton-lab.rust"

@@ -8,10 +8,9 @@ rand = "0.3"
 
 [dependencies.adapton]
 git = "https://github.com/cuplv/adapton.rust"
-branch = "dev"
+branch = "master"
 
 [dev-dependencies]
-eval = { path = "eval" }
 time = "0.1"
 clap = "2"
 
