@@ -244,7 +244,7 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		A: 'static + Eq+Clone+Hash+Debug,
 		B: 'static + Fn(A,&E) -> A,
 		F: 'static + Fn(A,Option<Name>) -> A,
-		N: 'static + Fn(A,(u32,Option<Name>)) -> A,
+		N: 'static + Fn(A,u32) -> A,
 	{
 		let start_name = Some(name_of_string(String::from("start")));
 		match self.tree {
@@ -253,12 +253,10 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 				tree.fold_lr_meta(start_name,init,Rc::new(move|a,e,l,n|{
 					match e {
 						TreeData::Leaf(ref vec) => {
-							ns(name_of_string(String::from("extra name")),||{
 								finbin(vec.iter().fold(a,|a,e|{bin(a,e)}),n)
-							})
 						},
 						_ => {
-							meta(a,(l,n))
+							meta(a,l)
 						},
 					}
 				}))
