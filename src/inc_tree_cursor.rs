@@ -1,7 +1,7 @@
-//! Temporary alteration of tree_cursor for incremental use
+//! Incremental Tree Cursor
 //!
 //! Tree Cursor for `level_tree`
-//! - a cursor within a persistent, ordered, binary tree
+//! - a cursor within an ordered, binary tree
 //! - optimised for splitting and combining trees at the cursor in a cannonical way
 //! - uses non-increasing levels for each subtree to maintain cannonical form
 //! - in the general case the most efficent levels will be drawn from 

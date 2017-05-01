@@ -1,9 +1,28 @@
-//! Temporary alteration of guaged_raz for incremental use
+//! Gauged Incremental Random Access Zipper
 //!
-//! Gauged RAZ - random access sequence
+//! RAZ - random access sequence
+//!
 //! - cursor access in low-const O(1) time
-//! - arbirary access in O(log n) time
+//! - arbitrary access in O(log n) time
 //! - combines tree cursor with stack
+//!
+//! A Raz has two modes, one for editing(Raz), and
+//! one for computations over all the data(RazTree).
+//! A user calls `focus` on a RazTree to begin editing
+//! mode, then `unfocus` to return to compute mode.
+//!
+//! Build the dataset by pushing items into the Raz, while
+//! occasionally running `archive_left` (or `archive_right`)
+//! to define subsequences.
+//! These subsequences are used by the incremental
+//! computation engine to boost performance. For simple
+//! computations over the RazTree, archives every 1000 or so
+//! elements work well. Consistency is not necessary, since
+//! insertions and deletions are expected. `archive_left` takes a
+//! level and a name. The level can be generated with the
+//! crate-level function `inc_level`. Names must be unique, and
+//! can be generated with `adapton::engine::*`'s `name_of_usize(num)`,
+//! by passing a number from a counter.
 
 use std::rc::Rc;
 
@@ -14,7 +33,7 @@ use inc_level_tree::{Tree};
 use inc_tree_cursor as tree;
 use inc_tree_cursor::TreeUpdate;
 use inc_archive_stack as stack;
-use raz_meta::{RazMeta,Navigation,Count,FirstLast};
+use raz_meta::{RazMeta,Navigation,FirstLast};
 use memo::{MemoFrom};
 
 use adapton::macros::*;
@@ -22,8 +41,7 @@ use adapton::engine::*;
 
 /// Random access zipper
 ///
-/// A cursor into a sequence, optimised for moving to 
-/// arbitrary points in the sequence
+/// A cursor into a sequence
 #[derive(Clone,Eq,PartialEq,Hash,Debug)]
 pub struct Raz<E:Debug+Clone+Eq+Hash+'static, M:RazMeta<E>+'static> {
 	l_forest: tree::Cursor<TreeData<E,M>>,
@@ -91,22 +109,19 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 	pub fn meta(&self) -> &M {&self.meta}
 	pub fn is_empty(&self) -> bool {self.tree.is_none()}
 
+	/// create a new RazTree with no data
 	pub fn empty() -> Self {
 		RazTree{meta: treetop_meta(None), tree: None}
 	}
 
 	/// Combine two trees left to right
 	///
-	/// returns None if either tree is empty or the levels
-	/// are inappropriate. The level of the left side should
-	/// be lower than the given level, and the level of the
-	/// right side should be equal or lower than the given level.
+	/// returns None if either tree is empty.
 	// TODO: Deal with bad levels.
 	pub fn join(ltree: Self, level: u32, name: Option<Name>, rtree: Self) -> Option<Self> {
 		let tree = match (ltree,rtree) {
 			(RazTree{tree:Some(lt),..},RazTree{tree:Some(rt),..}) => {
 				// if lt.level() < level && rt.level() <= level {
-					// there's a level check through bin in Tree::new()
 					bin(lt,level,name,rt)
 				// } else { return None }
 			},
@@ -125,7 +140,7 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		Some(RazTree{meta: treetop_meta(Some(&tree)), tree: Some(tree)})
 	}
 
-	/// Runs an binary function over the sequence data
+	/// Runs an incremental binary function over the sequence data
 	///
 	/// This is calculated from data in leaves of a tree structure,
 	/// so the operation must be associative. Returns None if there
@@ -156,7 +171,7 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		})
 	}
 
-	/// Runs an binary function over the sequence data, levels, and names
+	/// Runs an incremental binary function over the sequence data, levels, and names
 	///
 	/// This is calculated from data in leaves of a tree structure,
 	/// so the operation must be associative. Returns None if there
@@ -188,6 +203,10 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		})
 	}
 
+	/// Runs an incremental binary function over subsequences, levels, and names
+	///
+	/// Subsequences allow potential for optimization. The binary function
+	/// still operates on the results from the subsequence conputation.
 	pub fn fold_up_gauged<I,R,B>(self, init: Rc<I>, bin: Rc<B>) -> Option<R> where
 		R: 'static + Eq+Clone+Hash+Debug,
 		I: 'static + Fn(&Vec<E>) -> R,
@@ -210,6 +229,7 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		})
 	}
 
+	/// Runs an incremental fold over the sequence, left to right
 	pub fn fold_lr<A,B>(self, init: A, bin: Rc<B>) -> A where
 		A: 'static + Eq+Clone+Hash+Debug,
 		B: 'static + Fn(A,&E) -> A,
@@ -239,7 +259,7 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		}
 	}
 
-	/// left-to-right memoized fold with levels and names, with a name provided at the leaf
+	/// left-to-right incremental fold with levels and names, with a name provided at the leaf
 	pub fn fold_lr_archive<A,B,F,N>(self, init: A, bin: Rc<B>, finbin: Rc<F>, meta: Rc<N>) -> A where
 		A: 'static + Eq+Clone+Hash+Debug,
 		B: 'static + Fn(A,&E) -> A,
@@ -264,7 +284,7 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		}
 	}
 
-	/// returns a new tree with data mapped from the old tree
+	/// An incremental mapping of the tree, returning a new tree
 	pub fn map<R,F,N:RazMeta<R>>(self, f: Rc<F>) -> RazTree<R,N> where
 		R: 'static + Eq+Clone+Hash+Debug,
 		F: 'static + Fn(&E) -> R,
@@ -418,7 +438,7 @@ Raz<E,M> {
 		}
 	}
 
-	/// unfocus the RAZ before refocusing on a new location
+	/// unfocus the RazTree before refocusing on a new location
 	/// in the sequence.
 	pub fn unfocus(mut self) -> RazTree<E,M> {
 		let nmtree = name_of_string(String::from("tree"));
@@ -534,12 +554,15 @@ Raz<E,M> {
 	// }
 
 	/// add an element to the left of the cursor
+	///
 	/// returns number of non-archived elements
 	pub fn push_left(&mut self, elm: E) -> usize {
 		self.l_stack.push(elm);
 		self.l_stack.active_len()
 	}
 	/// add an element to the right of the cursor
+	///
+	/// returns number of non-archived elements
 	pub fn push_right(&mut self, elm: E) -> usize {
 		self.r_stack.push(elm);
 		self.r_stack.active_len()
@@ -572,16 +595,19 @@ Raz<E,M> {
 			}
 		} else { self.r_stack.peek() }
 	}
-	/// mark the data at the left to be shared
+	/// mark the data at the left to be part of a subsequence
 	pub fn archive_left(&mut self, level: u32, name: Option<Name>) {
 		self.l_stack.archive(name,level);
 	}
-	/// mark the data at the right to be shared
+	/// mark the data at the right to be part of a subsequence
 	pub fn archive_right(&mut self, level: u32, name: Option<Name>) {
 		self.r_stack.archive(name,level);
 	}
 
 	/// remove and return an element to the left of the cursor
+	///
+	/// if an archive point is to the left of the cursor,
+	/// it will be removed
 	pub fn pop_left(&mut self) -> Option<E> {
 		if self.l_stack.is_empty() {
 			if self.l_forest.up() == tree::UpResult::Fail { return None } else {
@@ -596,6 +622,9 @@ Raz<E,M> {
 		self.l_stack.pop()
 	}
 	/// remove and return an element to the right of the cursor
+	///
+	/// if an archive point is to the right of the cursor,
+	/// it will be removed
 	pub fn pop_right(&mut self) -> Option<E> {
 		if self.r_stack.is_empty() {
 			if self.r_forest.up() == tree::UpResult::Fail { return None } else {
@@ -829,70 +858,15 @@ for RazTree<E,M> {
 	}
 }
 
-
-
-////////////////////////////////
-// Zip and ZipSeq for Gauged RAZ 
-////////////////////////////////
-
-use zip::Zip;
-use seqzip::{Seq, SeqZip};
-
-impl<E:Debug+Clone+Eq+Hash+'static> Zip<E> for Raz<E,Count> {
-	fn peek_l(&self) -> Result<E,&str> {
-		self.peek_left().map(|elm| elm.clone()).ok_or("Gauged RAZ: no elements to peek at")
-	}
-	fn peek_r(&self) -> Result<E,&str> {
-		self.peek_right().map(|elm| elm.clone()).ok_or("Gauged RAZ: no elements to peek at")
-	}
-	fn push_l(&self, val: E) -> Self {
-		let mut raz = self.clone();
-		raz.push_left(val);
-		raz
-	}
-	fn push_r(&self, val: E) -> Self {
-		let mut raz = self.clone();
-		raz.push_right(val);
-		raz
-	}
-	fn pull_l(&self) -> Result<Self,&str> {
-		let mut raz = self.clone();
-		match raz.pop_left() {
-			Some(_) => Ok(raz),
-			None => Err("Gauged RAZ: no elements to remove")
-		}
-	}
-	fn pull_r(&self) -> Result<Self,&str> {
-		let mut raz = self.clone();
-		match raz.pop_right() {
-			Some(_) => Ok(raz),
-			None => Err("Gauged RAZ: no elements to remove")
-		}
-	}
-}
-
-impl<E: Debug+Clone+Eq+Hash+'static> Seq<E, Raz<E,Count>> for RazTree<E,Count> {
-	fn zip_to(&self, loc: usize) -> Result<Raz<E,Count>,&str> {
-		self.clone().focus(loc).ok_or("Gauged RAZ: focus out of range")
-	}
-}
-
-impl<E: Debug+Clone+Eq+Hash+'static> SeqZip<E, RazTree<E,Count>> for Raz<E,Count> {
-	fn unzip(&self) -> RazTree<E,Count> {
-		self.clone().unfocus()
-	}
-}
-
-
-
-///////////////////////
-// Tests for Gauged RAZ
-///////////////////////
+////////////////////////////
+// Tests for Incremental RAZ
+////////////////////////////
 
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use raz_meta::Count;
 	use inc_level_tree::good_levels;
 
 	fn example_tree() -> RazTree<usize,Count> {

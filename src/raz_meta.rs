@@ -8,7 +8,9 @@ use std::collections::HashMap;
 use adapton::engine::Name;
 
 /// trait for creating and searching for meta data in the
-/// branches of the raz. There are two pieces of meta data
+/// branches of the raz.
+/// 
+/// There are two pieces of meta data
 /// in each node, one created from its left branch and one
 /// created from its right branch. The level and name from
 /// the current node are also available.
@@ -50,6 +52,7 @@ pub enum Navigation<I> {
 	Left(I), Right(I), Here, Nowhere
 }
 
+/// Trait to set search position at either end of a sequence
 pub trait FirstLast {
 	fn first() -> Self;
 	fn last() -> Self;

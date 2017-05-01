@@ -186,6 +186,7 @@ IntoIterator for AStack<E,M> {
 	}
 }
 
+/// Iterator for elements of a archive stack
 pub struct Iter<E:'static+Debug+Clone+Eq+Hash, M:'static+Debug+Clone+Eq+Hash>(AStack<E,M>);
 impl<E:'static+Debug+Clone+Eq+Hash, M:'static+Debug+Clone+Eq+Hash>
 Iterator for Iter<E,M> {

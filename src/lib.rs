@@ -1,13 +1,27 @@
-//! This is a collection of persistent-like data structures
+//! A collection of incremental data structures with dynamic input
+//! and output.
 //!
 //! Many of the structures have an exposed mutable head for fast
 //! updates, and an `archive` function to move the current head
-//! past a pointer. For the incremental structures, this pointer is
-//! mutable in some way, so that the changes can propagate to later
-//! computations
+//! past a pointer, defining subsequences. This pointer is
+//! mutable, so that the changes can propagate to later
+//! computations.
 //!
-//! Currently, the incremental structures are under development, with
-//! features surpassing the structures that were worked on previously
+//! Fold and Map type computations over a level tree or a raz tree
+//! will be memoized, such that rerunning the computation after a
+//! change will be much faster than running from scratch.
+//!
+//! These collections are partially mutable and partially
+//! persistent (shared data). However, the authors have
+//! concentrated on incremental features, so partial sharing is not
+//! well implemented. Data archived without names will be fully
+//! persistent so that changes to cloned data will not affect the
+//! original. Data archived with names should be treated as a mutable
+//! structure, with changes to cloned data affecting the original. These
+//! affects will probably not be consistent. Editing a mutable structure
+//! within a namespace (`adapton::engine::ns`) should produce a version
+//! whose edits do not affect the original, but this has not been
+//! thoroughly tested.
 
 extern crate rand;
 #[macro_use] extern crate adapton;
@@ -66,7 +80,7 @@ pub type Tree<E> = level_tree::Tree<trees::NegBin,E>;
 /// branches are recombined into larger trees
 pub type TCursor<E> = tree_cursor::Cursor<trees::NegBin,E>;
 
-///level generator for inc_* structures (others use `Rng::gen()`)
+///level generator for incremental structures
 pub fn inc_level() -> u32 {
   inc_level_tree::gen_branch_level(&mut rand::thread_rng())
 }

@@ -1,12 +1,8 @@
-//! Random access zipper, early version
+//! Random Access Zipper, non-incremental, non-gauged
 //!
-//! This version uses a tree structure to
+//! This original version of the RAZ uses a tree structure to
 //! represent a sequence. The tree contains
-//! one element per leaf, so the search depth
-//! may be higher than the version in `gauged_raz`.
-//! This version is fully persistent, with
-//! every edit sharing all other data. Cloning
-//! is fast and expected
+//! one element per leaf and is fully persistent.
 
 use std::rc::Rc;
 //use std::fmt::Debug;

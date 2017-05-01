@@ -1,5 +1,5 @@
-///! Misc memoization traits
-///!
+//! Conversions by Memoization
+//!
 
 /// Construct `Self` via a memoized conversion
 ///

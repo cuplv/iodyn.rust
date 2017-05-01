@@ -1,6 +1,6 @@
-//! Temporary alteration of level_tree for incremental use
+//! Incremental Level Tree
 //!
-//! a persistent, cannonical tree that keeps track of the
+//! a cannonical tree that keeps track of the
 //! "level" of each of its branches.
 //!
 //! Levels help maintain a cannonical structure that improves
@@ -85,18 +85,19 @@ Tree<E> {
 	pub fn r_tree(&self) -> Option<Tree<E>> { force(&self.link).r_branch.clone() }
 
 	/// peek at the data contained at the top node of the tree
-	///
-	/// this functionality is _not_ available through Deref
 	pub fn peek(&self) -> E { force(&self.link).data }
 
-	/// memoized fold operation, from leaves to root
+	/// incremental fold operation, from leaves to root
 	pub fn fold_up<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R where
 		F: 'static + Fn(Option<R>,E,Option<R>) -> R
 	{
 		self.fold_up_meta(Rc::new(move|l,d,_lv,_n,r|{node_calc(l,d,r)}))
 	}
 
-	/// memoized tree fold operation with levels and names
+	/// incremental tree fold operation with levels and names
+	/// 
+	/// Names passed to the mapping function are USED (as is and forked) in the
+	/// resulting tree and should not be reused directly for the creation of arts.
 	pub fn fold_up_meta<R:Eq+Clone+Hash+Debug+'static,F>(self, node_calc: Rc<F>) -> R where
 		F: 'static + Fn(Option<R>,E,u32,Option<Name>,Option<R>) -> R
 	{
@@ -118,7 +119,7 @@ Tree<E> {
 		}}
 	}
 
-	/// memoized fold operation, left to right
+	/// incremental fold operation, left to right
 	pub fn fold_lr<A,F>(self, accum: A, node_calc: Rc<F>) -> A where
 		A: 'static + Eq + Clone + Hash + Debug,
 		F: 'static + Fn(A,E) -> A,
@@ -127,7 +128,10 @@ Tree<E> {
 		self.fold_lr_meta(start_name,accum,Rc::new(move|a,e,_l,_n|{node_calc(a,e)}))
 	}
 
-	/// memoized fold operation, left to right, with levels and names
+	/// incremental fold operation, left to right, with levels and names
+	/// 
+	/// Names passed to the mapping function are USED (as is and forked) in the
+	/// resulting tree and should not be reused directly for the creation of arts.
 	pub fn fold_lr_meta<A,F>(self, start_name: Option<Name>, accum: A, node_calc: Rc<F>) -> A where
 		A: 'static + Eq + Clone + Hash + Debug,
 		F: 'static + Fn(A,E,u32,Option<Name>) -> A,
@@ -165,12 +169,12 @@ Tree<E> {
 		}}
 	}
 
-  /// memoized map operation
+  /// incremental map operation
   ///
   /// because of the possibility of meta data in tree nodes, the
   /// mapping function takes all the data of a tree, including refs
   /// to subtrees. Names passed to the mapping function are USED in the
-  /// resulting tree and should not be reused for the creation of arts.
+  /// resulting tree and should not be reused directly for the creation of arts.
   pub fn map<R:Eq+Clone+Hash+Debug+'static,F>(self, map_val: Rc<F>) -> Tree<R>
   where
   	F: 'static + Fn(E,u32,Option<Name>,Option<&Tree<R>>,Option<&Tree<R>>) -> R
