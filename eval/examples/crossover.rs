@@ -29,7 +29,7 @@ const DEFAULT_UNITSIZE: usize = 100;
 const DEFAULT_NAMESIZE: usize = 1;
 const DEFAULT_EDITS: usize = 1;
 const DEFAULT_CHANGES: usize = 30;
-const DEFAULT_TRIALS: usize = 10;
+//const DEFAULT_TRIALS: usize = 10;
 
 fn main () {
   let child =
