@@ -56,12 +56,12 @@ impl Rand for GenSetElm{
     GenSetElm(Elm(rng.gen::<usize>()))
   }
 }
-impl Add for GenSetElm{
-  type Output = GenSetElm;
-  fn add(self, rhs: Self) -> Self::Output {
-      unreachable!()
-  }
-}
+// impl Add for GenSetElm{
+//   type Output = GenSetElm;
+//   fn add(self, rhs: Self) -> Self::Output {
+//       unreachable!()
+//   }
+// }
 impl From<usize> for GenSetElm {
   fn from(num: usize) -> Self {
     GenSetElm(Elm(num))

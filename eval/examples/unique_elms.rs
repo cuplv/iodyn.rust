@@ -99,7 +99,7 @@ fn main2() {
       {let mut t = Skiplist::emp(pathlen, name_unit()); t.archive(name_unit()); t},
       |mut a,&GenSetElm(e)|{ a.put(e, ()); a },
       |mut a,nm|{ match nm { None => a, Some(nm) => { a.archive(nm); a }}},
-      |a,(_lev,_nmopt)|{ a },
+      |a,_lev|{ a },
       |a|{a},
     ),
     changes: changes,
