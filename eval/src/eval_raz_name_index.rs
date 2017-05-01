@@ -310,10 +310,10 @@ CompFoldMeta<E,O,(u32,Option<Name>),F,N> for EvalRazNameIndex<E,G> where
 }
 
 impl<E:Adapt,O:Adapt,F,FF,N,G:Rng>
-CompFoldArchive<E,O,(u32,Option<Name>),F,FF,N> for EvalRazNameIndex<E,G> where
+CompFoldArchive<E,O,u32,F,FF,N> for EvalRazNameIndex<E,G> where
 	F:'static + Fn(O,&E)->O,
 	FF:'static + Fn(O,Option<Name>)->O,
-	N:'static + Fn(O,(u32,Option<Name>))->O,
+	N:'static + Fn(O,u32)->O,
 {
 	type Target = O;
 	fn comp_fold_archive(&self, accum: O, f:Rc<F>, ff:Rc<FF>, n:Rc<N>, _rng: &mut StdRng) -> (Duration,Self::Target) {
