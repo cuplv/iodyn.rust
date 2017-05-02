@@ -35,6 +35,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
 use rand::{StdRng,SeedableRng};
+use adapton::reflect;
 use adapton::engine::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;

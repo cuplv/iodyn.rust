@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use rand::{StdRng,SeedableRng};
 use eval::actions::*;
 use eval::types::*;
+use adapton::reflect;
 use adapton_lab::labviz::*;
 #[allow(unused)] use eval::types::*;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
@@ -31,7 +32,7 @@ use iodyn::skiplist::{FinMap,Skiplist};
 use eval::test_seq::{TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;
-use adapton::engine::reflect::trace::*;
+use adapton::reflect::trace::*;
 use eval::interface::*;
 
 const DEFAULT_DATASEED: usize = 0;

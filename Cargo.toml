@@ -19,4 +19,4 @@ travis-ci = { repository = "https://github.com/cuplv/iodyn.rust" }
 
 [dependencies]
 rand = "0.3"
-adapton = "0.2"
+adapton = "0.3"
