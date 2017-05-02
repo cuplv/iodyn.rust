@@ -22,7 +22,6 @@ use eval::actions::*;
 use eval::types::*;
 use adapton_lab::labviz::*;
 #[allow(unused)] use eval::types::*;
-#[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::accum_lists::*;

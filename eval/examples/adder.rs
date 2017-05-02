@@ -24,7 +24,6 @@ use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
 #[allow(unused)] use iodyn::IRaz;
 #[allow(unused)] use iodyn::inc_archive_stack::{AtTail,AStack as IAStack};
-#[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::eval_iastack::EvalIAStack;

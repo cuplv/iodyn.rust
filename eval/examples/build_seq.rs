@@ -15,7 +15,6 @@ use std::io::Write;
 use rand::{StdRng,SeedableRng};
 #[allow(unused)] use eval::types::*;
 use eval::actions::*;
-#[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 use eval::test_build::{TestResult,BuildTest};
@@ -73,22 +72,19 @@ fn main() {
 
   // run experiments
   let mut rng = StdRng::from_seed(&[editseed]);
-  let result_raz: TestResult<EvalNRaz<usize,StdRng>> = test.test(&mut rng);
   let result_iraz: TestResult<EvalIRaz<usize,StdRng>> = test.test(&mut rng);
   let result_vec: TestResult<EvalVec<usize,StdRng>> = test.test(&mut rng);
 
   // post-process results
-  let build_raz = result_raz.build.iter().map(|d|d.num_nanoseconds().unwrap());
   let build_iraz = result_iraz.build.iter().map(|d|d.num_nanoseconds().unwrap());
   let build_vec = result_vec.build.iter().map(|d|d.num_nanoseconds().unwrap());
-  let build_all: Vec<((i64,i64),i64)> = build_raz.zip(build_iraz).zip(build_vec).collect();
-  let edit_raz = result_raz.edit.iter().map(|d|d.num_nanoseconds().unwrap());
+  let build_all: Vec<(i64,i64)> = build_iraz.zip(build_vec).collect();
   let edit_iraz = result_iraz.edit.iter().map(|d|d.num_nanoseconds().unwrap());
   let edit_vec = result_vec.edit.iter().map(|d|d.num_nanoseconds().unwrap());
-  let edit_all: Vec<((i64,i64),i64)> = edit_raz.zip(edit_iraz).zip(edit_vec).collect();
+  let edit_all: Vec<(i64,i64)> = edit_iraz.zip(edit_vec).collect();
   
-  println!("build time(raz,iraz,vec): {:?}", build_all);
-  println!("edit time(raz,iraz,vec): {:?}", edit_all);
+  println!("build time(iraz,vec): {:?}", build_all);
+  println!("edit time(iraz,vec): {:?}", edit_all);
 
   ///////
   // Draft of output generation
@@ -113,16 +109,8 @@ fn main() {
   writeln!(dat,"'{}'\t'{}'\t'{}'","Size","Build Time","Edit Time").unwrap();
   for i in 0..count {
     let size = multiplier.powi(i as i32) as usize;
-    let br = (build_all[i].0).0 as f64 / 1_000_000.0;
-    let ed = (edit_all[i].0).0 as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}\t{}",size,br,ed).unwrap();
-  }
-  writeln!(dat,"").unwrap();
-  writeln!(dat,"").unwrap();
-  for i in 0..count {
-    let size = multiplier.powi(i as i32) as usize;
-    let br = (build_all[i].0).1 as f64 / 1_000_000.0;
-    let ed = (edit_all[i].0).1 as f64 / 1_000_000.0;
+    let br = build_all[i].0 as f64 / 1_000_000.0;
+    let ed = edit_all[i].0 as f64 / 1_000_000.0;
     writeln!(dat,"{}\t{}\t{}",size,br,ed).unwrap();    
   }
   writeln!(dat,"").unwrap();
@@ -152,12 +140,10 @@ fn main() {
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","NonIncRaz build time").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","IncRaz build time").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Vec build time").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","NonIncRaz edit time").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","IncRaz edit time").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","Vec edit time").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","IncRaz build time").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:2 t '{}' with lines,\\",filename.to_owned()+".dat","Vec build time").unwrap();
+  writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","IncRaz edit time").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with lines,\\",filename.to_owned()+".dat","Vec edit time").unwrap();
 
   ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
 

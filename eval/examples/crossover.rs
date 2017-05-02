@@ -16,7 +16,6 @@ use rand::{StdRng,SeedableRng};
 use eval::actions::*;
 #[allow(unused)] use eval::types::*;
 #[allow(unused)] use eval::eval_raz_name_index::EvalRazNameIndex;
-#[allow(unused)] use eval::eval_nraz::EvalNRaz;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::test_seq::{TestResult,EditComputeSequence};
