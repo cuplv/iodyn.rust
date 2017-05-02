@@ -29,10 +29,10 @@ use std::rc::Rc;
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use inc_level_tree::{Tree};
-use inc_tree_cursor as tree;
-use inc_tree_cursor::TreeUpdate;
-use inc_archive_stack as stack;
+use level_tree::{Tree};
+use tree_cursor as tree;
+use tree_cursor::TreeUpdate;
+use archive_stack as stack;
 use raz_meta::{RazMeta,Navigation,FirstLast};
 use memo::{MemoFrom};
 
@@ -679,7 +679,7 @@ Raz<E,M> {
 /////////////////////////////
 // Traits for Raz and RazTree
 /////////////////////////////
-use inc_level_tree as ltree;
+use level_tree as ltree;
 use std::convert::From;
 
 /// convenience fn for making a tree from data
@@ -867,7 +867,7 @@ for RazTree<E,M> {
 mod tests {
 	use super::*;
 	use raz_meta::Count;
-	use inc_level_tree::good_levels;
+	use level_tree::good_levels;
 
 	fn example_tree() -> RazTree<usize,Count> {
 		let a = leaf(vec!(1,2),None);

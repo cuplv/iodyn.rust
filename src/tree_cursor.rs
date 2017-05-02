@@ -12,7 +12,7 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::rc::Rc;
 use std::mem;
-pub use inc_level_tree::{Tree, gen_branch_level as gen_level};
+pub use level_tree::{Tree, gen_branch_level as gen_level};
 
 use adapton::macros::*;
 use adapton::engine::*;

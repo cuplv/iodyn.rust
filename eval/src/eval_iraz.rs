@@ -6,8 +6,8 @@ use time::Duration;
 use adapton::engine::*;
 use iodyn::memo::MemoFrom;
 use iodyn::{IRaz, IRazTree};
-use iodyn::inc_archive_stack::{AtTail};
-use iodyn::inc_tree_cursor::gen_level;
+use iodyn::archive_stack::{AtTail};
+use iodyn::tree_cursor::gen_level;
 use primitives::*;
 use interface::{Adapt};
 

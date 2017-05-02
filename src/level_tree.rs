@@ -205,7 +205,7 @@ Tree<E> {
 /// This is an O(n) operation, so it shouldn't be used in release mode
 ///
 /// ```
-/// use iodyn::inc_level_tree::{good_levels,Tree};
+/// use iodyn::level_tree::{good_levels,Tree};
 ///
 /// let tree = Tree::new(4,None,(),None,Tree::new(1,None,(),None,None)).unwrap();
 /// debug_assert!(good_levels(&tree),"this section of code has a problem");

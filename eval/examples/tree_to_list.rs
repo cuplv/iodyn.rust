@@ -39,7 +39,7 @@ use adapton::engine::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
 #[allow(unused)] use iodyn::{IRaz,IRazTree};
-#[allow(unused)] use iodyn::inc_archive_stack::AStack as IAStack;
+#[allow(unused)] use iodyn::archive_stack::AStack as IAStack;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::eval_iastack::EvalIAStack;

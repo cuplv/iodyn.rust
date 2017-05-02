@@ -16,7 +16,7 @@
 use std::mem;
 use std::fmt::Debug;
 use std::hash::Hash;
-use inc_stack::Stack;
+use stack::Stack;
 use adapton::engine::Name;
 
 /// Incremental Archive Stack

@@ -28,24 +28,24 @@ extern crate rand;
 
 pub mod trees;              // traits for the various forms of trees
 pub mod memo;
-pub mod inc_stack;
-pub mod inc_archive_stack;
-pub mod inc_level_tree;
-pub mod inc_tree_cursor;
-pub mod inc_gauged_raz;
+pub mod stack;
+pub mod archive_stack;
+pub mod level_tree;
+pub mod tree_cursor;
+pub mod raz;
 pub mod raz_meta;
 
 pub mod skiplist;
 pub mod trie;
 
-/// Gauged Incremental Raz - Experimental for use with Adapton
-pub type IRaz<E> = inc_gauged_raz::Raz<E,raz_meta::Count>;
+/// Gauged Incremental Raz with element counts
+pub type IRaz<E> = raz::Raz<E,raz_meta::Count>;
 /// Unfocused `IRaz`
-pub type IRazTree<E> = inc_gauged_raz::RazTree<E,raz_meta::Count>;
+pub type IRazTree<E> = raz::RazTree<E,raz_meta::Count>;
 /// Cross between vector and persistent stack
-pub type ArchiveStack<E> = inc_archive_stack::AStack<E,()>;
+pub type ArchiveStack<E> = archive_stack::AStack<E,()>;
 
 ///level generator for incremental structures
 pub fn inc_level() -> u32 {
-  inc_level_tree::gen_branch_level(&mut rand::thread_rng())
+  level_tree::gen_branch_level(&mut rand::thread_rng())
 }
