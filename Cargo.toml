@@ -12,6 +12,7 @@ repository = "https://github.com/cuplv/iodyn.rust"
 readme = "README.md"
 keywords = ["incremental","adapton","sequence","RAZ","memoization"]
 categories = ["data-structures"]
+license = "MPL-2.0"
 exclude = ["travis.sh"]
 
 [badges]
