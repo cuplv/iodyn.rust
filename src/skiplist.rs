@@ -325,8 +325,8 @@ fn skiplist_vs_hashmap () {
         let nm = if gauged && i % gauge == 0 { Some(name_of_usize(i)) } else { None };
 
         // Test random insertion
-        if !(nm == None) { println!("=========\nname {:?}:", nm); };
-        println!("insert #{:?}: key {:?} maps to {:?}", i, r1, r2);
+        //if !(nm == None) { println!("=========\nname {:?}:", nm); };
+        //println!("insert #{:?}: key {:?} maps to {:?}", i, r1, r2);
         m.insert(r1, r2);
         t.put(r1, r2);
         match nm {
@@ -337,7 +337,7 @@ fn skiplist_vs_hashmap () {
         // Test random lookup        
         let r3 : usize = rng.gen(); 
         let r3 = r3 % (numkeys * 2); // Look for non-existent keys with prob 0.5
-        println!("lookup #{:?}: key {:?} maps to {:?}", i, r3, m.get(&r3));
+        //println!("lookup #{:?}: key {:?} maps to {:?}", i, r3, m.get(&r3));
         assert_eq!(m.get(&r3).map(|&n|n.clone()), t.get(r3));
     }
 }

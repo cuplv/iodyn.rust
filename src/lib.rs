@@ -26,16 +26,20 @@
 extern crate rand;
 #[macro_use] extern crate adapton;
 
-pub mod trees;              // traits for the various forms of trees
-pub mod memo;
-pub mod stack;
-pub mod archive_stack;
-pub mod level_tree;
-pub mod tree_cursor;
-pub mod raz;
-pub mod raz_meta;
+#[doc(hidden)]
+pub mod trees;          // old work, but want to reincorporate the Level trait into current Raz
+pub mod memo;           // Conversion function traits
+pub mod stack;          // Cons-list
+pub mod archive_stack;  // Sequences with subsequence vectors and metadata
+pub mod level_tree;     // generic tree with cannonical structure, basis for incremental functions
+pub mod tree_cursor;    // interface for traversing a level tree
+pub mod raz;            // Gauged Incremental Random Access Zipper
+pub mod raz_meta;       // Generic interface and concrete versions of metadata for searching the Raz
 
+// Two forms of tries. They work, but performance needs improvement
+#[doc(hidden)]
 pub mod skiplist;
+#[doc(hidden)]
 pub mod trie;
 
 /// Gauged Incremental Raz with element counts
