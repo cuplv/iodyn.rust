@@ -72,13 +72,13 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 	}
 	
 	fn get(curr: Self, key: usize) -> Option<V> {
-		let mut seq_view = RazTree::focus(curr.map, key).unwrap();
-		Raz::peek_right(&mut seq_view).unwrap().clone().take()
+		let mut seq_view = RazTree::focus(curr.map, key + 1).unwrap();
+		Raz::peek_left(&mut seq_view).unwrap().clone().take()
 	}
 	
 	fn contains(curr: Self, key: usize) -> bool {
-		let mut seq_view = RazTree::focus(curr.map, key).unwrap();
-		(*Raz::peek_right(&mut seq_view).unwrap()).is_some()
+		let mut seq_view = RazTree::focus(curr.map, key + 1).unwrap();
+		(*Raz::peek_left(&mut seq_view).unwrap()).is_some()
 	}
 	
 	fn del(curr: Self, key: usize) -> (Option<V>, Self) {
@@ -90,7 +90,7 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 	
 	//currently not working
 	fn keyset(curr: Self) -> Vec<usize> {
-		curr.map.fold_up(
+		/*curr.map.fold_up(
 			Rc::new(|e:&Option<usize>| {
 					match *e {
 						None => vec!(),
@@ -101,7 +101,8 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 					v1.append(&mut v2);
 					v1
 				})
-		)
+		)*/
+		panic!("stubbed");
 	}
 }
 
@@ -321,6 +322,7 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 	}
 	
 	fn cycle(curr: Self) -> bool {
+		/*
 		//TODOS: figure out how to make recursive inner function, enumerate vertices of graph
 		//this is still pseudo-codey and not working
 		use std::cmp;
@@ -365,7 +367,8 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 			}
 		}
 		
-		found_cycle
+		found_cycle*/
+		panic!("stubbed");
 	}
 }
 	
