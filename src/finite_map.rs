@@ -4,9 +4,11 @@ use std::fmt::Debug;
 use adapton::engine::name_of_usize;
 use std::vec::Vec;
 use std::collections::vec_deque::VecDeque;
+use std::collections::HashMap;
 use std::io::BufReader;
 use std::io::BufRead;
 use std::fs::File;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 struct SizedMap<V> where V: Clone + Debug + Eq + Hash + 'static {
@@ -14,6 +16,12 @@ struct SizedMap<V> where V: Clone + Debug + Eq + Hash + 'static {
 	gran: usize,
 	map: RazTree<Option<V>>
 }
+
+struct SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash + 'static {
+	size: usize,
+	gran: usize,
+	map: HashMap<K, V>
+} 
 
 pub trait FinMap<K, V> {
 	//first usize: total size, second: granularity
@@ -29,8 +37,9 @@ pub trait FinMap<K, V> {
 	
 	fn contains(Self, K) -> bool;
 	
-	//Should this return a tuple: (Self, Option<V>)? got error: Self must have "Sized" trait
 	fn del(Self, K) -> (Option<V>, Self);
+	
+	fn keyset(Self) -> Vec<K>;
 }
 
 impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
@@ -77,6 +86,64 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 		let ret = Raz::pop_right(&mut seq_view).unwrap();
 		Raz::push_right(&mut seq_view, None);
 		(ret, SizedMap { size: curr.size, gran: curr.gran, map: Raz::unfocus(seq_view) })
+	}
+	
+	//currently not working
+	fn keyset(curr: Self) -> Vec<usize> {
+		curr.map.fold_up(
+			Rc::new(|e:&Option<usize>| {
+					match *e {
+						None => vec!(),
+						Some(k) => vec!(k)
+					}
+				}),
+			Rc::new(|v1:Vec<usize>, v2:Vec<usize>| {
+					v1.append(&mut v2);
+					v1
+				})
+		)
+	}
+}
+
+impl<K, V> FinMap<K, V> for SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash, K: Eq + Hash {
+	fn new(size: usize, gran: usize) -> Self {
+		SizedHashMap { size : size, gran : gran, map : HashMap::with_capacity(size) }
+	}
+	
+	fn size(curr: Self) -> usize {
+		curr.size
+	}
+	
+	fn gran(curr: Self) -> usize {
+		curr.gran
+	}
+	
+	fn put(curr: Self, key: K, val: V) -> Self {
+		let mut ret = curr.map;
+		ret.insert(key, val);
+		SizedHashMap { size: curr.size, gran: curr.gran, map: ret }
+	}
+	
+	fn get(curr: Self, key: K) -> Option<V> {
+		let res = HashMap::get(&curr.map, &key);
+		match res {
+			None => None,
+			Some(v) => Some(v.clone())
+		}
+	}
+	
+	fn contains(curr: Self, key: K) -> bool {
+		HashMap::contains_key(&curr.map, &key)
+	}
+	
+	fn del(curr: Self, key: K) -> (Option<V>, Self) {
+		let mut ret = curr.map;
+		let mval = ret.remove(&key);
+		(mval, SizedHashMap { size: curr.size, gran: curr.gran, map: ret } )
+	}
+	
+	fn keyset(curr: Self) -> Vec<K> {
+		panic!("unimplemented");
 	}
 }
 
@@ -229,6 +296,8 @@ pub trait DirectedGraph<NdId, Data> : Graph<NdId, Data> {
 	fn add_directed_edge(Self, NdId, NdId) -> Self;
 	
 	fn successors(Self, NdId) -> Option<Vec<NdId>>;
+	
+	fn cycle(Self) -> bool;
 }
 
 impl<T, Data> DirectedGraph<usize, Data> for T 
@@ -249,6 +318,54 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 	
 	fn successors(curr: Self, id: usize) -> Option<Vec<usize>> {
 		Graph::adjacents(curr, id)
+	}
+	
+	fn cycle(curr: Self) -> bool {
+		//TODOS: figure out how to make recursive inner function, enumerate vertices of graph
+		//this is still pseudo-codey and not working
+		use std::cmp;
+		//Tarjan's algorithm
+		let mut indexes : SizedMap<usize> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
+		let mut lowlinks: SizedMap<usize> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
+		let mut index = 0;
+		let mut stack : VecDeque<usize> = VecDeque::new();
+		let mut found_cycle = false;
+		
+		//this is strongconnect() in Tarjan's algorithm
+		let strongconnect = |v: usize| {
+			indexes = FinMap::put(indexes, v, index);
+			lowlinks = FinMap::put(lowlinks, v, index);
+			index = index + 1;
+			stack.push_back(v);
+			
+			for w in Self::successors(curr.clone(), v).unwrap() {
+				if !FinMap::contains(indexes.clone(), w) {
+					//strongconnect(w);
+					lowlinks = FinMap::put(lowlinks, v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(), 
+																 FinMap::get(lowlinks.clone(), w).unwrap()));
+				}
+				else if stack.contains(&w) {
+					lowlinks = FinMap::put(lowlinks, v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(),
+																 FinMap::get(indexes.clone(), w).unwrap()));
+				}
+			}
+			
+			if FinMap::get(indexes, v).unwrap() == FinMap::get(lowlinks, v).unwrap() {
+				//normally we would return the specific cycle, but we're just detecting and returning bools
+				found_cycle = true;
+			}
+		};
+		
+		//enumerate the vertices as V - fold over Raz?
+		//assume V is the list of vertices
+		let V = vec!(1, 2);
+		for v in V {
+			if !FinMap::contains(indexes.clone(), v) {
+				strongconnect(v);
+			}
+		}
+		
+		found_cycle
 	}
 }
 	
