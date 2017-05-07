@@ -30,19 +30,25 @@ impl fmt::Debug for HashVal {
     }
 }
 
-/// TODO-Someday: Do this more efficiently
-fn make_mask(len:usize) -> usize {
-    assert!(len > 0);
-    let mut mask = 0;
-    for _ in 0..len {
-        mask <<= 1;
-        mask |= 0x1;
-    }
-    return mask;
-}
+// /// TODO-Someday: Do this more efficiently
+// fn make_mask(len:usize) -> usize {
+//     assert!(len > 0);
+//     let mut mask = 0;
+//     for _ in 0..len {
+//         mask <<= 1;
+//         mask |= 0x1;
+//     }
+//     return mask;
+// }
 
-#[derive(PartialEq,Eq,Clone,Debug,Hash)]
+#[derive(PartialEq,Eq,Clone,Hash)]
 struct Bits {bits:u32, len:u32}
+
+impl fmt::Debug for Bits {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Bits{{bits:{:b}, len:{}}}", self.bits, self.len)
+    }
+}
 
 #[derive(PartialEq,Eq,Clone,Debug,Hash)]
 pub struct Trie
@@ -115,7 +121,7 @@ impl<K:'static+Hash+Eq+Clone+Debug,
                   mut map1:HashMap<K,V>)
                   -> (HashMap<K,V>, HashMap<K,V>) 
     {
-        let mask : u64 = make_mask(bits_len as usize) as u64;
+        //let mask : u64 = make_mask(bits_len as usize) as u64;
         for (k,v) in map.into_iter() {
             let k_hash = my_hash(&k);
             //assert_eq!((mask & k_hash) >> 1, bits.bits as u64); // XXX/???
@@ -139,13 +145,14 @@ impl<K:'static+Hash+Eq+Clone+Debug,
 
     pub fn join (lt: Self, rt: Self, n:Name) -> Self {
         //assert_eq!(lt.gauge, rt.gauge); // ??? -- Or take the min? Or the max? Or the average?
+        let gauge = if lt.gauge > rt.gauge { lt.gauge } else { rt.gauge };
         let lt_rec = lt.rec;
-        let lt = Trie{rec:TrieRec::Empty, .. lt};
+        let lt = Trie{gauge:gauge, rec:TrieRec::Empty};
         Trie{rec:Self::join_rec(&lt, lt_rec, rt.rec, Bits{len:0, bits:0}, n),..lt}
     }
 
     fn split_bits (bits:&Bits) -> (Bits, Bits) {
-        let lbits = Bits{len:bits.len+1, bits: bits.bits };
+        let lbits = Bits{len:bits.len+1, bits:/* zero ------ */ bits.bits };
         let rbits = Bits{len:bits.len+1, bits:(1 << bits.len) | bits.bits };
         (lbits, rbits)
     }
@@ -162,7 +169,6 @@ impl<K:'static+Hash+Eq+Clone+Debug,
                     TrieRec::Leaf(l)
                 } else {
                     // Sub-Case: the leaves are large enough to justify not being combined.
-                    let (lb, rb) = Self::split_bits(&bits);
                     let (e0, e1) = (HashMap::new(), HashMap::new());
                     let (l0, l1) = Self::split_map(l.map, bits.len + 1, e0, e1);
                     let (r0, r1) = Self::split_map(r.map, bits.len + 1, l0, l1);
@@ -205,18 +211,17 @@ impl<K:'static+Hash+Eq+Clone+Debug,
     }               
 }
 
-fn at_leaf(v:&Vec<usize>) -> Trie<usize,()> {
-    let mut hm = HashMap::new();
-    for x in v { hm.insert(*x,()); }
-    Trie::from_hashmap(hm)
-}
-
-fn at_bin(l:Trie<usize,()>,lev:u32,n:Option<Name>,r:Trie<usize,()>) -> Trie<usize,()> {
-    Trie::join(l,r,n.unwrap())
-}
 
 #[test]
 pub fn test_join () {
+    fn at_leaf(v:&Vec<usize>) -> Trie<usize,()> {
+        let mut hm = HashMap::new();
+        for x in v { hm.insert(*x,()); }
+        Trie::from_hashmap(hm)
+    }    
+    fn at_bin(l:Trie<usize,()>,_lev:u32,n:Option<Name>,r:Trie<usize,()>) -> Trie<usize,()> {
+        Trie::join(l,r,n.unwrap())
+    }
     use rand::{thread_rng,Rng};
     use adapton::engine::*;
     use archive_stack::*;
@@ -230,16 +235,18 @@ pub fn test_join () {
 
     let mut elms : AStack<usize,_> = AStack::new();
     let mut elmv : Vec<usize> = vec![];
-    for i in 0..20 {
-        let elm = rng.gen::<usize>();
+    for i in 0..10 {
+        let elm = rng.gen::<usize>() % 100;
         elmv.push(elm);
         elms.push(elm);
-        if i % 3 == 0 {
+        if i % 2 == 0 {
             elms.archive(Some(name_of_usize(i)), gen_branch_level(&mut rng));
         }
     }
     let tree: RazTree<_,Count> = RazTree::memo_from(&AtHead(elms));
     let trie = tree.fold_up_gauged(Rc::new(at_leaf),Rc::new(at_bin)).unwrap();
+
+    println!("{:?}\n", trie);
 
     for i in elmv {
         println!("find {:?}", i);
