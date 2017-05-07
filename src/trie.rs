@@ -146,7 +146,7 @@ impl<K:'static+Hash+Eq+Clone+Debug,
 
     fn split_bits (bits:&Bits) -> (Bits, Bits) {
         let lbits = Bits{len:bits.len+1, bits: bits.bits };
-        let rbits = Bits{len:bits.len+1, bits:(1 << bits.len) & bits.bits };
+        let rbits = Bits{len:bits.len+1, bits:(1 << bits.len) | bits.bits };
         (lbits, rbits)
     }
 
