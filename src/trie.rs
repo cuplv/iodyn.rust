@@ -87,7 +87,11 @@ impl<K:'static+Hash+Eq+Clone+Debug,
 impl<K:'static+Hash+Eq+Clone+Debug,
      V:'static+Hash+Eq+Clone+Debug> Trie<K,V> {
 
-    pub fn find (t: &Trie<K,V>, h:HashVal, k:&K) -> Option<V> {
+    pub fn find (&self, k:&K) -> Option<V> {
+        Self::find_hash(self, HashVal(my_hash(k) as usize), k)
+    }
+
+    pub fn find_hash (t: &Trie<K,V>, h:HashVal, k:&K) -> Option<V> {
         Self::find_rec(t, &t.rec, h, k)
     }
 
@@ -105,16 +109,17 @@ impl<K:'static+Hash+Eq+Clone+Debug,
         }
     }
 
-    fn split_map (map: HashMap<K,V>, bits:&Bits,
+    fn split_map (map: HashMap<K,V>, 
+                  bits_len:u32,
                   mut map0:HashMap<K,V>, 
                   mut map1:HashMap<K,V>)
                   -> (HashMap<K,V>, HashMap<K,V>) 
     {
-        let mask : u64 = make_mask(bits.len as usize) as u64;
+        let mask : u64 = make_mask(bits_len as usize) as u64;
         for (k,v) in map.into_iter() {
             let k_hash = my_hash(&k);
-            assert!(mask & k_hash == bits.bits as u64);
-            if 0 == k_hash & (1 << (bits.len + 1)) {
+            //assert_eq!((mask & k_hash) >> 1, bits.bits as u64); // XXX/???
+            if 0 == (k_hash & (1 << bits_len)) {
                 map0.insert(k, v);
             } else {
                 map1.insert(k, v);
@@ -133,7 +138,7 @@ impl<K:'static+Hash+Eq+Clone+Debug,
     }
 
     pub fn join (lt: Self, rt: Self, n:Name) -> Self {
-        assert_eq!(lt.gauge, rt.gauge); // ??? -- Or take the min? Or the max? Or the average?
+        //assert_eq!(lt.gauge, rt.gauge); // ??? -- Or take the min? Or the max? Or the average?
         let lt_rec = lt.rec;
         let lt = Trie{rec:TrieRec::Empty, .. lt};
         Trie{rec:Self::join_rec(&lt, lt_rec, rt.rec, Bits{len:0, bits:0}, n),..lt}
@@ -146,6 +151,7 @@ impl<K:'static+Hash+Eq+Clone+Debug,
     }
 
     fn join_rec (t:&Trie<K,V>, lt: TrieRec<K,V>, rt: TrieRec<K,V>, bits:Bits, n:Name) -> TrieRec<K,V> {
+        println!("{:?} {:?}", bits, n);
         match (lt, rt) {
             (TrieRec::Empty, rt) => rt,
             (lt, TrieRec::Empty) => lt,
@@ -158,8 +164,8 @@ impl<K:'static+Hash+Eq+Clone+Debug,
                     // Sub-Case: the leaves are large enough to justify not being combined.
                     let (lb, rb) = Self::split_bits(&bits);
                     let (e0, e1) = (HashMap::new(), HashMap::new());
-                    let (l0, l1) = Self::split_map(l.map, &lb, e0, e1);
-                    let (r0, r1) = Self::split_map(r.map, &rb, l0, l1);
+                    let (l0, l1) = Self::split_map(l.map, bits.len + 1, e0, e1);
+                    let (r0, r1) = Self::split_map(r.map, bits.len + 1, l0, l1);
                     let (n1, n2) = name_fork(n.clone());
                     let r0 = cell(n1, TrieRec::Leaf(TrieLeaf{map:r0}));
                     let r1 = cell(n2, TrieRec::Leaf(TrieLeaf{map:r1}));
@@ -168,7 +174,7 @@ impl<K:'static+Hash+Eq+Clone+Debug,
             },
             (TrieRec::Leaf(l), TrieRec::Bin(r)) => {
                 let (e0, e1) = (HashMap::new(), HashMap::new());
-                let (l0, l1) = Self::split_map(l.map, &bits, e0, e1);
+                let (l0, l1) = Self::split_map(l.map, bits.len + 1, e0, e1);
                 let (lb, rb) = Self::split_bits(&bits);
                 let (n1, n2) = name_fork(n.clone());
                 let (m0, m1) = name_fork(r.name.clone());
@@ -178,7 +184,7 @@ impl<K:'static+Hash+Eq+Clone+Debug,
             },
             (TrieRec::Bin(l), TrieRec::Leaf(r)) => {
                 let (e0, e1) = (HashMap::new(), HashMap::new());
-                let (r0, r1) = Self::split_map(r.map, &bits, e0, e1);
+                let (r0, r1) = Self::split_map(r.map, bits.len + 1, e0, e1);
                 let (lb, rb) = Self::split_bits(&bits);
                 let (n1, n2) = name_fork(n.clone());
                 let (m0, m1) = name_fork(l.name.clone());
@@ -223,14 +229,20 @@ pub fn test_join () {
     let mut rng = thread_rng();
 
     let mut elms : AStack<usize,_> = AStack::new();
-    for i in 0..10000 {
+    let mut elmv : Vec<usize> = vec![];
+    for i in 0..20 {
         let elm = rng.gen::<usize>();
+        elmv.push(elm);
         elms.push(elm);
-        if i % 10 == 0 {
+        if i % 3 == 0 {
             elms.archive(Some(name_of_usize(i)), gen_branch_level(&mut rng));
         }
     }
     let tree: RazTree<_,Count> = RazTree::memo_from(&AtHead(elms));
-    let trie = tree.fold_up_gauged(Rc::new(at_leaf),Rc::new(at_bin));
+    let trie = tree.fold_up_gauged(Rc::new(at_leaf),Rc::new(at_bin)).unwrap();
 
+    for i in elmv {
+        println!("find {:?}", i);
+        assert_eq!(trie.find(&i), Some(()));
+    }
 }
