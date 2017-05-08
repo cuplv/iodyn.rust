@@ -71,11 +71,13 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 		SizedMap { size: curr.size, gran: curr.gran, map: Raz::unfocus(seq_view) }
 	}
 	
+	//TEMPORARY WORKAROUND
 	fn get(curr: Self, key: usize) -> Option<V> {
 		let mut seq_view = RazTree::focus(curr.map, key + 1).unwrap();
 		Raz::peek_left(&mut seq_view).unwrap().clone().take()
 	}
 	
+	//TEMPORARY WORKAROUND
 	fn contains(curr: Self, key: usize) -> bool {
 		let mut seq_view = RazTree::focus(curr.map, key + 1).unwrap();
 		(*Raz::peek_left(&mut seq_view).unwrap()).is_some()
@@ -88,21 +90,19 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 		(ret, SizedMap { size: curr.size, gran: curr.gran, map: Raz::unfocus(seq_view) })
 	}
 	
-	//currently not working
 	fn keyset(curr: Self) -> Vec<usize> {
-		/*curr.map.fold_up(
-			Rc::new(|e:&Option<usize>| {
-					match *e {
-						None => vec!(),
-						Some(k) => vec!(k)
+		let empty_vec: Vec<usize> = vec!();
+		match curr.map.fold_lr(
+			(empty_vec, 0),
+			Rc::new(|(mut vs, k):(Vec<usize>, usize), v2:&Option<V>| {
+					match v2 {
+						&Some(_) => {vs.push(k+1); (vs, k+1)}
+						&None => (vs, k+1)
 					}
-				}),
-			Rc::new(|v1:Vec<usize>, v2:Vec<usize>| {
-					v1.append(&mut v2);
-					v1
 				})
-		)*/
-		panic!("stubbed");
+		) {
+			(vec, k) => vec
+		}
 	}
 }
 
@@ -144,7 +144,9 @@ impl<K, V> FinMap<K, V> for SizedHashMap<K, V> where V: Clone + Debug + Eq + Has
 	}
 	
 	fn keyset(curr: Self) -> Vec<K> {
-		panic!("unimplemented");
+		//let ret: Vec<&K> = curr.map.iter().map(|(k, _)| k.clone()).collect();
+		//ret.iter().map(|x| *(x.clone())).collect()
+		panic!("unimplemented")
 	}
 }
 
@@ -378,7 +380,7 @@ fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option
 	let reader = BufReader::new(f);
 	let lines: Vec<_> = reader.lines().collect();
 	
-	let mut g: T = Graph::new(10000, 10000);
+	let mut g: T = Graph::new(10000, 100);
 	
 	for l in lines {
 		let line = match l {
@@ -495,7 +497,6 @@ mod tests {
   }
   
   #[test]
-  #[should_panic]
   fn test_gran() {
   	let dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
   	
