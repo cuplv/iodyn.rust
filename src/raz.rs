@@ -415,16 +415,38 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		}
 	}
 
+	pub fn into_iter_lr(self) -> IterR<E,M> {
+		let Raz{r_stack, r_forest, ..} = self.focus_left();
+		let mut current = r_stack.active_data().clone();
+		current.reverse();
+		let (_,_,iter) = r_forest.into_iters();
+		IterR {
+			items: current.into_iter(),
+			cursor: iter,
+		}
+	}
+
+	pub fn into_iter_rl(self) -> IterL<E,M> {
+		let Raz{l_stack, l_forest, ..} = self.focus(M::Index::last()).unwrap();
+		let mut current = l_stack.active_data().clone();
+		let (iter,_,_) = l_forest.into_iters();
+		current.reverse();
+		IterL {
+			items: current.into_iter(),
+			cursor: iter,
+		}
+	}
+
 }
 
-// impl<T: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>>
-// IntoIterator for RazTree<T,M> {
-// 	type Item = T;
-// 	type IntoIter = IterR<T>;
-// 	fn into_iter(self) -> Self::IntoIter {
-// 		IterR(self.focus_left())
-// 	}
-// }
+impl<T: Debug+Clone+Eq+Hash+'static, M:RazMeta<T>>
+IntoIterator for RazTree<T,M> {
+	type Item = T;
+	type IntoIter = IterR<T,M>;
+	fn into_iter(self) -> Self::IntoIter {
+		self.into_iter_lr()
+	}
+}
 
 impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>>
 Raz<E,M> {
@@ -640,20 +662,48 @@ Raz<E,M> {
 	}
 }
 
-// pub struct IterL<T: Debug+Clone+Eq+Hash+'static>(Raz<T>);
-// impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterL<T> {
-// 	type Item = T;
-// 	fn next(&mut self) -> Option<Self::Item> {
-// 		unimplemented!() // don't change the data!
-// 	}
-// }
-// pub struct IterR<T: Debug+Clone+Eq+Hash+'static>(Raz<T>);
-// impl<T: Debug+Clone+Eq+Hash+'static> Iterator for IterR<T> {
-// 	type Item = T;
-// 	fn next(&mut self) -> Option<Self::Item> {
-// 		unimplemented!() // don't change the data!
-// 	}
-// }
+pub struct IterR<T: Debug+Clone+Eq+Hash+'static, M:RazMeta<T>+'static>{
+	items: ::std::vec::IntoIter<T>,
+	cursor: tree::IterR<TreeData<T,M>>,
+}
+impl<T: Debug+Clone+Eq+Hash+'static, M:RazMeta<T>>
+Iterator for IterR<T,M> {
+	type Item = T;
+	fn next(&mut self) -> Option<Self::Item> {
+		if let Some(val) = self.items.next() { return Some(val) }
+		match self.cursor.next() {
+			None => return None,
+			Some(TreeData::Dummy) => unreachable!(),
+			Some(TreeData::Leaf(vec)) => { self.items = (*vec).clone().into_iter() },
+			Some(TreeData::Branch{..}) => {},
+		}
+		self.next()
+	}
+}
+
+pub struct IterL<T: Debug+Clone+Eq+Hash+'static, M:RazMeta<T>+'static>{
+	items: ::std::vec::IntoIter<T>,
+	cursor: tree::IterL<TreeData<T,M>>,
+}
+impl<T: Debug+Clone+Eq+Hash+'static, M:RazMeta<T>>
+Iterator for IterL<T,M> {
+	type Item = T;
+	fn next(&mut self) -> Option<Self::Item> {
+		if let Some(val) = self.items.next() { return Some(val) }
+		match self.cursor.next() {
+			None => return None,
+			Some(TreeData::Dummy) => unreachable!(),
+			Some(TreeData::Leaf(vec)) => {
+				let mut items = (*vec).clone();
+				items.reverse();
+				self.items = items.into_iter();
+			},
+			Some(TreeData::Branch{..}) => {},
+		}
+		self.next()
+	}
+}
+
 // impl<T: Debug+Clone+Eq+Hash+'static> IterR<T> {
 // 	pub fn inc_fold_out<R,B>(self, init:R, bin:Rc<B>) -> R where
 // 		R: 'static + Eq+Clone+Hash+Debug,
@@ -1217,6 +1267,20 @@ mod tests {
 			_ => panic!("Wrong data")
 		}
 
+	}
+
+	#[test]
+	fn test_iter() {
+		let tree = example_tree();
+		let tree_items = tree.into_iter_lr().collect::<Vec<_>>();
+		let count_items = (1..13).collect::<Vec<_>>();
+		assert_eq!(count_items, tree_items);
+
+		let tree = example_tree();
+		let tree_items = tree.into_iter_rl().collect::<Vec<_>>();
+		let mut count_items = (1..13).collect::<Vec<_>>();
+		count_items.reverse();
+		assert_eq!(count_items, tree_items);
 	}
 
   // iters need to be updated
