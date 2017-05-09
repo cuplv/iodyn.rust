@@ -96,7 +96,7 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 			(empty_vec, 0),
 			Rc::new(|(mut vs, k):(Vec<usize>, usize), v2:&Option<V>| {
 					match v2 {
-						&Some(_) => {vs.push(k+1); (vs, k+1)}
+						&Some(_) => {vs.push(k); (vs, k+1)}
 						&None => (vs, k+1)
 					}
 				})
@@ -504,5 +504,21 @@ mod tests {
   	let dt = DirectedGraph::add_directed_edge(dt, 10, 11);
   	let dt = DirectedGraph::add_directed_edge(dt, 20, 21);
   	let dt = DirectedGraph::add_directed_edge(dt, 30, 39);
+  }
+  
+  #[test]
+  fn test_keyset() {
+  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
+  	
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 2);
+  	let dt = DirectedGraph::add_directed_edge(dt, 10, 11);
+  	let dt = DirectedGraph::add_directed_edge(dt, 20, 21);
+  	let dt = DirectedGraph::add_directed_edge(dt, 30, 39);
+  	
+  	let ks = FinMap::keyset(dt);
+  	
+  	println!("keyset vec: {:?}", ks.clone());
+  	
+  	assert_eq!(ks, vec!(1, 2, 10, 11, 20, 21, 30, 39));
   }
 }
