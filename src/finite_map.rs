@@ -324,9 +324,6 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 	}
 	
 	fn cycle(curr: Self) -> bool {
-		/*
-		//TODOS: figure out how to make recursive inner function, enumerate vertices of graph
-		//this is still pseudo-codey and not working
 		use std::cmp;
 		//Tarjan's algorithm
 		let mut indexes : SizedMap<usize> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
@@ -336,41 +333,54 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		let mut found_cycle = false;
 		
 		//this is strongconnect() in Tarjan's algorithm
-		let strongconnect = |v: usize| {
+		fn strongconnect(v:usize, mut indexes: SizedMap<usize>, mut lowlinks: SizedMap<usize>,
+						 mut stack: VecDeque<usize>, mut index: usize, 
+						 mut found_cycle: bool, succs: Vec<usize>) 
+						-> (SizedMap<usize>, SizedMap<usize>, VecDeque<usize>, usize, bool) {
 			indexes = FinMap::put(indexes, v, index);
 			lowlinks = FinMap::put(lowlinks, v, index);
 			index = index + 1;
 			stack.push_back(v);
 			
-			for w in Self::successors(curr.clone(), v).unwrap() {
+			for w in succs {
 				if !FinMap::contains(indexes.clone(), w) {
 					//strongconnect(w);
-					lowlinks = FinMap::put(lowlinks, v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(), 
+					lowlinks = FinMap::put(lowlinks.clone(), v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(), 
 																 FinMap::get(lowlinks.clone(), w).unwrap()));
 				}
 				else if stack.contains(&w) {
-					lowlinks = FinMap::put(lowlinks, v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(),
+					lowlinks = FinMap::put(lowlinks.clone(), v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(),
 																 FinMap::get(indexes.clone(), w).unwrap()));
 				}
 			}
 			
-			if FinMap::get(indexes, v).unwrap() == FinMap::get(lowlinks, v).unwrap() {
+			if FinMap::get(indexes.clone(), v).unwrap() == FinMap::get(lowlinks.clone(), v).unwrap() {
 				//normally we would return the specific cycle, but we're just detecting and returning bools
 				found_cycle = true;
 			}
+			
+			(indexes, lowlinks, stack, index, found_cycle)
 		};
 		
-		//enumerate the vertices as V - fold over Raz?
 		//assume V is the list of vertices
-		let V = vec!(1, 2);
+		let V = FinMap::keyset(curr.clone());
 		for v in V {
 			if !FinMap::contains(indexes.clone(), v) {
-				strongconnect(v);
+				match strongconnect(v, lowlinks.clone(), indexes.clone(), 
+									stack.clone(), index, found_cycle,
+									DirectedGraph::successors(curr.clone(), v).unwrap()) {
+										(is, ls, s, i, fc) => {
+											indexes = is;
+											lowlinks = ls;
+											stack = s;
+											index = i;
+											found_cycle = fc;
+										}
+									}
 			}
 		}
 		
-		found_cycle*/
-		panic!("stubbed");
+		found_cycle
 	}
 }
 	
