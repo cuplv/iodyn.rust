@@ -366,7 +366,10 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 			if Some(v_index) == FinMap::get(data.indexes.clone(), v) {
 				if Some(v_index) == FinMap::get(data.lowlinks.clone(), v) {
 					//normally would generate SCC, but just set to true
-					data.found_cycle = true;
+					let stack_next = data.stack.pop();
+					if stack_next != Some(v) {
+						data.found_cycle = true;
+					}
 				} 
 			}
 		}
@@ -381,59 +384,10 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		
 		for n in FinMap::keyset(curr.clone()) {
 			strongconnect(n, curr.clone(), &mut data);
+			if data.found_cycle {break;}
 		}
 		
 		data.found_cycle
-		
-		
-		/*let mut indexes : SizedMap<usize> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
-		let mut lowlinks: SizedMap<usize> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
-		let mut index = 0;
-		let mut stack : VecDeque<usize> = VecDeque::new();
-		let mut found_cycle = false;
-		
-		//this is strongconnect() in Tarjan's algorithm
-		fn strongconnect(v:usize, mut indexes: SizedMap<usize>, mut lowlinks: SizedMap<usize>,
-						 mut stack: VecDeque<usize>, mut index: usize, 
-						 mut found_cycle: bool, succs: Option<Vec<usize>>) {
-			indexes = FinMap::put(indexes, v, index);
-			lowlinks = FinMap::put(lowlinks, v, index);
-			index = index + 1;
-			stack.push_back(v);
-			
-			if succs == None { return; }
-			
-			for w in succs.unwrap() {
-				if !FinMap::contains(indexes.clone(), w) {
-					strongconnect(w, indexes, lowlinks, stack, index, found_cycle, None);
-					lowlinks = FinMap::put(lowlinks.clone(), v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(), 
-																 FinMap::get(lowlinks.clone(), w).unwrap()));
-				}
-				else if stack.contains(&w) {
-					lowlinks = FinMap::put(lowlinks.clone(), v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(),
-																 FinMap::get(indexes.clone(), w).unwrap()));
-				}
-			}
-			
-			println!("made it through strongconnect work for {}", v);
-			
-			if FinMap::get(indexes.clone(), v).unwrap() == FinMap::get(lowlinks.clone(), v).unwrap() {
-				//normally we would return the specific cycle, but we're just detecting and returning bools
-				found_cycle = true;
-			}
-		};
-		
-		//assume V is the list of vertices
-		let V = FinMap::keyset(curr.clone());
-		for v in V {
-			if !FinMap::contains(indexes.clone(), v) {
-				strongconnect(v, lowlinks.clone(), indexes.clone(), 
-							  stack.clone(), index, found_cycle,
-							  DirectedGraph::successors(curr.clone(), v));
-			}
-		}
-		
-		found_cycle*/
 	}
 }
 	
@@ -582,27 +536,37 @@ mod tests {
   	
   	let ks = FinMap::keyset(dt);
   	
-  	println!("keyset vec: {:?}", ks.clone());
-  	
   	assert_eq!(ks, vec!(1, 2, 10, 11, 20, 21, 30, 39));
   }
   
   #[test]
   fn test_cycle() {
-  	/*let dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
+  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
   	
   	let dt = DirectedGraph::add_directed_edge(dt, 1, 2);
   	let dt = DirectedGraph::add_directed_edge(dt, 2, 3);
   	let dt = DirectedGraph::add_directed_edge(dt, 3, 1);
   	
-  	assert!(DirectedGraph::cycle(dt));*/
+  	assert!(DirectedGraph::cycle(dt));
   	
   	let dt2: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
   	
   	let dt2 = DirectedGraph::add_directed_edge(dt2, 1, 4);
   	let dt2 = DirectedGraph::add_directed_edge(dt2, 2, 3);
-  	let dt2 = DirectedGraph::add_directed_edge(dt2, 3, 1);
+  	let dt2 = DirectedGraph::add_directed_edge(dt2, 6, 5);
   	
   	assert_eq!(DirectedGraph::cycle(dt2), false);
+  }
+  
+  #[test]
+  fn stress_test_cycle() {
+  	let path: String = "fpsol2_graph.txt".to_owned();
+  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(path);
+  	
+  	assert!(!DirectedGraph::cycle(dt.clone()));
+  	
+  	let dt2 = DirectedGraph::add_directed_edge(dt, 214, 15);
+  	
+  	assert!(DirectedGraph::cycle(dt2));
   }
 }
