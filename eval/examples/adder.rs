@@ -14,6 +14,7 @@ extern crate adapton_lab;
 extern crate iodyn;
 extern crate eval;
 
+use std::fmt::{self,Debug};
 use std::io::BufWriter;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -37,7 +38,7 @@ use eval::test_seq::{TestMResult,EditComputeSequence};
 ///
 /// Unchecked, but should only contain [0123456789,+]
 /// This is mainly used to randomly generate a sequence
-#[derive(Debug,Clone,Copy,Hash,Eq,PartialEq)]
+#[derive(Clone,Copy,Hash,Eq,PartialEq)]
 struct Lang(pub char);
 impl Rand for Lang{
   fn rand<R: Rng>(rng: &mut R) -> Self {
@@ -46,6 +47,11 @@ impl Rand for Lang{
   		1...3 => ',',
   		_ => *rng.choose(&['0','1','2','3','4','5','6','7','8','9']).unwrap(),
   	})
+  }
+}
+impl Debug for Lang {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f,"{:?}",self.0)
   }
 }
 
@@ -327,6 +333,34 @@ fn main2() {
 	  	div_of_trace(&tr).write_html(&mut writer);
 	  }
 	}
+
+  // correctness check
+
+  let non_inc_comparison =
+    result_non_inc.result_data
+    .clone().into_iter()
+    .collect::<Vec<_>>()
+  ;
+  let inc_comparison = {
+    // archive stack iterates from cursor at tail
+    let mut backwards =
+      result_inc.result_data
+      .clone().into_iter()
+      .collect::<Vec<_>>()
+    ;
+    backwards.reverse();
+    backwards
+  };
+  match non_inc_comparison == inc_comparison {
+    true => println!("Final results from both versions match"),
+    false => {
+      println!("Final results differ:");
+      println!("incremental results({}): {:?}", inc_comparison.len(),inc_comparison);
+      println!("non incremental results({}): {:?}", non_inc_comparison.len(),non_inc_comparison);
+      println!("This is an error");
+      ::std::process::exit(1);
+    }
+  }
 
   // post-process results
 

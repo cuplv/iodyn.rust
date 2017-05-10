@@ -28,10 +28,10 @@ for EditComputeSequence<C,E,U> where
 	fn test(&mut self, rng: &mut StdRng) -> TestResult<I,O> {
 		let mut testdata: I;
 		let mut results: O;
-		let mut edits = Vec::with_capacity(self.changes);
-		let mut full_edits = Vec::with_capacity(self.changes);
-		let mut computes = Vec::with_capacity(self.changes);
-		let mut full_computes = Vec::with_capacity(self.changes);
+		let mut edits = Vec::with_capacity(self.changes+1);
+		let mut full_edits = Vec::with_capacity(self.changes+1);
+		let mut computes = Vec::with_capacity(self.changes+1);
+		let mut full_computes = Vec::with_capacity(self.changes+1);
 
 		// step 1: initialize sequence
 		let mut init_result = None;
@@ -87,11 +87,11 @@ pub struct TestMResult<I,O> {
 	pub full_edits: Vec<Duration>,
 	pub computes: Vec<Vec<Duration>>,
 	pub full_computes: Vec<Duration>,
+	pub result_data: O,
 	in_type: PhantomData<I>,
-	out_type: PhantomData<O>,
 }
-//use std::fmt::Debug;
-impl<C,E,U,I,O>
+use std::fmt::Debug;
+impl<C,E,U,I:Debug,O:Debug>
 Testor<TestMResult<I,O>>
 for EditComputeSequence<C,E,U> where
 	C: Creator<Duration,I>,
@@ -100,10 +100,11 @@ for EditComputeSequence<C,E,U> where
 {
 	fn test(&mut self, rng: &mut StdRng) -> TestMResult<I,O> {
 		let mut testdata: I;
-		let mut edits = Vec::with_capacity(self.changes);
-		let mut full_edits = Vec::with_capacity(self.changes);
-		let mut computes = Vec::with_capacity(self.changes);
-		let mut full_computes = Vec::with_capacity(self.changes);
+		let mut results: O;
+		let mut edits = Vec::with_capacity(self.changes+1);
+		let mut full_edits = Vec::with_capacity(self.changes+1);
+		let mut computes = Vec::with_capacity(self.changes+1);
+		let mut full_computes = Vec::with_capacity(self.changes+1);
 
 		// step 1: initialize sequence
 		let mut init_result = None;
@@ -119,8 +120,9 @@ for EditComputeSequence<C,E,U> where
 		let full_comp_time = Duration::span(||{
 			comp_result = Some(self.comp.compute(&testdata,rng));
 		});
-		let (comp_times,_result) = comp_result.unwrap();
-		//println!("first result: {:?}", _result);
+		let (comp_times,result) = comp_result.unwrap();
+		//println!("first result: {:?}", result);
+		results = result;
 		computes.push(comp_times);
 		full_computes.push(full_comp_time);
 
@@ -139,8 +141,9 @@ for EditComputeSequence<C,E,U> where
 			let full_comp_time = Duration::span(||{
 				comp_result = Some(self.comp.compute(&testdata,rng));
 			});
-			let (comp_times,_result) = comp_result.unwrap();
-			//println!("result({}): {:?}", _i, _result);
+			let (comp_times,result) = comp_result.unwrap();
+			//println!("result({}): {:?}", _i, result);
+			results = result;
 			computes.push(comp_times);
 			full_computes.push(full_comp_time);
 		}
@@ -150,8 +153,8 @@ for EditComputeSequence<C,E,U> where
 			full_edits: full_edits,
 			computes: computes,
 			full_computes: full_computes,
+			result_data: results,
 			in_type: PhantomData,
-			out_type: PhantomData,
 		}
 	}
 }

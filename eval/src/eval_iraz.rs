@@ -1,4 +1,4 @@
-//use std::fmt::{self,Debug};
+use std::fmt::{self,Debug};
 use std::cmp;
 use std::rc::Rc;
 use rand::{Rng,StdRng,Rand};
@@ -14,7 +14,7 @@ use interface::{Adapt};
 /// Test harness for the incremental Raz
 ///
 /// Coorinates elements, insertion location, gen'ed levels
-#[derive(Clone,Debug)]
+#[derive(Clone)]
 pub struct EvalIRaz<E:Adapt,G:Rng> {
 	// Option for cleaner code, None means uninitialized
 	raztree: Option<IRazTree<E>>,
@@ -24,14 +24,13 @@ pub struct EvalIRaz<E:Adapt,G:Rng> {
 	datagauge: usize,
 	namegauge: usize,
 }
-// impl<E:Adapt,G:Rng> Debug for EvalIRaz<E,G> {
-// 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-// 		let tree = self.raztree.clone();
-// 		let size = self.raztree.clone().unwrap().meta().0;
-// 		let content = tree.unwrap().into_iter().collect::<Vec<_>>();
-// 		write!(f,"EvalIRaz {{ size:{}, data:{:?} }}",size,content)
-// 	}
-// }
+impl<E:Adapt,G:Rng> Debug for EvalIRaz<E,G> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let tree = self.raztree.clone().unwrap();
+		let content = tree.into_iter().collect::<Vec<_>>();
+		write!(f,"{:?}",content)
+	}
+}
 
 impl<E:Adapt,G:Rng> EvalIRaz<E,G> {
 	pub fn new(us: usize, ns: usize, coord:G) -> Self {
