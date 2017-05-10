@@ -95,8 +95,8 @@ EditAppend for EvalVec<E,G> {
 impl<E:Rand,G:Rng>
 EditInsert for EvalVec<E,G> {
 	fn insert(mut self, batch_size: usize, _rng: &mut StdRng) -> (Duration,Self) {
-		let data_vec = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
 		let loc = self.coord.gen::<usize>() % self.vec.len();
+		let data_vec = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
 		let time = Duration::span(||{
 			for val in data_vec {
 				self.vec.insert(loc,val);

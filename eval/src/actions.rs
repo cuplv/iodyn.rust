@@ -165,6 +165,16 @@ for Native<D::Input,O,F> where
 		time
 	}
 }
+impl<O,F,D>
+Computor<(Duration,O),D>
+for Native<D::Input,O,F> where
+	D:CompNative<O>,
+	F:Fn(&D::Input)->O,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Duration,O) {
+		data.comp_native(self.0.clone(),rng)
+	}
+}
 
 pub struct Reverse;
 impl<D: CompRev>
@@ -266,6 +276,17 @@ for TreeFoldG<E,O,I,B> where
 		time
 	}
 }
+impl<E,O,I,B,D>
+Computor<(Duration,D::Target),D>
+for TreeFoldG<E,O,I,B> where
+	I:Fn(&Vec<E>)->O,
+	B:Fn(O,u32,Option<Name>,O)->O,
+	D:CompTreeFoldG<E,O,I,B>,
+{
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Duration,D::Target) {
+		data.comp_tfoldg(self.init.clone(),self.bin.clone(),rng)
+	}
+}
 
 pub struct Mapper<I,O,F:Fn(&I)->O>{
 	name: Name,
@@ -290,6 +311,14 @@ Computor<Duration,D> for Mapper<I,O,F> {
 		#[allow(unused)]
 		let saver = Vec::new().push(answer); // don't let rust compile this away
 		time
+	}
+}
+impl<I,O,F:Fn(&I)->O,D:CompMap<I,O,F>>
+Computor<(Duration,D::Target),D> for Mapper<I,O,F> {
+	fn compute(&mut self, data: &D, rng: &mut StdRng) -> (Duration,D::Target) {
+		ns(self.name.clone(),||{
+			data.comp_map(self.mapfn.clone(),rng)
+		})
 	}
 }
 

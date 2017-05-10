@@ -3,12 +3,13 @@ use time::{Duration};
 use rand::{StdRng};
 use actions::{Creator,Editor,Computor,Testor};
 
-pub struct TestResult<D> {
+pub struct TestResult<I,O> {
 	pub edits: Vec<Duration>,
 	pub full_edits: Vec<Duration>,
 	pub computes: Vec<Duration>,
 	pub full_computes: Vec<Duration>,
-	pd: PhantomData<D>,
+	pub result_data: O,
+	in_type: PhantomData<I>,
 }
 
 pub struct EditComputeSequence<C,E,U> {
@@ -17,15 +18,16 @@ pub struct EditComputeSequence<C,E,U> {
 	pub comp: U,
 	pub changes: usize,
 }
-impl<'a,C,E,U,D>
-Testor<TestResult<D>>
+impl<'a,C,E,U,I,O>
+Testor<TestResult<I,O>>
 for EditComputeSequence<C,E,U> where
-	C: Creator<Duration,D>,
-	E: Editor<Duration,D>,
-	U: Computor<Duration,D>,
+	C: Creator<Duration,I>,
+	E: Editor<Duration,I>,
+	U: Computor<(Duration,O),I>,
 {
-	fn test(&mut self, rng: &mut StdRng) -> TestResult<D> {
-		let mut testdata: D;
+	fn test(&mut self, rng: &mut StdRng) -> TestResult<I,O> {
+		let mut testdata: I;
+		let mut results: O;
 		let mut edits = Vec::with_capacity(self.changes);
 		let mut full_edits = Vec::with_capacity(self.changes);
 		let mut computes = Vec::with_capacity(self.changes);
@@ -44,7 +46,8 @@ for EditComputeSequence<C,E,U> where
 		let full_comp_time = Duration::span(||{
 			comp_result = Some(self.comp.compute(&testdata,rng));
 		});
-		let comp_time = comp_result.unwrap();
+		let (comp_time, result) = comp_result.unwrap();
+		results = result;
 		computes.push(comp_time);
 		full_computes.push(full_comp_time);
 
@@ -62,7 +65,8 @@ for EditComputeSequence<C,E,U> where
 			let full_comp_time = Duration::span(||{
 				comp_result = Some(self.comp.compute(&testdata,rng));
 			});
-			let comp_time = comp_result.unwrap();
+			let (comp_time, result) = comp_result.unwrap();
+			results = result;
 			computes.push(comp_time);
 			full_computes.push(full_comp_time);
 		}
@@ -72,7 +76,8 @@ for EditComputeSequence<C,E,U> where
 			full_edits: full_edits,
 			computes: computes,
 			full_computes: full_computes,
-			pd: PhantomData,
+			result_data: results,
+			in_type: PhantomData,
 		}
 	}
 }

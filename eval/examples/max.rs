@@ -85,7 +85,7 @@ fn main2() {
     },
     edit: BatchInsert(edits),
     comp: Native::new(
-      |v:&Vec<_>|{ *v.iter().max().unwrap() },
+      |v:&Vec<_>|{ v.iter().max().map(|&n|{n}) },
     ),
     changes: changes,
   };
@@ -96,12 +96,18 @@ fn main2() {
 
   let mut rng = StdRng::from_seed(&[editseed]);
 
-  let result_non_inc: TestResult<EvalVec<u32,StdRng>> = test_non_inc.test(&mut rng);
+  let result_non_inc: TestResult<
+    EvalVec<u32,StdRng>,
+    Option<u32>,
+  > = test_non_inc.test(&mut rng);
 
   // for visual debugging
   if do_trace {reflect::dcg_reflect_begin()}
 
-  let result_inc: TestResult<EvalIRaz<u32,StdRng>> = test_inc.test(&mut rng);
+  let result_inc: TestResult<
+    EvalIRaz<u32,StdRng>,
+    Option<u32>,
+  > = test_inc.test(&mut rng);
 
   if do_trace {
 	  let traces = reflect::dcg_reflect_end();
@@ -116,6 +122,19 @@ fn main2() {
 	  	div_of_trace(&tr).write_html(&mut writer);
 	  }
 	}
+
+  // correctness check
+
+  match result_inc.result_data == result_non_inc.result_data {
+    true => println!("Final results from both versions match"),
+    false => {
+      println!("Final results differ:");
+      println!("incremental result: {:?}", result_inc.result_data);
+      println!("non incremental result: {:?}", result_non_inc.result_data);
+      println!("This is an error");
+      ::std::process::exit(1);
+    }
+  }
 
   // post-process results
 
