@@ -144,9 +144,8 @@ impl<K, V> FinMap<K, V> for SizedHashMap<K, V> where V: Clone + Debug + Eq + Has
 	}
 	
 	fn keyset(curr: Self) -> Vec<K> {
-		//let ret: Vec<&K> = curr.map.iter().map(|(k, _)| k.clone()).collect();
-		//ret.iter().map(|x| *(x.clone())).collect()
-		panic!("unimplemented")
+		//curr.map.iter().map(|(K, V)| K.clone()).collect()
+		panic!("unimplemented");
 	}
 }
 
