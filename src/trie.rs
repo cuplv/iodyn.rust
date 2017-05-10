@@ -12,12 +12,12 @@ use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use adapton::engine::{cell,name_fork,force,Art,Name};
 
-fn my_hash<T>(obj: T) -> u64
+fn my_hash<T>(obj: T) -> HashVal
   where T: Hash
 {
   let mut hasher = DefaultHasher::new();
   obj.hash(&mut hasher);
-  hasher.finish()
+  HashVal(hasher.finish() as usize)
 }
 
 /// A hash value -- We define a custom Debug impl for this type.
@@ -26,20 +26,9 @@ pub struct HashVal(usize);
 
 impl fmt::Debug for HashVal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:b}", self.0)
+        write!(f, "{:b}", self.0 & 0b1111)
     }
 }
-
-// /// TODO-Someday: Do this more efficiently
-// fn make_mask(len:usize) -> usize {
-//     assert!(len > 0);
-//     let mut mask = 0;
-//     for _ in 0..len {
-//         mask <<= 1;
-//         mask |= 0x1;
-//     }
-//     return mask;
-// }
 
 #[derive(PartialEq,Eq,Clone,Hash)]
 struct Bits {bits:u32, len:u32}
@@ -70,7 +59,7 @@ enum TrieRec<K:'static+Hash+Eq+Clone+Debug,
 #[derive(PartialEq,Eq,Clone,Debug)]
 struct TrieLeaf<K:'static+Hash+Eq+Clone+Debug,
                 V:'static+Hash+Eq+Clone+Debug> {
-    map:HashMap<K,V>,
+    map:HashMap<K,(HashVal,V)>,
 }
 #[derive(Hash,PartialEq,Eq,Clone,Debug)]
 struct TrieBin<K:'static+Hash+Eq+Clone+Debug,
@@ -94,7 +83,7 @@ impl<K:'static+Hash+Eq+Clone+Debug,
      V:'static+Hash+Eq+Clone+Debug> Trie<K,V> {
 
     pub fn find (&self, k:&K) -> Option<V> {
-        Self::find_hash(self, HashVal(my_hash(k) as usize), k)
+        Self::find_hash(self, my_hash(k), k)
     }
 
     pub fn find_hash (t: &Trie<K,V>, h:HashVal, k:&K) -> Option<V> {
@@ -104,7 +93,10 @@ impl<K:'static+Hash+Eq+Clone+Debug,
     fn find_rec (t: &Trie<K,V>, r:&TrieRec<K,V>, h:HashVal, k:&K) -> Option<V> {
         match r {
             &TrieRec::Empty => None,
-            &TrieRec::Leaf(ref l) => match l.map.get(k) { Some(v) => Some(v.clone()), None => None },
+            &TrieRec::Leaf(ref l) => match l.map.get(k) { 
+                None => None,
+                Some(&(_,ref v)) => Some(v.clone()),
+            },
             &TrieRec::Bin(ref b) => {
                 if h.0 & 1 == 0 {
                     Self::find_rec(t, &get!(b.left), HashVal(h.0 >> 1), k)
@@ -115,20 +107,19 @@ impl<K:'static+Hash+Eq+Clone+Debug,
         }
     }
 
-    fn split_map (map: HashMap<K,V>, 
+    fn split_map (map: HashMap<K,(HashVal,V)>, 
                   bits_len:u32,
-                  mut map0:HashMap<K,V>, 
-                  mut map1:HashMap<K,V>)
-                  -> (HashMap<K,V>, HashMap<K,V>) 
+                  mut map0:HashMap<K,(HashVal,V)>, 
+                  mut map1:HashMap<K,(HashVal,V)>)
+                  -> (HashMap<K,(HashVal,V)>, HashMap<K,(HashVal,V)>) 
     {
         //let mask : u64 = make_mask(bits_len as usize) as u64;
-        for (k,v) in map.into_iter() {
-            let k_hash = my_hash(&k);
+        for (k,(k_hash,v)) in map.into_iter() {
             //assert_eq!((mask & k_hash) >> 1, bits.bits as u64); // XXX/???
-            if 0 == (k_hash & (1 << bits_len)) {
-                map0.insert(k, v);
+            if 0 == (k_hash.0 & (1 << bits_len)) {
+                map0.insert(k, (k_hash,v));
             } else {
-                map1.insert(k, v);
+                map1.insert(k, (k_hash,v));
             }
         };
         (map0, map1)
@@ -138,7 +129,7 @@ impl<K:'static+Hash+Eq+Clone+Debug,
         Trie{gauge:gauge, rec:TrieRec::Empty}
     }
 
-    pub fn from_hashmap(hm:HashMap<K,V>) -> Self { 
+    pub fn from_hashmap(hm:HashMap<K,(HashVal,V)>) -> Self { 
         Trie{gauge:hm.len(), 
              rec:TrieRec::Leaf(TrieLeaf{map:hm})}
     }
@@ -158,54 +149,59 @@ impl<K:'static+Hash+Eq+Clone+Debug,
     }
 
     fn join_rec (t:&Trie<K,V>, lt: TrieRec<K,V>, rt: TrieRec<K,V>, bits:Bits, n:Name) -> TrieRec<K,V> {
-        println!("{:?} {:?}", bits, n);
         match (lt, rt) {
             (TrieRec::Empty, rt) => rt,
             (lt, TrieRec::Empty) => lt,
             (TrieRec::Leaf(mut l), TrieRec::Leaf(r)) => {
-                if l.map.len() + r.map.len() < t.gauge {
+                if l.map.len() == 0 { 
+                    TrieRec::Leaf(r)
+                } else if r.map.len() == 0 {
+                    TrieRec::Leaf(l)
+                } else if l.map.len() + r.map.len() < t.gauge {
                     // Sub-Case: the leaves, when combined, are smaller than the gauge.
-                    for (k,v) in r.map.into_iter() { l.map.insert(k,v); }
+                    for (k,(k_hash,v)) in r.map.into_iter() { 
+                        l.map.insert(k,(k_hash,v));
+                    }
                     TrieRec::Leaf(l)
                 } else {
                     // Sub-Case: the leaves are large enough to justify not being combined.
                     let (e0, e1) = (HashMap::new(), HashMap::new());
-                    let (l0, l1) = Self::split_map(l.map, bits.len + 1, e0, e1);
-                    let (r0, r1) = Self::split_map(r.map, bits.len + 1, l0, l1);
+                    let (l0, l1) = Self::split_map(l.map, bits.len, e0, e1);
+                    let (r0, r1) = Self::split_map(r.map, bits.len, l0, l1);
                     let (n1, n2) = name_fork(n.clone());
-                    let r0 = cell(n1, TrieRec::Leaf(TrieLeaf{map:r0}));
-                    let r1 = cell(n2, TrieRec::Leaf(TrieLeaf{map:r1}));
-                    TrieRec::Bin(TrieBin{left:r0, right:r1, bits:bits, name:n})
+                    let t0 = cell(n1, TrieRec::Leaf(TrieLeaf{map:r0}));
+                    let t1 = cell(n2, TrieRec::Leaf(TrieLeaf{map:r1}));
+                    TrieRec::Bin(TrieBin{left:t0, right:t1, bits:bits, name:n})
                 }
             },
             (TrieRec::Leaf(l), TrieRec::Bin(r)) => {
                 let (e0, e1) = (HashMap::new(), HashMap::new());
-                let (l0, l1) = Self::split_map(l.map, bits.len + 1, e0, e1);
-                let (lb, rb) = Self::split_bits(&bits);
-                let (n1, n2) = name_fork(n.clone());
+                let (l0, l1) = Self::split_map(l.map, bits.len, e0, e1);
+                let (b0, b1) = Self::split_bits(&bits);
+                let (n0, n1) = name_fork(n.clone());
                 let (m0, m1) = name_fork(r.name.clone());
-                let ol = cell(n1, Self::join_rec(t, TrieRec::Leaf(TrieLeaf{map:l0}), get!(r.left),  lb, m0));
-                let or = cell(n2, Self::join_rec(t, TrieRec::Leaf(TrieLeaf{map:l1}), get!(r.right), rb, m1));
-                TrieRec::Bin(TrieBin{ left:ol, right:or, name:n, bits:bits })
+                let o0 = cell(n0, Self::join_rec(t, TrieRec::Leaf(TrieLeaf{map:l0}), get!(r.left),  b0, m0));
+                let o1 = cell(n1, Self::join_rec(t, TrieRec::Leaf(TrieLeaf{map:l1}), get!(r.right), b1, m1));
+                TrieRec::Bin(TrieBin{ left:o0, right:o1, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Leaf(r)) => {
                 let (e0, e1) = (HashMap::new(), HashMap::new());
-                let (r0, r1) = Self::split_map(r.map, bits.len + 1, e0, e1);
-                let (lb, rb) = Self::split_bits(&bits);
-                let (n1, n2) = name_fork(n.clone());
+                let (r0, r1) = Self::split_map(r.map, bits.len, e0, e1);
+                let (b0, b1) = Self::split_bits(&bits);
+                let (n0, n1) = name_fork(n.clone());
                 let (m0, m1) = name_fork(l.name.clone());
-                let ol = cell(n1, Self::join_rec(t, get!(l.left),  TrieRec::Leaf(TrieLeaf{map:r0}), lb, m0));
-                let or = cell(n2, Self::join_rec(t, get!(l.right), TrieRec::Leaf(TrieLeaf{map:r1}), rb, m1));
-                TrieRec::Bin(TrieBin{ left:ol, right:or, name:n, bits:bits })
+                let o0 = cell(n0, Self::join_rec(t, get!(l.left),  TrieRec::Leaf(TrieLeaf{map:r0}), b0, m0));
+                let o1 = cell(n1, Self::join_rec(t, get!(l.right), TrieRec::Leaf(TrieLeaf{map:r1}), b1, m1));
+                TrieRec::Bin(TrieBin{ left:o0, right:o1, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Bin(r)) => {
                 assert!(l.bits == bits);
                 assert!(l.bits == r.bits);
                 let (n1, n2) = name_fork(n.clone());
-                let (lb, rb) = Self::split_bits(&bits);
-                let ol = cell(n1, Self::join_rec(t, get!(l.left),  get!(r.left),  lb, l.name));
-                let or = cell(n2, Self::join_rec(t, get!(l.right), get!(r.right), rb, r.name));
-                TrieRec::Bin(TrieBin{ left:ol, right:or, name:n, bits:bits })
+                let (b0, b1) = Self::split_bits(&bits);
+                let o0 = cell(n1, Self::join_rec(t, get!(l.left),  get!(r.left),  b0, l.name));
+                let o1 = cell(n2, Self::join_rec(t, get!(l.right), get!(r.right), b1, r.name));
+                TrieRec::Bin(TrieBin{ left:o0, right:o1, name:n, bits:bits })
             }
         }
     }               
@@ -216,7 +212,10 @@ impl<K:'static+Hash+Eq+Clone+Debug,
 pub fn test_join () {
     fn at_leaf(v:&Vec<usize>) -> Trie<usize,()> {
         let mut hm = HashMap::new();
-        for x in v { hm.insert(*x,()); }
+        for x in v { 
+            let x_hash = my_hash(&x);
+            hm.insert(*x,(x_hash,()));
+        }
         Trie::from_hashmap(hm)
     }    
     fn at_bin(l:Trie<usize,()>,_lev:u32,n:Option<Name>,r:Trie<usize,()>) -> Trie<usize,()> {
@@ -232,24 +231,24 @@ pub fn test_join () {
     use std::rc::Rc;
 
     let mut rng = thread_rng();
-
     let mut elms : AStack<usize,_> = AStack::new();
     let mut elmv : Vec<usize> = vec![];
-    for i in 0..10 {
+    for i in 0..1000 {
         let elm = rng.gen::<usize>() % 100;
         elmv.push(elm);
         elms.push(elm);
-        if i % 2 == 0 {
+        if i % 1 == 0 {
             elms.archive(Some(name_of_usize(i)), gen_branch_level(&mut rng));
         }
     }
     let tree: RazTree<_,Count> = RazTree::memo_from(&AtHead(elms));
-    let trie = tree.fold_up_gauged(Rc::new(at_leaf),Rc::new(at_bin)).unwrap();
+    //println!("{:?}\n", tree);
 
-    println!("{:?}\n", trie);
+    let trie = tree.fold_up_gauged(Rc::new(at_leaf),Rc::new(at_bin)).unwrap();
+    //println!("{:?}\n", trie);
 
     for i in elmv {
-        println!("find {:?}", i);
+        //println!("find {:?}", i);
         assert_eq!(trie.find(&i), Some(()));
     }
 }
