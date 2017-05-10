@@ -163,7 +163,7 @@ pub trait Graph<NdId, Data> {
 	
 	fn del_edge(Self, NdId, NdId) -> Self;
 	
-	fn adjacents(Self, NdId) -> Option<Vec<NdId>>;
+	fn adjacents(Self, NdId) -> Vec<NdId>;
 	
 	fn get_data(Self, NdId) -> Option<Data>;
 	
@@ -218,10 +218,10 @@ impl<T, Data> Graph<usize, Data> for T
 		ret
 	}
 	
-	fn adjacents(curr: Self, id: usize) -> Option<Vec<usize>> {
+	fn adjacents(curr: Self, id: usize) -> Vec<usize> {
 		match FinMap::get(curr, id) {
-			Some((_, adjs)) => Some(adjs),
-			None => None
+			Some((_, adjs)) => adjs,
+			None => vec!()
 		}
 	}
 	
@@ -248,7 +248,7 @@ impl<T, Data> Graph<usize, Data> for T
 			//get c's level
 			let c = q.pop_front().unwrap();
 			let c_lev = Self::get_data(g.clone(), c).unwrap();
-			let adjs = Self::adjacents(curr.clone(), c).unwrap();
+			let adjs = Self::adjacents(curr.clone(), c);
 			//iterate over nodes adjacent to c
 			for n in adjs {
 				//if n is not yet visited
@@ -283,7 +283,7 @@ impl<T, Data> Graph<usize, Data> for T
 				//add c to the visited set
 				v = FinMap::put(v, c, true);
 				
-				let adjs = DirectedGraph::successors(curr.clone(), c).unwrap();
+				let adjs = DirectedGraph::successors(curr.clone(), c);
 				
 				for n in adjs {
 					s.push_back(n);
@@ -298,7 +298,7 @@ impl<T, Data> Graph<usize, Data> for T
 pub trait DirectedGraph<NdId, Data> : Graph<NdId, Data> {
 	fn add_directed_edge(Self, NdId, NdId) -> Self;
 	
-	fn successors(Self, NdId) -> Option<Vec<NdId>>;
+	fn successors(Self, NdId) -> Vec<NdId>;
 	
 	fn cycle(Self) -> bool;
 }
@@ -319,14 +319,74 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		FinMap::put(ret, src, (k, adjs))
 	}
 	
-	fn successors(curr: Self, id: usize) -> Option<Vec<usize>> {
+	fn successors(curr: Self, id: usize) -> Vec<usize> {
 		Graph::adjacents(curr, id)
 	}
 	
 	fn cycle(curr: Self) -> bool {
 		use std::cmp;
 		//Tarjan's algorithm
-		let mut indexes : SizedMap<usize> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
+		
+		struct GraphInfo {
+			index: usize,
+			indexes: SizedMap<usize>,
+			lowlinks: SizedMap<usize>,
+			stack: Vec<usize>,
+			found_cycle: bool,
+		}
+		
+		fn strongconnect<G, D>(v: usize, g: G, data: &mut GraphInfo) where G: DirectedGraph<usize, D> + Clone {
+			
+			if FinMap::contains(data.indexes.clone(), v) {
+				//already visited
+				return;
+			}
+			
+			let v_index = data.index;
+			data.indexes = FinMap::put(data.indexes.clone(), v, v_index);
+			data.lowlinks = FinMap::put(data.lowlinks.clone(), v, v_index);
+			data.stack.push(v);
+			data.index += 1;
+			
+			for w in DirectedGraph::successors(g.clone(), v) {
+				if FinMap::contains(data.indexes.clone(), w) {
+					if data.stack.contains(&w) {
+						data.lowlinks = FinMap::put(data.lowlinks.clone(), v,
+													cmp::min(FinMap::get(data.lowlinks.clone(), v).unwrap(),
+															 FinMap::get(data.indexes.clone(),  w).unwrap()));
+					}
+				} else {
+					strongconnect(w, g.clone(), data);
+					data.lowlinks = FinMap::put(data.lowlinks.clone(), v,
+												cmp::min(FinMap::get(data.lowlinks.clone(), v).unwrap(),
+														 FinMap::get(data.lowlinks.clone(), w).unwrap()));
+				}
+			}
+			
+			if Some(v_index) == FinMap::get(data.indexes.clone(), v) {
+				if Some(v_index) == FinMap::get(data.lowlinks.clone(), v) {
+					//normally would generate SCC, but just set to true
+					data.found_cycle = true;
+				} 
+			}
+		}
+		
+		let mut data = GraphInfo {
+			index : 0,
+			indexes : FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone())),
+			lowlinks : FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone())),
+			stack : Vec::new(),
+			found_cycle : false,
+		};
+		
+		for n in FinMap::keyset(curr.clone()) {
+			strongconnect(n, curr.clone(), &mut data);
+		}
+		
+		data.found_cycle
+		
+		
+		/*let mut indexes : SizedMap<usize> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		let mut lowlinks: SizedMap<usize> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		let mut index = 0;
 		let mut stack : VecDeque<usize> = VecDeque::new();
@@ -335,16 +395,17 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		//this is strongconnect() in Tarjan's algorithm
 		fn strongconnect(v:usize, mut indexes: SizedMap<usize>, mut lowlinks: SizedMap<usize>,
 						 mut stack: VecDeque<usize>, mut index: usize, 
-						 mut found_cycle: bool, succs: Vec<usize>) 
-						-> (SizedMap<usize>, SizedMap<usize>, VecDeque<usize>, usize, bool) {
+						 mut found_cycle: bool, succs: Option<Vec<usize>>) {
 			indexes = FinMap::put(indexes, v, index);
 			lowlinks = FinMap::put(lowlinks, v, index);
 			index = index + 1;
 			stack.push_back(v);
 			
-			for w in succs {
+			if succs == None { return; }
+			
+			for w in succs.unwrap() {
 				if !FinMap::contains(indexes.clone(), w) {
-					//strongconnect(w);
+					strongconnect(w, indexes, lowlinks, stack, index, found_cycle, None);
 					lowlinks = FinMap::put(lowlinks.clone(), v, cmp::min(FinMap::get(lowlinks.clone(), v).unwrap(), 
 																 FinMap::get(lowlinks.clone(), w).unwrap()));
 				}
@@ -354,33 +415,25 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 				}
 			}
 			
+			println!("made it through strongconnect work for {}", v);
+			
 			if FinMap::get(indexes.clone(), v).unwrap() == FinMap::get(lowlinks.clone(), v).unwrap() {
 				//normally we would return the specific cycle, but we're just detecting and returning bools
 				found_cycle = true;
 			}
-			
-			(indexes, lowlinks, stack, index, found_cycle)
 		};
 		
 		//assume V is the list of vertices
 		let V = FinMap::keyset(curr.clone());
 		for v in V {
 			if !FinMap::contains(indexes.clone(), v) {
-				match strongconnect(v, lowlinks.clone(), indexes.clone(), 
-									stack.clone(), index, found_cycle,
-									DirectedGraph::successors(curr.clone(), v).unwrap()) {
-										(is, ls, s, i, fc) => {
-											indexes = is;
-											lowlinks = ls;
-											stack = s;
-											index = i;
-											found_cycle = fc;
-										}
-									}
+				strongconnect(v, lowlinks.clone(), indexes.clone(), 
+							  stack.clone(), index, found_cycle,
+							  DirectedGraph::successors(curr.clone(), v));
 			}
 		}
 		
-		found_cycle
+		found_cycle*/
 	}
 }
 	
@@ -442,9 +495,9 @@ mod tests {
   	dt = Graph::add_edge(dt, 1, 2);
   	dt = Graph::add_edge(dt, 2, 3);
   	dt = Graph::add_edge(dt, 3, 1);
-  	assert_eq!(Some(vec!(2, 3)), Graph::adjacents(dt.clone(), 1));
+  	assert_eq!(vec!(2, 3), Graph::adjacents(dt.clone(), 1));
   	dt = Graph::del_edge(dt, 1, 2);
-  	assert_eq!(Some(vec!(3)), Graph::adjacents(dt.clone(), 1))
+  	assert_eq!(vec!(3), Graph::adjacents(dt.clone(), 1))
   }
   
   #[test]
@@ -461,10 +514,12 @@ mod tests {
   	
   	let bfs_tree = Graph::bfs(dt, 1);
   	
-  	assert_eq!(Some(vec!(2, 3)), DirectedGraph::successors(bfs_tree.clone(), 1));
-  	assert_eq!(Some(vec!(4)), DirectedGraph::successors(bfs_tree.clone(), 2));
-  	assert_eq!(Some(vec!()), DirectedGraph::successors(bfs_tree.clone(), 3));
-  	assert_eq!(Some(vec!()), DirectedGraph::successors(bfs_tree.clone(), 4));
+  	let empty_vec: Vec<usize> = vec!();
+  	
+  	assert_eq!(vec!(2, 3), DirectedGraph::successors(bfs_tree.clone(), 1));
+  	assert_eq!(vec!(4), DirectedGraph::successors(bfs_tree.clone(), 2));
+  	assert_eq!(empty_vec, DirectedGraph::successors(bfs_tree.clone(), 3));
+  	assert_eq!(empty_vec, DirectedGraph::successors(bfs_tree.clone(), 4));
   	assert_eq!(Some(0), Graph::get_data(bfs_tree.clone(), 1));
   	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 2));
   	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 3));
@@ -530,5 +585,24 @@ mod tests {
   	println!("keyset vec: {:?}", ks.clone());
   	
   	assert_eq!(ks, vec!(1, 2, 10, 11, 20, 21, 30, 39));
+  }
+  
+  #[test]
+  fn test_cycle() {
+  	/*let dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
+  	
+  	let dt = DirectedGraph::add_directed_edge(dt, 1, 2);
+  	let dt = DirectedGraph::add_directed_edge(dt, 2, 3);
+  	let dt = DirectedGraph::add_directed_edge(dt, 3, 1);
+  	
+  	assert!(DirectedGraph::cycle(dt));*/
+  	
+  	let dt2: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
+  	
+  	let dt2 = DirectedGraph::add_directed_edge(dt2, 1, 4);
+  	let dt2 = DirectedGraph::add_directed_edge(dt2, 2, 3);
+  	let dt2 = DirectedGraph::add_directed_edge(dt2, 3, 1);
+  	
+  	assert_eq!(DirectedGraph::cycle(dt2), false);
   }
 }
