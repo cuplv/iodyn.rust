@@ -1,4 +1,5 @@
 use inc_gauged_raz::*;
+use inc_gauged_trie::*;
 use std::hash::Hash;
 use std::fmt::Debug;
 use adapton::engine::name_of_usize;

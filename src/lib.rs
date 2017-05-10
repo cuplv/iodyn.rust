@@ -21,6 +21,7 @@ pub mod inc_level_tree;
 pub mod inc_tree_cursor;
 pub mod inc_gauged_raz;
 pub mod finite_map;
+pub mod inc_gauged_trie;
 
 /// Persistent Raz - original design, simple but works
 pub type PRaz<E> = persist_raz::Raz<E>;
