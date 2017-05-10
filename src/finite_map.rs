@@ -1,5 +1,5 @@
 use inc_gauged_raz::*;
-use inc_gauged_trie::*;
+use inc_gauged_trie;
 use std::hash::Hash;
 use std::fmt::Debug;
 use adapton::engine::name_of_usize;
@@ -22,7 +22,51 @@ struct SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash + 'static {
 	size: usize,
 	gran: usize,
 	map: HashMap<K, V>
-} 
+}
+
+#[derive(Debug, Clone)]
+struct SizedTrie<K, V> where V: Clone + Debug + Eq + Hash + 'static {
+	size: usize,
+	gran: usize,
+	map: inc_gauged_trie::Trie<K, V>
+}
+
+impl<K, V> FinMap<K, V> for SizedTrie<K, V> 
+	where V: Clone + Debug + Eq + Hash + 'static, K: Eq + Hash + Clone + Debug + 'static {
+	fn new(size: usize, gran: usize) -> Self {
+		SizedTrie{ size: size, gran: gran, map: inc_gauged_trie::FinMap::emp() }
+	}
+	
+	fn size(curr: Self) -> usize {
+		curr.size
+	}
+	
+	fn gran(curr: Self) -> usize {
+		curr.gran
+	}
+	
+	fn put(mut curr: Self, k: K, v: V) -> Self {
+		inc_gauged_trie::FinMap::put(&mut curr.map, k, v);
+		curr
+	}
+	
+	fn get(mut curr: Self, k: K) -> Option<V> {
+		inc_gauged_trie::FinMap::get(&mut curr.map, k)
+	}
+	
+	fn contains(curr: Self, k: K) -> bool {
+		inc_gauged_trie::FinMap::get(&curr.map, k).is_some()
+	}
+	
+	fn del(mut curr: Self, k: K) -> (Option<V>, Self) {
+		let prev = inc_gauged_trie::FinMap::rem(&mut curr.map, k);
+		(prev, curr)
+	}
+	
+	fn keyset(curr: Self) -> Vec<K> {
+		panic!("unimplemented");
+	}
+}
 
 pub trait FinMap<K, V> {
 	//first usize: total size, second: granularity
@@ -457,6 +501,32 @@ mod tests {
   #[test]
   fn test_bfs() {
   	let mut dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100, 10);
+  	dt = Graph::add_node(dt, 1, Some(1));
+  	dt = Graph::add_node(dt, 2, Some(2));
+  	dt = Graph::add_node(dt, 3, Some(3));
+  	dt = Graph::add_node(dt, 4, Some(4));
+  	dt = Graph::add_edge(dt, 1, 2);
+  	dt = Graph::add_edge(dt, 1, 3);
+  	dt = Graph::add_edge(dt, 2, 4);
+  	dt = Graph::add_edge(dt, 3, 4); //this is the basic diamond graph
+  	
+  	let bfs_tree = Graph::bfs(dt, 1);
+  	
+  	let empty_vec: Vec<usize> = vec!();
+  	
+  	assert_eq!(vec!(2, 3), DirectedGraph::successors(bfs_tree.clone(), 1));
+  	assert_eq!(vec!(4), DirectedGraph::successors(bfs_tree.clone(), 2));
+  	assert_eq!(empty_vec, DirectedGraph::successors(bfs_tree.clone(), 3));
+  	assert_eq!(empty_vec, DirectedGraph::successors(bfs_tree.clone(), 4));
+  	assert_eq!(Some(0), Graph::get_data(bfs_tree.clone(), 1));
+  	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 2));
+  	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 3));
+  	assert_eq!(Some(2), Graph::get_data(bfs_tree.clone(), 4));
+  }
+  
+  #[test]
+  fn test_bfs_trie() {
+  	let mut dt: SizedTrie<usize, (Option<usize>, Vec<usize>)> = Graph::new(100, 10);
   	dt = Graph::add_node(dt, 1, Some(1));
   	dt = Graph::add_node(dt, 2, Some(2));
   	dt = Graph::add_node(dt, 3, Some(3));
