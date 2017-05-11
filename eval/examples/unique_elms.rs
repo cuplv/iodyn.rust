@@ -114,7 +114,7 @@ fn main2() {
     },
     edit: BatchInsert(edits),
     comp: TreeFoldG::new(
-      |v:&Vec<usize>|{ () },
+      |v:&Vec<GenSetElm>|{ () },
       move|t1,lev,nm,t2|{ () },
     ),
     changes: changes,
@@ -170,7 +170,7 @@ fn main2() {
   // for visual debugging
   if do_trace {reflect::dcg_reflect_begin()}
 
-  let result_trie: TestResult<EvalIRaz<GenSetElm,StdRng>> = panic!(""); //test_trie.test(&mut rng);
+  let result_trie: TestResult<EvalIRaz<GenSetElm,StdRng>> = test_trie.test(&mut rng);
 
   if do_trace {
     let traces = reflect::dcg_reflect_end();
