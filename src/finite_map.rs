@@ -18,7 +18,8 @@ struct SizedMap<V> where V: Clone + Debug + Eq + Hash + 'static {
 	map: RazTree<Option<V>>
 }
 
-struct SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash + 'static {
+#[derive(Debug,Clone)]
+struct SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash + 'static, K:Hash + Eq {
 	size: usize,
 	gran: usize,
 	map: HashMap<K, V>
@@ -436,12 +437,12 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 }
 	
 
-fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option<usize>, Vec<usize>)>>(path: String) -> T {
+fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option<usize>, Vec<usize>)>>(path: String, size: usize, gran: usize) -> T {
 	let f = File::open(path).unwrap();
 	let reader = BufReader::new(f);
 	let lines: Vec<_> = reader.lines().collect();
 	
-	let mut g: T = Graph::new(10000, 100);
+	let mut g: T = Graph::new(size, gran);
 	
 	for l in lines {
 		let line = match l {
@@ -460,7 +461,7 @@ fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option
 				Err(_) => break
 			};
 			
-			g = DirectedGraph::add_directed_edge(g.clone(), v1, v2);
+			g = DirectedGraph::add_directed_edge(g, v1, v2);
 		}
 	}
 	g
@@ -551,11 +552,165 @@ mod tests {
   }
   
   #[test]
+  fn test_eval_results() {
+  	use std::time::Instant;
+  	
+  	//91e
+  	let g1: String = "91e_graph.txt".to_owned();
+  	let g11: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(g1.clone(), 100, 7);
+  	let g12: SizedTrie<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g1.clone(), 100, 7);
+  	let g13: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g1.clone(), 100, 7);
+  	
+  	let start = Instant::now();
+  	let _ = Graph::bfs(g11, 1);
+  	println!("RAZ on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _  = Graph::bfs(g12, 1);
+  	println!("Trie on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _ = Graph::bfs(g13, 1);
+  	println!("Rust HashMap on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	//986e
+  	let g2: String = "986e_graph.txt".to_owned();
+  	let g21: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(g2.clone(), 1000, 10);
+  	let g22: SizedTrie<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g2.clone(), 1000, 10);
+  	let g23: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g2.clone(), 1000, 10);
+  	
+  	let start = Instant::now();
+  	let _ = Graph::bfs(g21, 1);
+  	println!("RAZ on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _  = Graph::bfs(g22, 1);
+  	println!("Trie on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _ = Graph::bfs(g23, 1);
+  	println!("Rust HashMap on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	//8961e
+  	let g3: String = "8961e_graph.txt".to_owned();
+  	let g31: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(g3.clone(), 10000, 13);
+  	let g32: SizedTrie<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g3.clone(), 10000, 13);
+  	let g33: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g3.clone(), 10000, 13);
+  	
+  	let start = Instant::now();
+  	let _ = Graph::bfs(g31, 1);
+  	println!("RAZ on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _  = Graph::bfs(g32, 1);
+  	println!("Trie on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _ = Graph::bfs(g33, 1);
+  	println!("Rust HashMap on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	//18707e
+  	let g4: String = "18707e_graph.txt".to_owned();
+  	let g41: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(g4.clone(), 20000, 15);
+  	let g42: SizedTrie<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g4.clone(), 20000, 15);
+  	let g43: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g4.clone(), 20000, 15);
+  	
+  	let start = Instant::now();
+  	let _ = Graph::bfs(g41, 1);
+  	println!("RAZ on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _  = Graph::bfs(g42, 1);
+  	println!("Trie on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _ = Graph::bfs(g43, 1);
+  	println!("Rust HashMap on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
+  }
+  
+  #[test]
+  fn test_eval_results_dfs() {
+  	use std::time::Instant;
+  	
+  	//91e
+  	let g1: String = "91e_graph.txt".to_owned();
+  	let g11: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(g1.clone(), 100, 7);
+  	let g12: SizedTrie<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g1.clone(), 100, 7);
+  	let g13: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g1.clone(), 100, 7);
+  	
+  	let start = Instant::now();
+  	let _ = Graph::dfs(g11, 1);
+  	println!("RAZ on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _  = Graph::dfs(g12, 1);
+  	println!("Trie on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _ = Graph::dfs(g13, 1);
+  	println!("Rust HashMap on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	//986e
+  	let g2: String = "986e_graph.txt".to_owned();
+  	let g21: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(g2.clone(), 1000, 10);
+  	let g22: SizedTrie<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g2.clone(), 1000, 10);
+  	let g23: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g2.clone(), 1000, 10);
+  	
+  	let start = Instant::now();
+  	let _ = Graph::dfs(g21, 1);
+  	println!("RAZ on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _  = Graph::dfs(g22, 1);
+  	println!("Trie on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _ = Graph::dfs(g23, 1);
+  	println!("Rust HashMap on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	//8961e
+  	let g3: String = "8961e_graph.txt".to_owned();
+  	let g31: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(g3.clone(), 10000, 13);
+  	let g32: SizedTrie<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g3.clone(), 10000, 13);
+  	let g33: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g3.clone(), 10000, 13);
+  	
+  	let start = Instant::now();
+  	let _ = Graph::dfs(g31, 1);
+  	println!("RAZ on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _  = Graph::dfs(g32, 1);
+  	println!("Trie on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _ = Graph::dfs(g33, 1);
+  	println!("Rust HashMap on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	//18707e
+  	let g4: String = "18707e_graph.txt".to_owned();
+  	let g41: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(g4.clone(), 20000, 15);
+  	let g42: SizedTrie<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g4.clone(), 20000, 15);
+  	let g43: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g4.clone(), 20000, 15);
+  	
+  	let start = Instant::now();
+  	let _ = Graph::dfs(g41, 1);
+  	println!("RAZ on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _  = Graph::dfs(g42, 1);
+  	println!("Trie on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
+  	
+  	let start = Instant::now();
+  	let _ = Graph::dfs(g43, 1);
+  	println!("Rust HashMap on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
+  }
+  
+  #[test]
   fn test_simple_parser() {
   	use std::time::Instant;
   	
   	let path: String = "fpsol2_graph.txt".to_owned();
-  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(path);
+  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(path, 10000, 100);
   	
   	let start = Instant::now();
   	
@@ -631,7 +786,7 @@ mod tests {
   #[test]
   fn stress_test_cycle() {
   	let path: String = "fpsol2_graph.txt".to_owned();
-  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(path);
+  	let dt: SizedMap<(Option<usize>, Vec<usize>)> = dgraph_from_col(path, 10000, 100);
   	
   	assert!(!DirectedGraph::cycle(dt.clone()));
   	
