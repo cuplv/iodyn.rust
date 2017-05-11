@@ -114,8 +114,11 @@ fn main2() {
     },
     edit: BatchInsert(edits),
     comp: TreeFoldG::new(
-      |v:&Vec<GenSetElm>|{ () },
-      move|t1,lev,nm,t2|{ () },
+      |v:&Vec<GenSetElm>|{ Trie::<_,()>::from_key_vec(v) },
+      move|t1,_lev,nm,t2|{ 
+          let nm2 = nm.clone();
+          ns(nm.unwrap().clone(),||Trie::join(t1, t2, nm2.unwrap())) 
+      },
     ),
     changes: changes,
   };
@@ -217,7 +220,7 @@ fn main2() {
   println!("----------------------------------------------------------------------------------");
   println!("Computation time (ms): (initial run, first incremental run); Note:do_trace={:?}", do_trace);
   println!("hashmap:  ({:8.3}, {:8.3})", comp_hash[0] as f32 / 1000000.0, comp_hash[1] as f32 / 1000000.0);
-  println!("trie:     ({:8.3}, {:8.3})", comp_trie[0] as f32 / 1000000.0, comp_skiplist[1] as f32 / 1000000.0);
+  println!("trie:     ({:8.3}, {:8.3})", comp_trie[0] as f32 / 1000000.0, comp_trie[1] as f32 / 1000000.0);
   println!("skiplist: ({:8.3}, {:8.3})", comp_skiplist[0] as f32 / 1000000.0, comp_skiplist[1] as f32 / 1000000.0);
   println!("vec_list: ({:8.3}, {:8.3})", comp_ivl[0]  as f32 / 1000000.0, comp_ivl[1]  as f32 / 1000000.0);
 

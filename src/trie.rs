@@ -129,6 +129,26 @@ impl<K:'static+Hash+Eq+Clone+Debug,
         Trie{gauge:gauge, rec:TrieRec::Empty}
     }
 
+    pub fn from_vec(vec:&Vec<(K,V)>) -> Self { 
+        let mut hm = HashMap::new();
+        for &(ref k, ref v) in vec.iter() {
+            let k_hash = my_hash(k);
+            hm.insert(k.clone(),(k_hash,v.clone()));
+        };
+        Trie{gauge:hm.len(), 
+             rec:TrieRec::Leaf(TrieLeaf{map:hm})}
+    }
+
+    pub fn from_key_vec(vec:&Vec<K>) -> Trie<K,()> { 
+        let mut hm = HashMap::new();
+        for k in vec.iter() {
+            let k_hash = my_hash(k);
+            hm.insert(k.clone(),(k_hash,()));
+        };
+        Trie{gauge:hm.len(), 
+             rec:TrieRec::Leaf(TrieLeaf{map:hm})}
+    }
+
     pub fn from_hashmap(hm:HashMap<K,(HashVal,V)>) -> Self { 
         Trie{gauge:hm.len(), 
              rec:TrieRec::Leaf(TrieLeaf{map:hm})}
