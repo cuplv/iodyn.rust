@@ -29,7 +29,8 @@ use adapton_lab::labviz::*;
 
 //use iodyn::inc_gauged_trie::{FinMap,Trie};
 use iodyn::skiplist::{FinMap,Skiplist};
-use eval::test_seq::{TestMResult,EditComputeSequence};
+use iodyn::trie::{Trie};
+use eval::test_seq::{TestResult,TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
 use adapton::engine::*;
 use adapton::reflect::trace::*;
@@ -85,6 +86,40 @@ fn main2() {
   let do_trace_html = args.is_present("trace-html");
   let coord = StdRng::from_seed(&[dataseed]);
 
+  let mut test_hashmap = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+      datagauge: datagauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: MFolder::<_,_,(),_,_,_,_,_>::new(
+      name_of_string(String::from("fillhashmap")),
+      HashMap::new(),
+      |mut m,&GenSetElm(e)|{m.insert(e,());m},
+      |m,_|{m},
+      |a|{a},
+    ),
+    changes: changes,
+  };
+
+
+  let mut test_trie = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+      datagauge: datagauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: TreeFoldG::new(
+      |v:&Vec<usize>|{ () },
+      move|t1,lev,nm,t2|{ () },
+    ),
+    changes: changes,
+  };
+
   //fold over raz, use skiplist as set to gather elements
   let mut testskiplist = EditComputeSequence{
     init: IncrementalInit {
@@ -105,23 +140,6 @@ fn main2() {
     changes: changes,
   };
 
-  let mut test_hashmap = EditComputeSequence{
-    init: IncrementalInit {
-      size: start_size,
-      datagauge: datagauge,
-      namegauge: namegauge,
-      coord: coord.clone(),
-    },
-    edit: BatchInsert(edits),
-    comp: MFolder::<_,_,(),_,_,_,_,_>::new(
-      name_of_string(String::from("fillhashmap")),
-      HashMap::new(),
-      |mut m,&GenSetElm(e)|{m.insert(e,());m},
-      |m,_|{m},
-      |a|{a},
-    ),
-    changes: changes,
-  };
   // fold over raz, use vec to store all elements
   let mut test_vl = EditComputeSequence{
     init: IncrementalInit {
@@ -144,13 +162,15 @@ fn main2() {
   let _ = init_dcg(); assert!(engine_is_dcg());
   let mut rng = StdRng::from_seed(&[editseed]);
 
-  // for visual debugging
-  if do_trace {reflect::dcg_reflect_begin()}
-
   let result_skiplist: TestMResult<
     EvalIRaz<GenSetElm,StdRng>,
     Skiplist<Elm,()>,
   > = testskiplist.test(&mut rng);
+
+  // for visual debugging
+  if do_trace {reflect::dcg_reflect_begin()}
+
+  let result_trie: TestResult<EvalIRaz<GenSetElm,StdRng>> = panic!(""); //test_trie.test(&mut rng);
 
   if do_trace {
     let traces = reflect::dcg_reflect_end();
@@ -185,15 +205,19 @@ fn main2() {
   // post-process results
   let comp_hash = result_hash.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_skiplist = result_skiplist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let comp_trie = result_trie.computes.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_ivl = inc_veclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
+
   let edit_hash = result_hash.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_skiplist = result_skiplist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  let edit_trie = result_trie.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_ivl = inc_veclist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
 
   println!("----------------------------------------------------------------------------------");
   println!("Computation time (ms): (initial run, first incremental run); Note:do_trace={:?}", do_trace);
   println!("hashmap:  ({:8.3}, {:8.3})", comp_hash[0] as f32 / 1000000.0, comp_hash[1] as f32 / 1000000.0);
+  println!("trie:     ({:8.3}, {:8.3})", comp_trie[0] as f32 / 1000000.0, comp_skiplist[1] as f32 / 1000000.0);
   println!("skiplist: ({:8.3}, {:8.3})", comp_skiplist[0] as f32 / 1000000.0, comp_skiplist[1] as f32 / 1000000.0);
   println!("vec_list: ({:8.3}, {:8.3})", comp_ivl[0]  as f32 / 1000000.0, comp_ivl[1]  as f32 / 1000000.0);
 
@@ -237,6 +261,14 @@ fn main2() {
   writeln!(dat,"").unwrap();
   e = 0.0; c = 0.0;
   for i in 0..changes {
+    e += edit_trie[i] as f64 / 1_000_000.0;
+    c += comp_trie[i] as f64 / 1_000_000.0;
+    writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
+  }
+  writeln!(dat,"").unwrap();
+  writeln!(dat,"").unwrap();
+  e = 0.0; c = 0.0;
+  for i in 0..changes {
     e += edit_ivl[i] as f64 / 1_000_000.0;
     c += comp_ivl[i] as f64 / 1_000_000.0;
     writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
@@ -270,9 +302,15 @@ fn main2() {
   writeln!(plotscript,"'{}' i 0 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Non-Inc HashMap edit").unwrap();
   writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap compute").unwrap();
   writeln!(plotscript,"'{}' i 0 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap total").unwrap();
+
   writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Skiplist edit").unwrap();
   writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist compute").unwrap();
   writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist total").unwrap();
+
+  writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Trie edit").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie compute").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie total").unwrap();
+
   writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc List edit").unwrap();
   writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List compute").unwrap();
   writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List total").unwrap();

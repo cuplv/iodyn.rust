@@ -41,7 +41,7 @@ pub mod finite_map;
 // Two forms of tries. They work, but performance needs improvement
 #[doc(hidden)]
 pub mod skiplist;
-#[doc(hidden)]
+//#[doc(hidden)]
 pub mod trie;
 
 /// Gauged Incremental Raz with element counts
