@@ -238,6 +238,20 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
 }
 
 
+// #[test]
+// fn test_clone() {
+//     use std::collections::hash_map::HashMap;
+//     let mut hm : HashMap<usize, usize> = HashMap::new();
+//     hm.insert(1, 2);
+//     hm.insert(3, 4);
+//     let mut v : Vec<usize> = vec![];
+//     for (k,v) in hm.iter() {
+//         let k : &usize = k;
+//         let k2 : usize = k.clone();
+//         v.push(3 as usize)
+//     }    
+// }
+
 #[test]
 pub fn test_join () {
     fn at_leaf(v:&Vec<usize>) -> Trie<usize,()> {
