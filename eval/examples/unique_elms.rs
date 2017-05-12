@@ -127,7 +127,8 @@ fn main2() {
   let mut testskiplist = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
-      datagauge: datagauge,
+      //datagauge: datagauge,
+      datagauge: 1,
       namegauge: namegauge,
       coord: coord.clone(),
     },
@@ -220,8 +221,8 @@ fn main2() {
   println!("----------------------------------------------------------------------------------");
   println!("Computation time (ms): (initial run, first incremental run); Note:do_trace={:?}", do_trace);
   println!("hashmap:  ({:8.3}, {:8.3})", comp_hash[0] as f32 / 1000000.0, comp_hash[1] as f32 / 1000000.0);
-  println!("trie:     ({:8.3}, {:8.3})", comp_trie[0] as f32 / 1000000.0, comp_trie[1] as f32 / 1000000.0);
   println!("skiplist: ({:8.3}, {:8.3})", comp_skiplist[0] as f32 / 1000000.0, comp_skiplist[1] as f32 / 1000000.0);
+  println!("trie:     ({:8.3}, {:8.3})", comp_trie[0] as f32 / 1000000.0, comp_trie[1] as f32 / 1000000.0);
   println!("vec_list: ({:8.3}, {:8.3})", comp_ivl[0]  as f32 / 1000000.0, comp_ivl[1]  as f32 / 1000000.0);
 
   ///////
@@ -302,21 +303,22 @@ fn main2() {
   writeln!(plotscript,"set mxtics 5           # set the spacing for the mxtics").unwrap();
   writeln!(plotscript,"set grid               # enable the grid").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Non-Inc HashMap edit").unwrap();
+  
+  //writeln!(plotscript,"'{}' i 0 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Non-Inc HashMap edit").unwrap();
   writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap compute").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap total").unwrap();
+  //writeln!(plotscript,"'{}' i 0 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-Inc HashMap total").unwrap();
 
-  writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Skiplist edit").unwrap();
+  //writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Skiplist edit").unwrap();
   writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist compute").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist total").unwrap();
+  //writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist total").unwrap();
 
-  writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Trie edit").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie compute").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie total").unwrap();
+  //writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Trie edit").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie compute").unwrap();
+  //writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie total").unwrap();
 
-  writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc List edit").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List compute").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List total").unwrap();
+  //writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc List edit").unwrap();
+  writeln!(plotscript,"'{}' i 3 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List compute").unwrap();
+  //writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List total").unwrap();
 
   ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
 

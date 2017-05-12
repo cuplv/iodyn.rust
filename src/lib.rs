@@ -43,6 +43,7 @@ pub mod finite_map;
 pub mod skiplist;
 //#[doc(hidden)]
 pub mod trie;
+pub mod trie2;
 
 /// Gauged Incremental Raz with element counts
 pub type IRaz<E> = raz::Raz<E,raz_meta::Count>;
