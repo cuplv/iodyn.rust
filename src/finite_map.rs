@@ -32,43 +32,6 @@ struct SizedTrie<K, V> where V: Clone + Debug + Eq + Hash + 'static {
 	map: inc_gauged_trie::Trie<K, V>
 }
 
-impl<K, V> FinMap<K, V> for SizedTrie<K, V> 
-	where V: Clone + Debug + Eq + Hash + 'static, K: Eq + Hash + Clone + Debug + 'static {
-	fn new(size: usize, gran: usize) -> Self {
-		SizedTrie{ size: size, gran: gran, map: inc_gauged_trie::FinMap::emp() }
-	}
-	
-	fn size(curr: Self) -> usize {
-		curr.size
-	}
-	
-	fn gran(curr: Self) -> usize {
-		curr.gran
-	}
-	
-	fn put(mut curr: Self, k: K, v: V) -> Self {
-		inc_gauged_trie::FinMap::put(&mut curr.map, k, v);
-		curr
-	}
-	
-	fn get(mut curr: Self, k: K) -> Option<V> {
-		inc_gauged_trie::FinMap::get(&mut curr.map, k)
-	}
-	
-	fn contains(curr: Self, k: K) -> bool {
-		inc_gauged_trie::FinMap::get(&curr.map, k).is_some()
-	}
-	
-	fn del(mut curr: Self, k: K) -> (Option<V>, Self) {
-		let prev = inc_gauged_trie::FinMap::rem(&mut curr.map, k);
-		(prev, curr)
-	}
-	
-	fn keyset(curr: Self) -> Vec<K> {
-		panic!("unimplemented");
-	}
-}
-
 pub trait FinMap<K, V> {
 	//first usize: total size, second: granularity
 	fn new(usize, usize) -> Self;
@@ -152,7 +115,7 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 	}
 }
 
-impl<K, V> FinMap<K, V> for SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash, K: Eq + Hash {
+impl<K, V> FinMap<K, V> for SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash, K: Eq + Hash + Clone {
 	fn new(size: usize, gran: usize) -> Self {
 		SizedHashMap { size : size, gran : gran, map : HashMap::with_capacity(size) }
 	}
@@ -190,7 +153,43 @@ impl<K, V> FinMap<K, V> for SizedHashMap<K, V> where V: Clone + Debug + Eq + Has
 	}
 	
 	fn keyset(curr: Self) -> Vec<K> {
-		//curr.map.iter().map(|(K, V)| K.clone()).collect()
+		curr.map.iter().map(|(k, v)| k.clone()).collect()
+	}
+}
+
+impl<K, V> FinMap<K, V> for SizedTrie<K, V> 
+	where V: Clone + Debug + Eq + Hash + 'static, K: Eq + Hash + Clone + Debug + 'static {
+	fn new(size: usize, gran: usize) -> Self {
+		SizedTrie{ size: size, gran: gran, map: inc_gauged_trie::FinMap::emp() }
+	}
+	
+	fn size(curr: Self) -> usize {
+		curr.size
+	}
+	
+	fn gran(curr: Self) -> usize {
+		curr.gran
+	}
+	
+	fn put(mut curr: Self, k: K, v: V) -> Self {
+		inc_gauged_trie::FinMap::put(&mut curr.map, k, v);
+		curr
+	}
+	
+	fn get(mut curr: Self, k: K) -> Option<V> {
+		inc_gauged_trie::FinMap::get(&mut curr.map, k)
+	}
+	
+	fn contains(curr: Self, k: K) -> bool {
+		inc_gauged_trie::FinMap::get(&curr.map, k).is_some()
+	}
+	
+	fn del(mut curr: Self, k: K) -> (Option<V>, Self) {
+		let prev = inc_gauged_trie::FinMap::rem(&mut curr.map, k);
+		(prev, curr)
+	}
+	
+	fn keyset(curr: Self) -> Vec<K> {
 		panic!("unimplemented");
 	}
 }
@@ -212,11 +211,9 @@ pub trait Graph<NdId, Data> {
 	
 	fn get_data(Self, NdId) -> Option<Data>;
 	
-	fn bfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
-	
-	fn dfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
+	fn bfs<DG:DirectedGraph<NdId, usize>>(Self, NdId) -> DG where DG: Clone;
 
-	fn dfs2<DG:DirectedGraph<NdId, usize>> (Self, NdId) -> DG;
+	fn dfs<DG:DirectedGraph<NdId, usize>> (Self, NdId) -> DG where DG: Clone;
 }
 
 impl<T, Data> Graph<usize, Data> for T 
@@ -281,20 +278,20 @@ impl<T, Data> Graph<usize, Data> for T
 	
 	//Question: want to keep graph size available (for size of visited map), best way to do this?
 	//action point: change return type to directed graph
-	fn bfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
+	fn bfs<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG where DG: Clone {
 		//setup
 		let mut q : VecDeque<usize> = VecDeque::new();
 		let mut v : SizedMap<bool> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
-		let mut g : T = Graph::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
+		let mut g : DG = DG::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		
 		q.push_back(root);
-		g = Self::add_node(g, root, Some(0));
+		g = DG::add_node(g, root, Some(0));
 		v = FinMap::put(v, root, true);
 		while !q.is_empty() {
 			//get next element in queue
 			//get c's level
 			let c = q.pop_front().unwrap();
-			let c_lev = Self::get_data(g.clone(), c).unwrap();
+			let c_lev = DG::get_data(g.clone(), c).unwrap();
 			let adjs = Self::adjacents(curr.clone(), c);
 			//iterate over nodes adjacent to c
 			for n in adjs {
@@ -310,20 +307,16 @@ impl<T, Data> Graph<usize, Data> for T
 		}
 		g
 	}
-	
-	fn dfs2<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG {
-            unimplemented!()
-        }
 
-	fn dfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
+	fn dfs<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG where DG: Clone {
 		//setup
 		let mut v : SizedMap<bool> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		let mut s : VecDeque<usize> = VecDeque::new();
-		let mut g : T = Graph::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
+		let mut g : DG = Graph::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		
 		//initialize DFS with the given root node
 		s.push_back(root);
-		g = Self::add_node(g, root, Some(0));
+		g = Graph::add_node(g, root, Some(0));
 		v = FinMap::put(v, root, true);
 		
 		//begin loop
@@ -334,10 +327,13 @@ impl<T, Data> Graph<usize, Data> for T
 				//add c to the visited set
 				v = FinMap::put(v, c, true);
 				
+				let c_lev = DG::get_data(g.clone(), c).unwrap();
+				
 				let adjs = DirectedGraph::successors(curr.clone(), c);
 				
 				for n in adjs {
 					s.push_back(n);
+					g = Graph::add_node(g, n, Some(c_lev+1));
 					g = DirectedGraph::add_directed_edge(g, c, n);
 				}
 			}
@@ -517,7 +513,7 @@ mod tests {
   	dt = Graph::add_edge(dt, 2, 4);
   	dt = Graph::add_edge(dt, 3, 4); //this is the basic diamond graph
   	
-  	let bfs_tree = Graph::bfs(dt, 1);
+  	let bfs_tree: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(dt, 1);
   	
   	let empty_vec: Vec<usize> = vec!();
   	
@@ -543,7 +539,7 @@ mod tests {
   	dt = Graph::add_edge(dt, 2, 4);
   	dt = Graph::add_edge(dt, 3, 4); //this is the basic diamond graph
   	
-  	let bfs_tree = Graph::bfs(dt, 1);
+  	let bfs_tree: SizedTrie<usize, (Option<usize>, Vec<usize>)> = Graph::bfs(dt, 1);
   	
   	let empty_vec: Vec<usize> = vec!();
   	
@@ -568,15 +564,15 @@ mod tests {
   	let g13: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g1.clone(), 100, 7);
   	
   	let start = Instant::now();
-  	let _ = Graph::bfs(g11, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(g11, 1);
   	println!("RAZ on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _  = Graph::bfs(g12, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)>  = Graph::bfs(g12, 1);
   	println!("Trie on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _ = Graph::bfs(g13, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(g13, 1);
   	println!("Rust HashMap on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	//986e
@@ -586,15 +582,15 @@ mod tests {
   	let g23: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g2.clone(), 1000, 10);
   	
   	let start = Instant::now();
-  	let _ = Graph::bfs(g21, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(g21, 1);
   	println!("RAZ on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _  = Graph::bfs(g22, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)>  = Graph::bfs(g22, 1);
   	println!("Trie on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _ = Graph::bfs(g23, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(g23, 1);
   	println!("Rust HashMap on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	//8961e
@@ -604,15 +600,15 @@ mod tests {
   	let g33: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g3.clone(), 10000, 13);
   	
   	let start = Instant::now();
-  	let _ = Graph::bfs(g31, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(g31, 1);
   	println!("RAZ on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _  = Graph::bfs(g32, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)>  = Graph::bfs(g32, 1);
   	println!("Trie on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _ = Graph::bfs(g33, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(g33, 1);
   	println!("Rust HashMap on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	//18707e
@@ -622,15 +618,15 @@ mod tests {
   	let g43: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g4.clone(), 20000, 15);
   	
   	let start = Instant::now();
-  	let _ = Graph::bfs(g41, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(g41, 1);
   	println!("RAZ on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _  = Graph::bfs(g42, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)>  = Graph::bfs(g42, 1);
   	println!("Trie on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _ = Graph::bfs(g43, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(g43, 1);
   	println!("Rust HashMap on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
   }
   
@@ -645,15 +641,15 @@ mod tests {
   	let g13: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g1.clone(), 100, 7);
   	
   	let start = Instant::now();
-  	let _ = Graph::dfs(g11, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g11, 1);
   	println!("RAZ on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _  = Graph::dfs(g12, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)>  = Graph::dfs(g12, 1);
   	println!("Trie on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _ = Graph::dfs(g13, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g13, 1);
   	println!("Rust HashMap on 91e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	//986e
@@ -663,15 +659,15 @@ mod tests {
   	let g23: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g2.clone(), 1000, 10);
   	
   	let start = Instant::now();
-  	let _ = Graph::dfs(g21, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g21, 1);
   	println!("RAZ on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _  = Graph::dfs(g22, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)>  = Graph::dfs(g22, 1);
   	println!("Trie on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _ = Graph::dfs(g23, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g23, 1);
   	println!("Rust HashMap on 986e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	//8961e
@@ -681,15 +677,15 @@ mod tests {
   	let g33: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g3.clone(), 10000, 13);
   	
   	let start = Instant::now();
-  	let _ = Graph::dfs(g31, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g31, 1);
   	println!("RAZ on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _  = Graph::dfs(g32, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)>  = Graph::dfs(g32, 1);
   	println!("Trie on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _ = Graph::dfs(g33, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g33, 1);
   	println!("Rust HashMap on 8961e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	//18707e
@@ -699,15 +695,15 @@ mod tests {
   	let g43: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = dgraph_from_col(g4.clone(), 20000, 15);
   	
   	let start = Instant::now();
-  	let _ = Graph::dfs(g41, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g41, 1);
   	println!("RAZ on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _  = Graph::dfs(g42, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)>  = Graph::dfs(g42, 1);
   	println!("Trie on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
   	
   	let start = Instant::now();
-  	let _ = Graph::dfs(g43, 1);
+  	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g43, 1);
   	println!("Rust HashMap on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
   }
   
@@ -720,7 +716,7 @@ mod tests {
   	
   	let start = Instant::now();
   	
-  	let bfs_res = Graph::bfs(dt.clone(), 1);
+  	let bfs_res: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(dt.clone(), 1);
   	
   	let end = start.elapsed();
   	
@@ -736,7 +732,7 @@ mod tests {
   	
   	let start2 = Instant::now();
   	
-  	let bfs_res2 = Graph::bfs(dt.clone(), 1);
+  	let bfs_res2: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(dt.clone(), 1);
   	
   	let end2 = start2.elapsed();
   	
