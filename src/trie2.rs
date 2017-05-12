@@ -65,7 +65,7 @@ enum TrieRec<K:'static+Hash+PartialEq+Eq+Clone+Debug,
 #[derive(PartialEq,Eq,Clone,Debug)]
 struct TrieLeaf<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 V:'static+Hash+PartialEq+Eq+Clone+Debug> {
-    kvs:Vec<(K,HashVal,V)>,
+    kvs:Rc<Vec<(K,HashVal,V)>>,
 }
 #[derive(Hash,PartialEq,Eq,Clone,Debug)]
 struct TrieBin<K:'static+Hash+PartialEq+Eq+Clone+Debug,
@@ -118,19 +118,19 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
         }
     }
 
-    fn split_vec (vec: Vec<(K,HashVal,V)>,
+    fn split_vec (vec: Rc<Vec<(K,HashVal,V)>>,
                   bits_len:u32,
                   mut vec0:Vec<(K,HashVal,V)>, 
                   mut vec1:Vec<(K,HashVal,V)>)
                   -> (Vec<(K,HashVal,V)>, Vec<(K,HashVal,V)>)
     {
         //let mask : u64 = make_mask(bits_len as usize) as u64;
-        for (k,k_hash,v) in vec.into_iter() {
+        for &(ref k, ref k_hash, ref v) in vec.iter() {
             //assert_eq!((mask & k_hash) >> 1, bits.bits as u64); // XXX/???
             if 0 == (k_hash.0 & (1 << bits_len)) {
-                vec0.push((k,k_hash,v));
+                vec0.push((k.clone(),k_hash.clone(),v.clone()))
             } else {
-                vec1.push((k,k_hash,v));
+                vec1.push((k.clone(),k_hash.clone(),v.clone()))
             }
         };
         (vec0, vec1)
@@ -151,7 +151,7 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
             vec.push((k.clone(),k_hash,v.clone()));
         };
         Trie{meta:Self::meta(vec.len()), 
-             rec:TrieRec::Leaf(TrieLeaf{kvs:vec})}
+             rec:TrieRec::Leaf(TrieLeaf{kvs:Rc::new(vec)})}
     }
 
     pub fn from_key_vec(vec_in:&Vec<K>) -> Trie<K,()> { 
@@ -161,7 +161,7 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
             vec.push((k.clone(),k_hash,()));
         };
         Trie{meta:Self::meta(vec.len()), 
-             rec:TrieRec::Leaf(TrieLeaf{kvs:vec})}
+             rec:TrieRec::Leaf(TrieLeaf{kvs:Rc::new(vec)})}
     }
 
     pub fn join (lt: Self, rt: Self, n:Name) -> Self {
@@ -178,29 +178,35 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
 
     // TODO-Soon: Opt: After splitting a vec, create leaves by first checking whether the vec is empty.
 
+    fn leaf_or_empty (kvs:Vec<(K,HashVal,V)>) -> TrieRec<K,V> {
+        if kvs.len() == 0 { TrieRec::Empty }
+        else { TrieRec::Leaf(TrieLeaf{kvs:Rc::new(kvs)}) }
+    }
+
     fn join_rec (meta:TrieMeta, lt: TrieRec<K,V>, rt: TrieRec<K,V>, bits:Bits, n:Name) -> TrieRec<K,V> {
         match (lt, rt) {
             (TrieRec::Empty, rt) => rt,
             (lt, TrieRec::Empty) => lt,
-            (TrieRec::Leaf(mut l), TrieRec::Leaf(r)) => {
+            (TrieRec::Leaf(l), TrieRec::Leaf(r)) => {
                 if l.kvs.len() == 0 { 
                     TrieRec::Leaf(r)
                 } else if r.kvs.len() == 0 {
                     TrieRec::Leaf(l)
                 } else if l.kvs.len() + r.kvs.len() < meta.gauge {
                     // Sub-Case: the leaves, when combined, are smaller than the gauge.
-                    for (k,k_hash,v) in r.kvs.into_iter() { 
-                        l.kvs.push((k,k_hash,v));
+                    let mut vec = (*l.kvs).clone();
+                    for &(ref k, ref k_hash, ref v) in r.kvs.iter() { 
+                        vec.push((k.clone(),k_hash.clone(),v.clone()));
                     }
-                    TrieRec::Leaf(l)
+                    Self::leaf_or_empty(vec)
                 } else {
                     // Sub-Case: the leaves are large enough to justify not being combined.
                     let (e0, e1) = (Vec::new(), Vec::new());
                     let (l0, l1) = Self::split_vec(l.kvs, bits.len, e0, e1);
                     let (r0, r1) = Self::split_vec(r.kvs, bits.len, l0, l1);
                     let (n1, n2) = name_fork(n.clone());
-                    let t0 = cell(n1, TrieRec::Leaf(TrieLeaf{kvs:r0}));
-                    let t1 = cell(n2, TrieRec::Leaf(TrieLeaf{kvs:r1}));
+                    let t0 = cell(n1, TrieRec::Leaf(TrieLeaf{kvs:Rc::new(r0)}));
+                    let t1 = cell(n2, TrieRec::Leaf(TrieLeaf{kvs:Rc::new(r1)}));
                     TrieRec::Bin(TrieBin{left:t0, right:t1, bits:bits, name:n})
                 }
             },
@@ -210,8 +216,8 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 let (b0, b1) = Self::split_bits(&bits);
                 let (n0, n1) = name_fork(n.clone());
                 let (m0, m1) = name_fork(r.name.clone());
-                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:TrieRec::Leaf(TrieLeaf{kvs:l0}), r:get!(r.left),  b:b0, n:m0);
-                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:TrieRec::Leaf(TrieLeaf{kvs:l1}), r:get!(r.right), b:b1, n:m1);
+                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:Self::leaf_or_empty(l0), r:get!(r.left),  b:b0, n:m0);
+                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:Self::leaf_or_empty(l1), r:get!(r.right), b:b1, n:m1);
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Leaf(r)) => {
@@ -220,8 +226,8 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 let (b0, b1) = Self::split_bits(&bits);
                 let (n0, n1) = name_fork(n.clone());
                 let (m0, m1) = name_fork(l.name.clone());
-                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:get!(l.left),  r:TrieRec::Leaf(TrieLeaf{kvs:r0}), b:b0, n:m0);
-                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:get!(l.right), r:TrieRec::Leaf(TrieLeaf{kvs:r1}), b:b1, n:m1);
+                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:get!(l.left),  r:Self::leaf_or_empty(r0), b:b0, n:m0);
+                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:get!(l.right), r:Self::leaf_or_empty(r1), b:b1, n:m1);
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Bin(r)) => {
