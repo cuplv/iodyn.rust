@@ -215,6 +215,8 @@ pub trait Graph<NdId, Data> {
 	fn bfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
 	
 	fn dfs(Self, NdId) -> Self where Self : DirectedGraph<NdId, usize>;
+
+	fn dfs2<DG:DirectedGraph<NdId, usize>> (Self, NdId) -> DG;
 }
 
 impl<T, Data> Graph<usize, Data> for T 
@@ -309,6 +311,10 @@ impl<T, Data> Graph<usize, Data> for T
 		g
 	}
 	
+	fn dfs2<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG {
+            unimplemented!()
+        }
+
 	fn dfs(curr: Self, root: usize) -> Self where Self : DirectedGraph<usize, usize> {
 		//setup
 		let mut v : SizedMap<bool> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
