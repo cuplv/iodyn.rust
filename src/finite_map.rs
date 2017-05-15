@@ -276,8 +276,6 @@ impl<T, Data> Graph<usize, Data> for T
 		}
 	}
 	
-	//Question: want to keep graph size available (for size of visited map), best way to do this?
-	//action point: change return type to directed graph
 	fn bfs<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG where DG: Clone {
 		//setup
 		let mut q : VecDeque<usize> = VecDeque::new();
