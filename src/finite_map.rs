@@ -195,7 +195,7 @@ impl<K, V> FinMap<K, V> for SizedTrie<K, V>
 }
 
 //undirected graph
-pub trait Graph<NdId, Data> {
+pub trait Graph<NdId, Data> : FinMap<NdId, (Option<Data>, Vec<NdId>)> {
 	//usize params are for size/granularity pass to maps: should be exposed or no?
 	fn new(usize, usize) -> Self;
 	
@@ -281,12 +281,10 @@ impl<T, Data> Graph<usize, Data> for T
 	fn bfs<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG where DG: Clone {
 		//setup
 		let mut q : VecDeque<usize> = VecDeque::new();
-		let mut v : SizedMap<bool> = FinMap::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
-		let mut g : DG = DG::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
+		let mut g : DG = Graph::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
 		
 		q.push_back(root);
 		g = DG::add_node(g, root, Some(0));
-		v = FinMap::put(v, root, true);
 		while !q.is_empty() {
 			//get next element in queue
 			//get c's level
@@ -296,11 +294,10 @@ impl<T, Data> Graph<usize, Data> for T
 			//iterate over nodes adjacent to c
 			for n in adjs {
 				//if n is not yet visited
-				if !FinMap::contains(SizedMap { size: v.size, gran: v.gran, map: v.map.clone() }, n) {
+				if !FinMap::contains(g.clone(), n) {
 					//this level is c's + 1
 					g = Graph::add_node(g, n, Some(c_lev + 1));
 					g = DirectedGraph::add_directed_edge(g, c, n);
-					v = FinMap::put(v, n, true);
 					q.push_back(n)
 				}
 			}
