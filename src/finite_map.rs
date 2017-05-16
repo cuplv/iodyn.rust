@@ -212,6 +212,8 @@ pub trait Graph<NdId, Data> : FinMap<NdId, (Option<Data>, Vec<NdId>)> {
 	fn get_data(Self, NdId) -> Option<Data>;
 	
 	fn bfs<DG:DirectedGraph<NdId, usize>>(Self, NdId) -> DG where DG: Clone;
+	
+	fn bfs_unfold<DG:DirectedGraph<NdId, usize>>(Self, NdId) -> DG where DG: Clone;
 
 	fn dfs<DG:DirectedGraph<NdId, usize>> (Self, NdId) -> DG where DG: Clone;
 }
@@ -301,6 +303,15 @@ impl<T, Data> Graph<usize, Data> for T
 			}
 		}
 		g
+	}
+	
+	fn bfs_unfold<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG where DG: Clone {
+		let mut g : DG = Graph::new(FinMap::size(curr.clone()), FinMap::gran(curr.clone()));
+		let mut q : VecDeque<usize> = VecDeque::new();
+		
+		q.push_back(root);
+		g = DG::add_node(g, root, Some(0));
+		panic!("stubbed");
 	}
 
 	fn dfs<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG where DG: Clone {
@@ -465,9 +476,9 @@ fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option
 }
 
 //correct way to do this, not Result?
-fn unfold<A,B,C>(f:Rc<C>, init:A) -> B where C: Fn(A) -> Result<A,B> {
+fn unfold_simple<A,B,C>(init:A, f:Rc<C>) -> B where C: Fn(A) -> Result<A,B> {
 	match f(init) {
-		Ok(cont) => unfold(f, cont),
+		Ok(cont) => unfold_simple(cont, f),
 		Err(res) => res
 	}
 }
