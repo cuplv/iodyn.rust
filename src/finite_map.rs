@@ -464,6 +464,14 @@ fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option
 	g
 }
 
+//correct way to do this, not Result?
+fn unfold<A,B,C>(f:Rc<C>, init:A) -> B where C: Fn(A) -> Result<A,B> {
+	match f(init) {
+		Ok(cont) => unfold(f, cont),
+		Err(res) => res
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
