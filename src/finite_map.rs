@@ -311,7 +311,26 @@ impl<T, Data> Graph<usize, Data> for T
 		
 		q.push_back(root);
 		g = DG::add_node(g, root, Some(0));
-		panic!("stubbed");
+		
+		unfold_simple( (g, q),
+			Rc::new(|(mut acc, mut q):(DG, VecDeque<usize>)| {
+					match q.pop_front() {
+						Some(k) => {
+							let k_lev = DG::get_data(acc.clone(), k).unwrap();
+							let adjs = Self::adjacents(curr.clone(), k);
+							for n in adjs {
+								if !FinMap::contains(acc.clone(), n) {
+									acc = Graph::add_node(acc, n, Some(k_lev + 1));
+									acc = DirectedGraph::add_directed_edge(acc, k, n);
+									q.push_back(n);
+								}
+							}
+							Ok((acc, q))
+						},
+						None => Err(acc)
+					}
+				})
+		)
 	}
 
 	fn dfs<DG:DirectedGraph<usize, usize>>(curr: Self, root: usize) -> DG where DG: Clone {
