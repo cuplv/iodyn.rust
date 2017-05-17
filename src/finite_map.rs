@@ -318,12 +318,18 @@ impl<T, Data> Graph<usize, Data> for T
 						Some(k) => {
 							let k_lev = DG::get_data(acc.clone(), k).unwrap();
 							let adjs = Self::adjacents(curr.clone(), k);
-							for n in adjs {
-								if !FinMap::contains(acc.clone(), n) {
-									acc = Graph::add_node(acc, n, Some(k_lev + 1));
-									acc = DirectedGraph::add_directed_edge(acc, k, n);
-									q.push_back(n);
+							
+							match adjs.iter().fold((acc.clone(), q.clone()),
+								|(mut acc, mut q), &n| {
+									if !FinMap::contains(acc.clone(), n) {
+										acc = Graph::add_node(acc, n, Some(k_lev + 1));
+										acc = DirectedGraph::add_directed_edge(acc, k, n);
+										q.push_back(n);
+									}
+									(acc, q)
 								}
+							) {
+								(r1, r2) => { acc = r1; q = r2; }
 							}
 							Ok((acc, q))
 						},
