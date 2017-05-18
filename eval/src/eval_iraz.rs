@@ -297,6 +297,21 @@ CompMax for EvalIRaz<E,G> {
 // 	}
 // }
 
+impl<E:Adapt,O,G:Rng>
+CompNative<O> for EvalIRaz<E,G> {
+	type Input = IRazTree<E>;
+	fn comp_native<F>(&self, f:Rc<F>, _rng: &mut StdRng) -> (Duration,O) where
+		F:Fn(&Self::Input)->O,
+	{
+		let clone = self.raztree.clone().unwrap();
+		let mut res = None;
+		let time = Duration::span(||{
+			res = Some(f(&clone));
+		});
+		(time, res.unwrap())
+	}
+}
+
 impl<E:Adapt,O:Adapt,I,B,G:Rng>
 CompTreeFold<E,O,I,B> for EvalIRaz<E,G> where
 	I:'static + Fn(&E)->O,
