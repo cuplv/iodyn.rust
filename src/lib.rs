@@ -26,40 +26,6 @@
 extern crate rand;
 #[macro_use] extern crate adapton;
 
-<<<<<<< HEAD
-/// Early work on traits for zippers
-///
-pub mod zip;                // trait for persistent zips
-/// Persistent stack, modified slightly from "Learning Rust With Entirely Too Many Linked Lists"
-///
-pub mod stack;              // persistent stack
-/// Early work on traits for the raz
-///
-pub mod seqzip;             // traits for persistent raz
-pub mod persist_raz;        // monolithic single-item persistent raz
-pub mod trees;              // traits for the various forms of trees
-pub mod level_tree;         // persistent tree
-pub mod tree_cursor;        // splittable cursor over tree (uses level_tree)
-pub mod archive_stack;      // more complex stack (uses stack)
-pub mod gauged_raz;         // raz of vectors using tree_cursor (uses archive_stack and tree_cursor)
-// temp for incremental use
-pub mod inc_level_tree;
-pub mod inc_tree_cursor;
-pub mod inc_gauged_raz;
-pub mod finite_map;
-pub mod inc_gauged_trie;
-
-/// Persistent Raz - original design, simple but works
-pub type PRaz<E> = persist_raz::Raz<E>;
-/// Unfocused `PRaz`
-pub type PRazTree<E> = persist_raz::RazSeq<E>;
-/// Raz - Sequence editing. Vectorized leaves, manualy defined
-pub type Raz<E> = gauged_raz::Raz<trees::NegBin,E>;
-/// Unfocused `Raz`
-pub type RazTree<E> = gauged_raz::RazTree<trees::NegBin,E>;
-/// Incremental Raz - Experimental for use with Adapton
-pub type IRaz<E> = inc_gauged_raz::Raz<E>;
-=======
 #[doc(hidden)]
 pub mod trees;          // old work, but want to reincorporate the Level trait into current Raz
 pub mod memo;           // Conversion function traits
@@ -70,6 +36,7 @@ pub mod tree_cursor;    // interface for traversing a level tree
 pub mod raz;            // Gauged Incremental Random Access Zipper
 pub mod raz_meta;       // Generic interface and concrete versions of metadata for searching the Raz
 pub mod raz_based;      // Some simple structs based on the Raz
+pub mod finite_map;
 
 // Two forms of tries. They work, but performance needs improvement
 #[doc(hidden)]
@@ -79,7 +46,7 @@ pub mod trie;
 
 /// Gauged Incremental Raz with element counts
 pub type IRaz<E> = raz::Raz<E,raz_meta::Count>;
->>>>>>> f1bbd50ebc4562c7115fa6b30d0609dd3f61dfa5
+
 /// Unfocused `IRaz`
 pub type IRazTree<E> = raz::RazTree<E,raz_meta::Count>;
 /// Cross between vector and persistent stack

@@ -9,8 +9,8 @@ andersen's analysis explanation: in #vmfuture
 */
 
 
-use inc_gauged_raz::*;
-use inc_gauged_trie;
+use IRaz;
+use IRazTree;
 use std::hash::Hash;
 use std::fmt::Debug;
 use adapton::engine::name_of_usize;
@@ -26,7 +26,7 @@ use std::rc::Rc;
 struct SizedMap<V> where V: Clone + Debug + Eq + Hash + 'static {
 	size: usize,
 	gran: usize,
-	map: RazTree<Option<V>>
+	map: IRazTree<Option<V>>,
 }
 
 #[derive(Debug,Clone)]
@@ -36,12 +36,13 @@ struct SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash + 'static, K:Hash +
 	map: HashMap<K, V>
 }
 
+/*
 #[derive(Debug, Clone)]
 struct SizedTrie<K, V> where V: Clone + Debug + Eq + Hash + 'static {
 	size: usize,
 	gran: usize,
 	map: inc_gauged_trie::Trie<K, V>
-}
+}*/
 
 pub trait FinMap<K, V> {
 	//first usize: total size, second: granularity
@@ -64,16 +65,16 @@ pub trait FinMap<K, V> {
 
 impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 	fn new(size: usize, gran: usize) -> Self {
-		let mut store: Raz<Option<V>> = Raz::new();
+		let mut store: IRaz<Option<V>> = IRaz::new();
 		
 		for x in 0..size {
-			Raz::push_right(&mut store, None);
+			IRaz::push_right(&mut store, None);
 			if (x%gran) == 0 {
-				Raz::archive_right(&mut store, x as u32, Some(name_of_usize(x)))
+				IRaz::archive_right(&mut store, x as u32, Some(name_of_usize(x)))
 			}
 		}
 		
-		SizedMap { size: size, gran: gran, map: Raz::unfocus(store) }
+		SizedMap { size: size, gran: gran, map: IRaz::unfocus(store) }
 	}
 	
 	fn size(curr: Self) -> usize {
@@ -85,29 +86,29 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 	}
 	
 	fn put(curr: Self, key: usize, val: V) -> Self {
-		let mut seq_view = RazTree::focus(curr.map, key).unwrap();
-		Raz::pop_right(&mut seq_view);
-		Raz::push_right(&mut seq_view, Some(val));
-		SizedMap { size: curr.size, gran: curr.gran, map: Raz::unfocus(seq_view) }
+		let mut seq_view = IRazTree::focus(curr.map, key).unwrap();
+		IRaz::pop_right(&mut seq_view);
+		IRaz::push_right(&mut seq_view, Some(val));
+		SizedMap { size: curr.size, gran: curr.gran, map: IRaz::unfocus(seq_view) }
 	}
 	
 	//TEMPORARY WORKAROUND
 	fn get(curr: Self, key: usize) -> Option<V> {
-		let mut seq_view = RazTree::focus(curr.map, key + 1).unwrap();
-		Raz::peek_left(&mut seq_view).unwrap().clone().take()
+		let mut seq_view = IRazTree::focus(curr.map, key + 1).unwrap();
+		IRaz::peek_left(&mut seq_view).unwrap().clone().take()
 	}
 	
 	//TEMPORARY WORKAROUND
 	fn contains(curr: Self, key: usize) -> bool {
-		let mut seq_view = RazTree::focus(curr.map, key + 1).unwrap();
-		(*Raz::peek_left(&mut seq_view).unwrap()).is_some()
+		let mut seq_view = IRazTree::focus(curr.map, key + 1).unwrap();
+		(IRaz::peek_left(&mut seq_view).unwrap()).is_some()
 	}
 	
 	fn del(curr: Self, key: usize) -> (Option<V>, Self) {
-		let mut seq_view = RazTree::focus(curr.map, key).unwrap();
-		let ret = Raz::pop_right(&mut seq_view).unwrap();
-		Raz::push_right(&mut seq_view, None);
-		(ret, SizedMap { size: curr.size, gran: curr.gran, map: Raz::unfocus(seq_view) })
+		let mut seq_view = IRazTree::focus(curr.map, key).unwrap();
+		let ret = IRaz::pop_right(&mut seq_view).unwrap();
+		IRaz::push_right(&mut seq_view, None);
+		(ret, SizedMap { size: curr.size, gran: curr.gran, map: IRaz::unfocus(seq_view) })
 	}
 	
 	fn keyset(curr: Self) -> Vec<usize> {
@@ -168,6 +169,7 @@ impl<K, V> FinMap<K, V> for SizedHashMap<K, V> where V: Clone + Debug + Eq + Has
 	}
 }
 
+/*
 impl<K, V> FinMap<K, V> for SizedTrie<K, V> 
 	where V: Clone + Debug + Eq + Hash + 'static, K: Eq + Hash + Clone + Debug + 'static {
 	fn new(size: usize, gran: usize) -> Self {
@@ -203,7 +205,7 @@ impl<K, V> FinMap<K, V> for SizedTrie<K, V>
 	fn keyset(curr: Self) -> Vec<K> {
 		panic!("unimplemented");
 	}
-}
+}*/
 
 //undirected graph
 pub trait Graph<NdId, Data> : FinMap<NdId, (Option<Data>, Vec<NdId>)> {
@@ -603,7 +605,7 @@ mod tests {
   	assert_eq!(Some(2), Graph::get_data(bfs_tree.clone(), 4));
   }
   
-  #[test]
+ /* #[test]
   fn test_bfs_trie() {
   	let mut dt: SizedTrie<usize, (Option<usize>, Vec<usize>)> = Graph::new(100, 10);
   	dt = Graph::add_node(dt, 1, Some(1));
@@ -781,7 +783,7 @@ mod tests {
   	let start = Instant::now();
   	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g43, 1);
   	println!("Rust HashMap on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
-  }
+  }*/
   
   #[test]
   fn test_simple_parser() {
