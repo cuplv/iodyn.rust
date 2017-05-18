@@ -4,12 +4,12 @@ version = "0.1.0"
 authors = ["kyleheadley <kyle.headley@colorado.edu>"]
 
 [dependencies]
-pmfp-collections = { path = "../" }
-rand = "0.3"
-clap = "2"
+iodyn = { path = "../" }
+adapton = "0.3"
+adapton-lab = "0.1"
 time = "0.1"
-streaming-stats = "0.1"
+rand = "0.3"
+#streaming-stats = "0.1"
 
-[dependencies.adapton]
-git = "https://github.com/cuplv/adapton.rust.git"
-branch = "dev"
+[dev-dependencies]
+clap = "2"

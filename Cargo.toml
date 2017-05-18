@@ -1,16 +1,23 @@
 [package]
-name = "pmfp-collections"
-version = "0.1.0"
-authors = ["kyleheadley <kyle.headley@colorado.edu>"]
+name = "iodyn"
+version = "0.2.0"
+authors = [
+	"Kyle Headley <kyle.headley@colorado.edu>",
+	"Matthew A. Hammer <Matthew.Hammer@Colorado.Edu>"
+]
+description = "An incremental collections library making use of Adapton"
+documentation = "https://docs.rs/iodyn"
+homepage = "http://adapton.org"
+repository = "https://github.com/cuplv/iodyn.rust"
+readme = "README.md"
+keywords = ["incremental","adapton","sequence","RAZ","memoization"]
+categories = ["data-structures"]
+license = "MPL-2.0"
+exclude = ["travis.sh"]
+
+[badges]
+travis-ci = { repository = "https://github.com/cuplv/iodyn.rust" }
 
 [dependencies]
 rand = "0.3"
-
-[dependencies.adapton]
-git = "https://github.com/cuplv/adapton.rust.git"
-branch = "dev"
-
-[dev-dependencies]
-eval = { path = "eval" }
-time = "0.1"
-clap = "2"
+adapton = "0.3"

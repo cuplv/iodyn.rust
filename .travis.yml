@@ -1,0 +1,5 @@
+language: rust
+rust: nightly
+script: ./travis.sh
+notifications:
+  slack: cuplv:OR1WCyAHqPEKlxmLNYGAQkx7

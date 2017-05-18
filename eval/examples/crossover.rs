@@ -5,9 +5,9 @@
 extern crate rand;
 extern crate time;
 #[macro_use] extern crate clap;
-extern crate stats;
+//extern crate stats;
 extern crate adapton;
-extern crate pmfp_collections;
+extern crate iodyn;
 extern crate eval;
 
 use std::fs::OpenOptions;
@@ -15,7 +15,7 @@ use std::io::Write;
 use rand::{StdRng,SeedableRng};
 use eval::actions::*;
 #[allow(unused)] use eval::types::*;
-#[allow(unused)] use eval::eval_nraz::EvalNRaz;
+#[allow(unused)] use eval::eval_raz_name_index::EvalRazNameIndex;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::test_seq::{TestResult,EditComputeSequence};
@@ -28,7 +28,7 @@ const DEFAULT_UNITSIZE: usize = 100;
 const DEFAULT_NAMESIZE: usize = 1;
 const DEFAULT_EDITS: usize = 1;
 const DEFAULT_CHANGES: usize = 30;
-const DEFAULT_TRIALS: usize = 10;
+//const DEFAULT_TRIALS: usize = 10;
 
 fn main () {
   let child =
@@ -47,11 +47,11 @@ fn main2() {
       --dataseed=[dataseed]			'seed for random data'
       --editseed=[edit_seed]    'seed for random edits (and misc.)'
       -s, --start=[start]       'starting sequence length'
-      -u, --unitsize=[unitsize] 'initial elements per structure unit'
+      -g, --unitsize=[unitsize] 'initial elements per structure unit'
       -n, --namesize=[namesize] 'initial tree nodes between each art'
       -e, --edits=[edits]       'edits per batch'
       -c, --changes=[changes]   'number of incremental changes'
-      -t, --trials=[trials]     'trials to average over'
+      -t, --trials=[trials]     'trials to average over (unused)'
       -o, --outfile=[outfile]   'name for output files (of different extensions)' ")
     .get_matches();
   let dataseed = value_t!(args, "seed", usize).unwrap_or(DEFAULT_DATASEED);
@@ -61,14 +61,14 @@ fn main2() {
 	let namesize = value_t!(args, "namesize", usize).unwrap_or(DEFAULT_NAMESIZE);
 	let edits = value_t!(args, "edits", usize).unwrap_or(DEFAULT_EDITS);
 	let changes = value_t!(args, "changes", usize).unwrap_or(DEFAULT_CHANGES);
-	let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
+	//let trials = value_t!(args, "trials", usize).unwrap_or(DEFAULT_TRIALS);
   let outfile = args.value_of("outfile");
 
   //setup test
   let mut test = EditComputeSequence{
     init: IncrementalInit {
       size: start,
-      unitgauge: unitsize,
+      datagauge: unitsize,
       namegauge: namesize,
       coord: StdRng::from_seed(&[dataseed]),
     },
@@ -81,8 +81,26 @@ fn main2() {
 
   // run experiments
   let mut rng = StdRng::from_seed(&[editseed]);
-  let result_raz: TestResult<EvalIRaz<usize,StdRng>> = test.test(&mut rng);
-  let result_vec: TestResult<EvalVec<usize,StdRng>> = test.test(&mut rng);
+  let result_raz: TestResult<
+    EvalIRaz<usize,StdRng>,
+    Option<usize>,
+  > = test.test(&mut rng);
+  let result_vec: TestResult<
+    EvalVec<usize,StdRng>,
+    Option<usize>,
+  > = test.test(&mut rng);
+
+  // correctness check
+  match result_raz.result_data == result_vec.result_data {
+    true => println!("Final results from both versions match"),
+    false => {
+      println!("Final results differ:");
+      println!("incremental result: {:?}",result_raz.result_data);
+      println!("non incremental result: {:?}",result_vec.result_data);
+      println!("This is an error");
+      ::std::process::exit(1);
+    }
+  }
 
   // post-process results
   let comp_raz = result_raz.computes.iter().map(|d|d.num_nanoseconds().unwrap());
@@ -142,8 +160,8 @@ fn main2() {
 
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
-  write!(plotscript,"set title \"{}", "Accumulating time to insert element(s) and compute max\\n").unwrap();
-  writeln!(plotscript,"(s)ize: {}, (u)nit-gauge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start,unitsize,namesize,edits).unwrap();
+  write!(plotscript,"set title \"{}", "Cumulative time to insert element(s) and compute max\\n").unwrap();
+  writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start,unitsize,namesize,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();

@@ -1,97 +1,190 @@
-// Modified from "Learning Rust With Entirely Too Many Linked Lists":
-// http://cglab.ca/~abeinges/blah/too-many-lists/book/third-final.html
+//! Incremental Linked List (Cons-list)
+//! 
+//! This list is augmented with Adapton articulations
+//! to be of use in memoized functions. As development
+//! continues, it will also be enhanced with internal
+//! memoization of common list operations.
+//! 
+//! There are two data types, `Stack` for optionally empty 
+//! lists and `Head` for lists with at least one element.
+//! Conversion is through the public type `Stack<T>(Option<Head<T>>)`
+//! All element types must be compatible with Adapton,
+//! meaning they must implement `T:'static+Debug+Clone+Eq+Hash`.
+//!
+//! The API is still in development, one of these interfaces may
+//! change to mimic the `Vec` interface.
 
-use std::rc::Rc;
+use std::fmt::Debug;
+use std::hash::Hash;
 
-// this layout is explained here: http://cglab.ca/~abeinges/blah/too-many-lists/book/first-layout.html
-// keeps data in heap; uses `Option`s null pointer optimization
+use adapton::engine::*;
 
-#[derive(Debug)]
-pub struct Stack<T> {
-    head: Link<T>,
+/// Common linked-list
+#[derive(Debug,PartialEq,Eq,Clone,Hash)]
+pub struct Stack<T:'static+Debug+Clone+Eq+Hash>(pub Option<Head<T>>);
+
+/// Linked list with at least one element
+#[derive(Debug,PartialEq,Eq,Clone,Hash)]
+pub struct Head<T:'static+Debug+Clone+Eq+Hash> {
+	name: Option<Name>,
+	main: Art<Body<T>>,
+}
+#[derive(Debug,PartialEq,Eq,Clone,Hash)]
+struct Body<T:'static+Debug+Clone+Eq+Hash> {
+	elem: T,
+	next: Option<Head<T>>,
 }
 
-type Link<T> = Option<Rc<Node<T>>>;
+impl<T:'static+Debug+Clone+Eq+Hash>
+Stack<T> {
 
-#[derive(Debug)]
-struct Node<T> {
-    elem: T,
-    next: Link<T>,
+	/// this is identical to `Stack(None)`
+	pub fn new() -> Self {
+		Stack(None)
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.0.is_none()
+	}
+
+	/// return a stack with the new item as head
+	pub fn push(&self, name: Option<Name>, elem: T) -> Self {
+		Stack(Some(push_onto(self.0.clone(), name, elem)))
+	}
+
+	/// return the top item, if there is one
+	pub fn peek(&self) -> Option<T> {
+		self.0.as_ref().map(|h|{h.peek()})
+	}
+
+	/// get the incremental name of this stack, if it's not empty
+	pub fn name(&self) -> Option<Name> {
+		match self.0 {
+			None => None,
+			Some(ref h) => h.name.clone()
+		}
+	}
+
+	/// return the stack without the top item (this is sometimes called `tail`)
+	pub fn pull(&self) -> Option<Self> {
+		self.0.as_ref().map(|h|{Stack(h.pull())})
+	}
+
+	/// return an iterator over the elements from the top of the stack
+	pub fn iter(&self) -> Iter<T> {
+		Iter{ next: self.0.clone() }
+	}
+
 }
 
-pub struct Iter<'a, T:'a> {
-  next: Option<&'a Node<T>>,
+impl<T:'static+Debug+Clone+Eq+Hash>
+Head<T> {
+
+	pub fn new(name: Option<Name>, elem: T) -> Self {
+		push_onto(None, name, elem)
+	}
+
+	/// return a list with the new element as head
+	pub fn push(&self, name: Option<Name>, elem: T) -> Self {
+		push_onto(Some(self.clone()), name, elem)
+	}
+
+	/// return the head element
+	pub fn peek(&self) -> T {
+		force(&self.main).elem
+	}
+
+	/// get the incremental name of this list
+	pub fn name(&self) -> Option<Name> {
+		self.name.clone()
+	}
+
+	/// return the list without the head element
+	pub fn pull(&self) -> Option<Self> {
+		force(&self.main).next
+	}
+
+	/// return an iterator over the elements of the list
+	pub fn iter(&self) -> Iter<T> {
+		Iter { next: Some(self.clone()) }
+	}
+
 }
 
-
-impl<T: Clone> Stack<T> {
-    pub fn new() -> Self {
-        Stack { head: None }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        if let None = self.head { true } else { false }
-    }
-
-    pub fn push(&self, elem: T) -> Stack<T> {
-        Stack { head: Some(Rc::new(Node {
-            elem: elem,
-            next: self.head.clone(),
-        }))}
-    }
-
-    pub fn peek(&self) -> Option<&T> {
-        self.head.as_ref().map(|ref node| &node.elem)
-    }
-
-    pub fn pull(&self) -> Option<Stack<T>> {
-        self.head.as_ref().map(|node| Stack { head: node.next.clone()})
-    }
-
-    pub fn iter(&self) -> Iter<T> {
-        Iter { next: self.head.as_ref().map(|node| &**node) }
-    }
+fn push_onto<T>(tail: Option<Head<T>>, name: Option<Name>, elem: T) -> Head<T> where
+	T:'static+Debug+Clone+Eq+Hash
+{
+	match name {
+		None => Head{
+			name: None,
+			main: put(Body{
+				elem: elem,
+				next: tail,
+			})
+		},
+		Some(nm) => Head{
+			name: Some(nm.clone()),
+			main: cell(nm, Body{
+				elem: elem,
+				next: tail,
+			})
+		},
+	}
 }
 
-impl<T: Clone> Stack<T> {
-  pub fn rev(&self) -> Stack<T> {
-    let mut outlist = Stack::new();
-    for item in self.iter() {
-      outlist = outlist.push(item.clone())
-    }
-    outlist
+/// Iterator for list items
+pub struct Iter<T:'static+Debug+Clone+Eq+Hash> {
+	next: Option<Head<T>>,
+}
+
+impl<T:'static+Debug+Clone+Eq+Hash>
+Iter<T> {
+	/// get the name prior to the next element
+	pub fn name(&self) -> Option<Name> {
+		match self.next {
+			None => None,
+			Some(ref h) => h.name.clone(),
+		}
+	}
+}
+
+impl<T:'static+Debug+Clone+Eq+Hash>
+Iterator for Iter<T> {
+	type Item = T;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		self.next.take().map(|head| {
+			let Body{elem,next} = force(&head.main);
+			self.next = next;
+			elem
+		})
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+  #[test]
+  fn test_push_peek() {
+  	let a = Stack::new();
+  	let b = a
+  		.push(Some(name_of_usize(5)),5)
+  		.push(Some(name_of_usize(6)),6);
+  	assert_eq!(6, b.peek().unwrap());
+
+  	let c = b.pull().unwrap();
+  	assert_eq!(5, c.peek().unwrap());
   }
-}
 
-// the default will recurse through this stack, increasing program's stack,
-// so we iterate (but it's slightly slower)
-impl<T> Drop for Stack<T> {
-  fn drop(&mut self) {
-    let mut head = self.head.take();
-    while let Some(node) = head {
-      if let Ok(mut node) = Rc::try_unwrap(node) {
-        head = node.next.take();
-      } else {
-        break;
-      }
-    }
-  }
-}
+  #[test]
+  fn test_iter() {
+		let a = 
+			Head::new(Some(name_of_usize(4)),4)
+			.push(Some(name_of_usize(3)),3)
+			.push(Some(name_of_usize(2)),2)
+			.push(Some(name_of_usize(1)),1);
+		assert_eq!(vec![1,2,3,4], a.iter().collect::<Vec<_>>());
+	} 
 
-// derive will require the inner data be `Clone` for some reason
-impl<T: Clone> Clone for Stack<T> {
-    fn clone(&self) -> Self {
-        Stack { head: self.head.clone() }
-    }
-}
-
-impl<'a, T> Iterator for Iter<'a, T> {
-  type Item = &'a T;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    self.next.map(|node| {
-      self.next = node.next.as_ref().map(|node| &**node);
-      &node.elem
-    })
-  }
 }

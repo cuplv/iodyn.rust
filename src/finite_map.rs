@@ -1,3 +1,14 @@
+/*
+"examples" pattern - separate binary for cargo, use for evaluation results
+iodyn::skiplist
+look at quickhull in eval/examples for plot generation
+
+transitive graph closure
+read IncAL paper
+andersen's analysis explanation: in #vmfuture
+*/
+
+
 use inc_gauged_raz::*;
 use inc_gauged_trie;
 use std::hash::Hash;

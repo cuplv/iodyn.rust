@@ -1,6 +1,32 @@
+//! A collection of incremental data structures with dynamic input
+//! and output.
+//!
+//! Many of the structures have an exposed mutable head for fast
+//! updates, and an `archive` function to move the current head
+//! past a pointer, defining subsequences. This pointer is
+//! mutable, so that the changes can propagate to later
+//! computations.
+//!
+//! Fold and Map type computations over a level tree or a raz tree
+//! will be memoized, such that rerunning the computation after a
+//! change will be much faster than running from scratch.
+//!
+//! These collections are partially mutable and partially
+//! persistent (shared data). However, the authors have
+//! concentrated on incremental features, so partial sharing is not
+//! well implemented. Data archived without names will be fully
+//! persistent so that changes to cloned data will not affect the
+//! original. Data archived with names should be treated as a mutable
+//! structure, with changes to cloned data affecting the original. These
+//! affects will probably not be consistent. Editing a mutable structure
+//! within a namespace (`adapton::engine::ns`) should produce a version
+//! whose edits do not affect the original, but this has not been
+//! thoroughly tested.
+
 extern crate rand;
 #[macro_use] extern crate adapton;
 
+<<<<<<< HEAD
 /// Early work on traits for zippers
 ///
 pub mod zip;                // trait for persistent zips
@@ -33,92 +59,33 @@ pub type Raz<E> = gauged_raz::Raz<trees::NegBin,E>;
 pub type RazTree<E> = gauged_raz::RazTree<trees::NegBin,E>;
 /// Incremental Raz - Experimental for use with Adapton
 pub type IRaz<E> = inc_gauged_raz::Raz<E>;
+=======
+#[doc(hidden)]
+pub mod trees;          // old work, but want to reincorporate the Level trait into current Raz
+pub mod memo;           // Conversion function traits
+pub mod stack;          // Cons-list
+pub mod archive_stack;  // Sequences with subsequence vectors and metadata
+pub mod level_tree;     // generic tree with cannonical structure, basis for incremental functions
+pub mod tree_cursor;    // interface for traversing a level tree
+pub mod raz;            // Gauged Incremental Random Access Zipper
+pub mod raz_meta;       // Generic interface and concrete versions of metadata for searching the Raz
+pub mod raz_based;      // Some simple structs based on the Raz
+
+// Two forms of tries. They work, but performance needs improvement
+#[doc(hidden)]
+pub mod skiplist;
+#[doc(hidden)]
+pub mod trie;
+
+/// Gauged Incremental Raz with element counts
+pub type IRaz<E> = raz::Raz<E,raz_meta::Count>;
+>>>>>>> f1bbd50ebc4562c7115fa6b30d0609dd3f61dfa5
 /// Unfocused `IRaz`
-pub type IRazTree<E> = inc_gauged_raz::RazTree<E>;
-/// Stack-based sequence editing
-pub type Zipper<E> = zip::Stacks<E>;
-/// Functional programming's common list, persistent
-pub type Stack<E> = stack::Stack<E>;
+pub type IRazTree<E> = raz::RazTree<E,raz_meta::Count>;
 /// Cross between vector and persistent stack
 pub type ArchiveStack<E> = archive_stack::AStack<E,()>;
-/// Persistent Tree, structured by Levels
-pub type Tree<E> = level_tree::Tree<trees::NegBin,E>;
-/// Cursor for use with `Tree`
-///
-/// The element type is required to implement `TreeUpdate`
-/// to provide a method that reconstructs data as updated
-/// branches are recombined into larger trees
-pub type TCursor<E> = tree_cursor::Cursor<trees::NegBin,E>;
 
-///level generator for inc_* structures (others use `Rng::gen()`)
+///level generator for incremental structures
 pub fn inc_level() -> u32 {
-  inc_level_tree::gen_branch_level(&mut rand::thread_rng())
-}
-
-// tests on early mods only (persist_raz)
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use seqzip::{AtLeft,AtRight};
-	use zip::Zip;
-	use seqzip::{Seq, SeqZip};
-  use persist_raz::Raz;
-
-  #[test]
-  fn test_stack_zipper() {
-  	// define a sequence
-  	let none = stack::Stack::new();
-  	let some = none.push(3).push(7).push(1).push(0);
-  	{
-		 	let result = some.iter().collect::<Vec<_>>();
-		  assert_eq!(vec!(&0,&1,&7,&3), result);
-		}
-
-  	// save some of it for later
-  	let save = some.pull().unwrap().pull().unwrap();
-
-  	// use a zip to edit it
-  	let cur = AtLeft(some).zip_to(2).unwrap();
-  	assert_eq!(Ok(1), cur.peek_l());
-  	let fix = cur.edit(zip::Dir::R, 2).unwrap();
-
-  	// upzip back to a sequence to see the result
-  	let restore = SeqZip::<_,AtLeft<_>>::unzip(&fix);
-  	let result = restore.iter().collect::<Vec<_>>();
-  	assert_eq!(vec!(&0,&1,&2,&3), result);
-
-  	// unzip the other way the other way
-  	let back: AtRight<_> = fix.unzip();
-  	let result: Vec<_> = back.iter().collect();
-  	assert_eq!(vec!(&3,&2,&1,&0), result);
-
-  	// show off that this is a persistent structure
-  	assert_eq!(Some(&7), save.peek());
-  }
-
-  #[test]
-  fn test_raz_zipper() {
-  	// define a sequence
-  	let none = Raz::new();
-  	let some = none.push_r(3).push_r(7).push_r(1).push_r(0);
-	 	let result = some.iter_r().collect::<Vec<_>>();
-	  assert_eq!(vec!(0,1,7,3), result);
-
-  	// save some of it for later
-  	let save = some.pull_r().unwrap().pull(zip::Dir::R).unwrap();
-
-  	// use a zip to edit it
-  	let _cur = some.unzip();
-  	let cur = _cur.zip_to(2).unwrap();
-  	assert_eq!(Ok(1), cur.peek_l());
-  	let fix = cur.edit(zip::Dir::R, 2).unwrap();
-
-  	// upzip back to a sequence to see the result
-  	let restore = SeqZip::<_,_>::unzip(&fix);
-  	let result = restore.iter().collect::<Vec<_>>();
-  	assert_eq!(vec!(0,1,2,3), result);
-
-  	// show off that this is a persistent structure
-  	assert_eq!(Ok(7), save.peek_r());
-  }
+  level_tree::gen_branch_level(&mut rand::thread_rng())
 }
