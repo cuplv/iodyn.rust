@@ -37,7 +37,7 @@ mod geom {
   impl Rand for Point{
     fn rand<R: Rng>(rng: &mut R) -> Self {
       // max must be less than 3_000_000_000 to avoid overflow on 64bit machine
-      let max = 1_000_000;
+      let max = 1_000_000_000;
       Point{x:rng.gen::<isize>() % max,y: rng.gen::<isize>() % max}
     }
   }

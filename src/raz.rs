@@ -672,11 +672,19 @@ Raz<E,M> {
 		} else { self.r_stack.peek() }
 	}
 	/// mark the data at the left to be part of a subsequence
+	///
+	/// Levels determine internal structure. Most usages should
+	/// call `iodyn::inc_level()` to generate one.
 	pub fn archive_left(&mut self, level: u32, name: Option<Name>) {
+		let level = if level == 0 { 1 } else { level };
 		ns(name_of_str("zip"),move||{self.l_stack.archive(name,level)});
 	}
 	/// mark the data at the right to be part of a subsequence
+	///
+	/// Levels determine internal structure. Most usages should
+	/// call `iodyn::inc_level()` to generate one.
 	pub fn archive_right(&mut self, level: u32, name: Option<Name>) {
+		let level = if level == 0 { 1 } else { level };
 		ns(name_of_str("zip"),move||{self.r_stack.archive(name,level)});
 	}
 
