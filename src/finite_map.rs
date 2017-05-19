@@ -9,8 +9,7 @@ andersen's analysis explanation: in #vmfuture
 */
 
 
-use IRaz;
-use IRazTree;
+use {IRaz, IRazTree, inc_level};
 use std::hash::Hash;
 use std::fmt::Debug;
 use adapton::engine::name_of_usize;
@@ -70,7 +69,7 @@ impl<V> FinMap<usize, V> for SizedMap<V> where V: Clone + Debug + Eq + Hash {
 		for x in 0..size {
 			IRaz::push_right(&mut store, None);
 			if (x%gran) == 0 {
-				IRaz::archive_right(&mut store, x as u32, Some(name_of_usize(x)))
+				IRaz::archive_right(&mut store, inc_level(), Some(name_of_usize(x)))
 			}
 		}
 		
@@ -784,7 +783,7 @@ mod tests {
   	let _: SizedMap<(Option<usize>, Vec<usize>)> = Graph::dfs(g43, 1);
   	println!("Rust HashMap on 18707e: {} nanoseconds", start.elapsed().subsec_nanos());
   }*/
-  
+ 
   #[test]
   fn test_simple_parser() {
   	use std::time::Instant;
