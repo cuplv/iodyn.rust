@@ -372,7 +372,7 @@ impl<T, Data> Graph<usize, Data> for T
 				
 				let c_lev = DG::get_data(g.clone(), c).unwrap();
 				
-				let adjs = DirectedGraph::successors(curr.clone(), c);
+				let adjs = Graph::adjacents(curr.clone(), c);
 				
 				for n in adjs {
 					s.push_back(n);
@@ -388,9 +388,9 @@ impl<T, Data> Graph<usize, Data> for T
 pub trait DirectedGraph<NdId, Data> : Graph<NdId, Data> {
 	fn add_directed_edge(Self, NdId, NdId) -> Self;
 	
-	fn successors(Self, NdId) -> Vec<NdId>;
-	
 	fn cycle(Self) -> bool;
+	
+	fn closure<DG:DirectedGraph<NdId, Data>>(Self) -> DG where DG: Clone;
 }
 
 impl<T, Data> DirectedGraph<usize, Data> for T 
@@ -407,10 +407,6 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		let (k, mut adjs) = FinMap::get(ret.clone(), src).unwrap();
 		adjs.push(dst);
 		FinMap::put(ret, src, (k, adjs))
-	}
-	
-	fn successors(curr: Self, id: usize) -> Vec<usize> {
-		Graph::adjacents(curr, id)
 	}
 	
 	fn cycle(curr: Self) -> bool {
@@ -438,7 +434,7 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 			data.stack.push(v);
 			data.index += 1;
 			
-			for w in DirectedGraph::successors(g.clone(), v) {
+			for w in Graph::adjacents(g.clone(), v) {
 				if FinMap::contains(data.indexes.clone(), w) {
 					if data.stack.contains(&w) {
 						data.lowlinks = FinMap::put(data.lowlinks.clone(), v,
@@ -479,6 +475,10 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		
 		data.found_cycle
 	}
+	
+	fn closure<DG:DirectedGraph<usize, Data>>(curr: Self) -> DG where DG: Clone {
+		panic!("stubbed");
+	}
 }
 	
 
@@ -512,7 +512,6 @@ fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option
 	g
 }
 
-//correct way to do this, not Result?
 fn unfold_simple<A,B,C>(init:A, f:Rc<C>) -> B where C: Fn(A) -> Result<A,B> {
 	match f(init) {
 		Ok(cont) => unfold_simple(cont, f),
@@ -568,10 +567,10 @@ mod tests {
   	
   	let empty_vec: Vec<usize> = vec!();
   	
-  	assert_eq!(vec!(2, 3), DirectedGraph::successors(bfs_tree.clone(), 1));
-  	assert_eq!(vec!(4), DirectedGraph::successors(bfs_tree.clone(), 2));
-  	assert_eq!(empty_vec, DirectedGraph::successors(bfs_tree.clone(), 3));
-  	assert_eq!(empty_vec, DirectedGraph::successors(bfs_tree.clone(), 4));
+  	assert_eq!(vec!(2, 3), Graph::adjacents(bfs_tree.clone(), 1));
+  	assert_eq!(vec!(4), Graph::adjacents(bfs_tree.clone(), 2));
+  	assert_eq!(empty_vec, Graph::adjacents(bfs_tree.clone(), 3));
+  	assert_eq!(empty_vec, Graph::adjacents(bfs_tree.clone(), 4));
   	assert_eq!(Some(0), Graph::get_data(bfs_tree.clone(), 1));
   	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 2));
   	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 3));
@@ -594,10 +593,10 @@ mod tests {
   	
   	let empty_vec: Vec<usize> = vec!();
   	
-  	assert_eq!(vec!(2, 3), DirectedGraph::successors(bfs_tree.clone(), 1));
-  	assert_eq!(vec!(4), DirectedGraph::successors(bfs_tree.clone(), 2));
-  	assert_eq!(empty_vec, DirectedGraph::successors(bfs_tree.clone(), 3));
-  	assert_eq!(empty_vec, DirectedGraph::successors(bfs_tree.clone(), 4));
+  	assert_eq!(vec!(2, 3), Graph::adjacents(bfs_tree.clone(), 1));
+  	assert_eq!(vec!(4), Graph::adjacents(bfs_tree.clone(), 2));
+  	assert_eq!(empty_vec, Graph::adjacents(bfs_tree.clone(), 3));
+  	assert_eq!(empty_vec, Graph::adjacents(bfs_tree.clone(), 4));
   	assert_eq!(Some(0), Graph::get_data(bfs_tree.clone(), 1));
   	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 2));
   	assert_eq!(Some(1), Graph::get_data(bfs_tree.clone(), 3));
