@@ -217,6 +217,8 @@ pub trait Graph<NdId, Data> : FinMap<NdId, (Option<Data>, Vec<NdId>)> {
 	
 	fn add_edge(Self, NdId, NdId) -> Self;
 	
+	fn has_edge(Self, NdId, NdId) -> bool;
+	
 	fn del_edge(Self, NdId, NdId) -> Self;
 	
 	fn adjacents(Self, NdId) -> Vec<NdId>;
@@ -263,6 +265,17 @@ impl<T, Data> Graph<usize, Data> for T
 		adjs2.push(id1);
 		ret = FinMap::put(ret, id2, (k, adjs2));
 		ret
+	}
+	
+	//works for graphs or directedgraphs
+	fn has_edge(curr: Self, id1: usize, id2: usize) -> bool {
+		if !FinMap::contains(curr.clone(), id1) {
+			return false
+		}
+		
+		let (k, adjs) = FinMap::get(curr, id1).unwrap();
+		
+		adjs.contains(&id2)
 	}
 	
 	fn del_edge(curr: Self, id1: usize, id2: usize) -> Self {
@@ -390,7 +403,7 @@ pub trait DirectedGraph<NdId, Data> : Graph<NdId, Data> {
 	
 	fn cycle(Self) -> bool;
 	
-	fn closure<DG:DirectedGraph<NdId, Data>>(Self) -> DG where DG: Clone;
+	fn closure(Self) -> Self;
 }
 
 impl<T, Data> DirectedGraph<usize, Data> for T 
@@ -476,8 +489,22 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		data.found_cycle
 	}
 	
-	fn closure<DG:DirectedGraph<usize, Data>>(curr: Self) -> DG where DG: Clone {
-		panic!("stubbed");
+	fn closure(curr: Self) -> Self {
+		let mut ret = curr.clone();
+		
+		for k in FinMap::keyset(curr.clone()) {
+			for i in FinMap::keyset(curr.clone()) {
+				for j in FinMap::keyset(curr.clone()) {
+					if Graph::has_edge(ret.clone(), i, j) {
+						continue
+					} else if Graph::has_edge(ret.clone(), i, k) && Graph::has_edge(ret.clone(), k, j) {
+						ret = DirectedGraph::add_directed_edge(ret, i, j);
+					}
+				}
+			}
+		}
+		
+		ret
 	}
 }
 	
@@ -871,5 +898,39 @@ mod tests {
   	let dt2 = DirectedGraph::add_directed_edge(dt, 214, 15);
   	
   	assert!(DirectedGraph::cycle(dt2));
+  }
+  
+  #[test]
+  fn test_transitive_closure() {
+  	let mut dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(10, 3);
+  	
+  	dt = DirectedGraph::add_directed_edge(dt, 1, 2);
+  	dt = DirectedGraph::add_directed_edge(dt, 1, 4);
+  	dt = DirectedGraph::add_directed_edge(dt, 2, 4);
+  	dt = DirectedGraph::add_directed_edge(dt, 2, 5);
+  	dt = DirectedGraph::add_directed_edge(dt, 3, 1);
+  	dt = DirectedGraph::add_directed_edge(dt, 3, 6);
+  	dt = DirectedGraph::add_directed_edge(dt, 4, 3);
+  	dt = DirectedGraph::add_directed_edge(dt, 4, 5);
+  	dt = DirectedGraph::add_directed_edge(dt, 4, 6);
+  	dt = DirectedGraph::add_directed_edge(dt, 4, 7);
+  	dt = DirectedGraph::add_directed_edge(dt, 5, 7);
+  	dt = DirectedGraph::add_directed_edge(dt, 7, 6);
+  	
+  	assert!(DirectedGraph::cycle(dt.clone()));
+  	
+  	let extended = DirectedGraph::closure(dt);
+  	
+  	let mut test = Graph::adjacents(extended.clone(), 1);
+  	test.sort();
+  	assert_eq!(vec!(1, 2, 3, 4, 5, 6, 7), test);
+  	
+  	test = Graph::adjacents(extended.clone(), 2);
+  	test.sort();
+  	assert_eq!(vec!(1, 2, 3, 4, 5, 6, 7), test);
+  	
+  	test = Graph::adjacents(extended.clone(), 5);
+  	test.sort();
+  	assert_eq!(vec!(6, 7), test);
   }
 }
