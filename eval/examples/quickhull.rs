@@ -6,10 +6,8 @@ extern crate iodyn;
 extern crate eval;
 
 use std::rc::Rc;
-use std::io::BufWriter;
+use std::io::{BufWriter,Write};
 use std::fs::File;
-use std::fs::OpenOptions;
-use std::io::Write;
 use rand::{StdRng,SeedableRng};
 use adapton::reflect;
 use adapton::engine::*;
@@ -24,7 +22,8 @@ use adapton_lab::labviz::*;
 #[allow(unused)] use eval::accum_lists::*;
 #[allow(unused)] use eval::types::*;
 use eval::actions::*;
-use eval::test_seq::{TestResult,EditComputeSequence};
+use eval::test_seq::{TestResult,EditComputeSequence,aggregate};
+use eval::util::*;
 
 use geom::*;
 mod geom {
@@ -113,6 +112,7 @@ fn main2() {
       -n, --namegauge=[namegauge] 'initial tree nodes between each art'
       -e, --edits=[edits]         'edits per batch'
       -c, --changes=[changes]     'number of incremental changes'
+      -t, --trials=[trials]       'number of runs to aggregate stats from'
       -o, --outfile=[outfile]     'name for output files (of different extensions)'
       --trace                     'produce an output trace of the incremental run' ")
     .get_matches();
@@ -122,10 +122,11 @@ fn main2() {
 	let datagauge = value_t!(args, "datagauge", usize).unwrap_or(1_000);
 	let namegauge = value_t!(args, "namegauge", usize).unwrap_or(1);
 	let edits = value_t!(args, "edits", usize).unwrap_or(1);
-	let changes = value_t!(args, "changes", usize).unwrap_or(30);
+  let changes = value_t!(args, "changes", usize).unwrap_or(30);
+  let trials = value_t!(args, "trials", usize).unwrap_or(1);
   let outfile = args.value_of("outfile");
   let do_trace = args.is_present("trace");
-	let coord = StdRng::from_seed(&[dataseed]);
+  let coord = StdRng::from_seed(&[dataseed]);
 
   let mut test_raz = EditComputeSequence{
     init: IncrementalInit {
@@ -156,6 +157,7 @@ fn main2() {
       ns(name_of_str("hull"),||{hull.archive_left(iodyn::inc_level(),Some(name_unit()))});
       let hull = ns(name_of_str("top_rec"),||memo!(name_unit() =>> quickhull_rec, n:nt, l:t_line, p:t_points, h:hull));
       //println!("unfocus and return");
+      //return ns(name_of_str("unfocus"),||{hull.memo_unfocus()});
       return hull.unfocus();
       fn above_line(ps: &IRazTree<Point>, line: Line) -> IRazTree<Point> {
         // build a filtered version of the input tree
@@ -249,151 +251,90 @@ fn main2() {
     changes: changes,
   };
 
-  init_dcg(); assert!(engine_is_dcg());
 
   // run experiments
 
+  init_dcg(); assert!(engine_is_dcg());
+
   let mut rng = StdRng::from_seed(&[editseed]);
 
-  let result_non_inc: TestResult<
+  let mut results_non_inc: Vec<TestResult<
     EvalVec<Point,StdRng>,
     Vec<_>,
-  > = test_vec.test(&mut rng);
-
-  // for visual debugging
-  if do_trace {reflect::dcg_reflect_begin()}
-
-  let result_inc: TestResult<
+  >> = Vec::new();
+  let mut results_inc: Vec<TestResult<
     EvalIRaz<Point,StdRng>,
     IRazTree<_>,
-  > = test_raz.test(&mut rng);
+  >> = Vec::new();
 
-  if do_trace {
-	  let traces = reflect::dcg_reflect_end();
+  for i in 0..trials+1 {
+    results_non_inc.push(test_vec.test(&mut rng));
+    // for visual debugging
+    if do_trace && i == 1 {reflect::dcg_reflect_begin()}
 
-	  // output trace
-	  let f = File::create("trace.html").unwrap();
-	  let mut writer = BufWriter::new(f);
-	  writeln!(writer, "{}", style_string()).unwrap();
-	  writeln!(writer, "<div class=\"label\">Editor trace({}):</div>", traces.len()).unwrap();
-	  writeln!(writer, "<div class=\"traces\">").unwrap();
-	  for tr in traces {
-	  	div_of_trace(&tr).write_html(&mut writer);
-	  }
-	}
+    results_inc.push(test_raz.test(&mut rng));
 
-  // correctness check
+    if do_trace && i == 1 {
+      let traces = reflect::dcg_reflect_end();
 
-  let non_inc_comparison =
-    result_non_inc.result_data
-    .clone().into_iter()
-    .collect::<Vec<_>>()
-  ;
-  let inc_comparison =
-    result_inc.result_data
-    .clone().into_iter()
-    .collect::<Vec<_>>()
-  ;
-  match non_inc_comparison == inc_comparison {
-    true => println!("Final results from both versions match"),
-    false => {
-      println!("Final results differ:");
+      // output trace
+      let f = File::create("trace.html").unwrap();
+      let mut writer = BufWriter::new(f);
+      writeln!(writer, "{}", style_string()).unwrap();
+      writeln!(writer, "<div class=\"label\">Editor trace({}):</div>", traces.len()).unwrap();
+      writeln!(writer, "<div class=\"traces\">").unwrap();
+      for tr in traces {
+        div_of_trace(&tr).write_html(&mut writer);
+      }
+    }
+    // correctness check
+
+    let non_inc_comparison =
+      results_non_inc[i].result_data
+      .clone().into_iter()
+      .collect::<Vec<_>>()
+    ;
+    let inc_comparison =
+      results_inc[i].result_data
+      .clone().into_iter()
+      .collect::<Vec<_>>()
+    ;
+    if non_inc_comparison != inc_comparison {
+      println!("Final results({}) differ:",i);
       println!("the incremental results({}): {:?}", inc_comparison.len(),inc_comparison);
       println!("non incremental results({}): {:?}", non_inc_comparison.len(),non_inc_comparison);
       println!("This is an error");
       ::std::process::exit(1);
     }
   }
+  println!("Final results from all runs of both versions match.");
 
-  // post-process results
+  let summary_inc = aggregate(&results_inc[1..]); // slice to remove warmup run
+  let summary_non_inc = aggregate(&results_non_inc[1..]);
 
-  let edit_non_inc = result_non_inc.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let edit_inc = result_inc.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let comp_non_inc = result_non_inc.computes.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let comp_inc = result_inc.computes.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  
-  let mut adapton_changes = Vec::new();
-  let mut native_changes = Vec::new();
-  for i in 0..(changes+1) {
-    let nc = comp_non_inc[i];
-    native_changes.push(nc as f64 / 1_000_000.0);
-    let ac = comp_inc[i];
-    adapton_changes.push(ac as f64 / 1_000_000.0);
-  }
-  let adapton_init = adapton_changes[0];
-  let native_init = native_changes[0];
-  adapton_changes.remove(0);
-  native_changes.remove(0);
-
-  let update_time = adapton_changes.iter().sum::<f64>() / adapton_changes.len() as f64;
-  let crossover = native_changes.iter().zip(adapton_changes.iter()).enumerate()
-    .fold((native_init,adapton_init,0),|(n,a,cross),(c,(nt,at))|{
-      let new_n = n + nt;
-      let new_a = a + at;
-      let new_cross = if n < a && new_n >= new_a { c + 1 } else { cross };
-      (new_n,new_a,new_cross)
-    }).2;
-
-  println!("At input size: {}",start_size);
-  println!(" - Native initial run: {:.*} ms",2,native_init);
-  println!(" - Adapton initial run: {:.*} ms",2,adapton_init);
-  println!(" - Adapton overhead: {:.*} (Adapton initial time / Native initial time)",2,adapton_init/native_init);
-  println!(" - Adapton update time: {:.*} ms avg over the first {} changes",2,update_time,changes);
-  if crossover > 0 {
-    println!(" - Adapton cross over: {} changes  (When Adapton's update time overcomes its overhead)",crossover);
-  }  else {
-    println!(" - Adapton cross over off chart  (When Adapton's update time overcomes its overhead)");
-  }
-  println!(" - Adapton speedup: {:.*} (Native initial time / Adapton update time)",2,native_init/update_time);
-
+  println!("At input size: {}, Average of {} trials after warmup",start_size,trials);
+  print_crossover_stats(&summary_non_inc.computes,&summary_inc.computes);
 
   // generate data file
-
 
   let filename = if let Some(f) = outfile {f} else {"out"};
   println!("Generating {}.pdf ...", filename);
 
-  let mut dat: Box<Write> =
-    Box::new(
-      OpenOptions::new()
-      .create(true)
-      .write(true)
-      .truncate(true)
-      .open(filename.to_owned()+".dat")
-      .unwrap()
-    )
-  ;
+  let mut dat = File::create(filename.to_owned()+".dat").unwrap();
 
-  let (mut en,mut rn,mut ei,mut ri) = (0f64,0f64,0f64,0f64);
-  writeln!(dat,"'{}'\t'{}'\t'{}'","Changes","Edit Time","Compute Time").unwrap();
-  for i in 0..changes {
-    en += edit_non_inc[i] as f64 / 1_000_000.0;
-    rn += comp_non_inc[i] as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}\t{}",i,en,rn).unwrap();    
-  }
+  summary_non_inc.write_to(&mut dat);
   writeln!(dat,"").unwrap();
   writeln!(dat,"").unwrap();
-  for i in 0..changes {
-    ei += edit_inc[i] as f64 / 1_000_000.0;
-    ri += comp_inc[i] as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}\t{}",i,ei,ri).unwrap();    
-  }
-
-  let mut plotscript =
-    OpenOptions::new()
-    .create(true)
-    .write(true)
-    .truncate(true)
-    .open(filename.to_owned()+".plotscript")
-    .unwrap()
-  ;
+  summary_inc.write_to(&mut dat);
 
   // generate plot script
 
+  let mut plotscript = File::create(filename.to_owned()+".plotscript").unwrap();
+
   writeln!(plotscript,"set terminal pdf").unwrap();
-  writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
+  writeln!(plotscript,"set output '{}.pdf'", filename).unwrap();
   write!(plotscript,"set title \"{}", "Cumulative time to calculate quickhull after inserting element(s)\\n").unwrap();
-  writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,datagauge,namegauge,edits).unwrap();
+  writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}, (t)rials: {}\"", start_size,datagauge,namegauge,edits,trials).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
   writeln!(plotscript,"set key left top box").unwrap();
@@ -403,10 +344,12 @@ fn main2() {
   writeln!(plotscript,"set mxtics 5           # set the spacing for the mxtics").unwrap();
   writeln!(plotscript,"set grid               # enable the grid").unwrap();
   writeln!(plotscript,"plot \\").unwrap();
-  writeln!(plotscript,"'{}' i 0 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Non-incremental Compute Time").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Incremental Compute Time").unwrap();
+  writeln!(plotscript,"'{}.dat' i 0 u 1:6:7 ls 1 t '{}' with errorbars,\\",filename,"Non-incremental Compute Time").unwrap();
+  writeln!(plotscript,"'{}.dat' i 0 u 1:6 ls 1 notitle with linespoints,\\",filename).unwrap();
+  writeln!(plotscript,"'{}.dat' i 1 u 1:6:7 ls 2 t '{}' with errorbars,\\",filename,"Incremental Compute Time").unwrap();
+  writeln!(plotscript,"'{}.dat' i 1 u 1:6 ls 2 notitle with linespoints,\\",filename).unwrap();
 
-  //generate plot
+  // generate plot
 
   ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
 

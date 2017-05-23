@@ -1,9 +1,11 @@
 extern crate time;
 extern crate rand;
+extern crate stats;
 extern crate adapton;
 extern crate adapton_lab;
 extern crate iodyn;
 
+pub mod util;
 pub mod actions;
 pub mod primitives;
 pub mod interface;

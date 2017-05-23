@@ -1,16 +1,9 @@
 use std::marker::PhantomData;
+use std::io::Write;
 use time::{Duration};
 use rand::{StdRng};
+use stats::OnlineStats;
 use actions::{Creator,Editor,Computor,Testor};
-
-pub struct TestResult<I,O> {
-	pub edits: Vec<Duration>,
-	pub full_edits: Vec<Duration>,
-	pub computes: Vec<Duration>,
-	pub full_computes: Vec<Duration>,
-	pub result_data: O,
-	in_type: PhantomData<I>,
-}
 
 pub struct EditComputeSequence<C,E,U> {
 	pub init: C,
@@ -78,6 +71,101 @@ for EditComputeSequence<C,E,U> where
 			full_computes: full_computes,
 			result_data: results,
 			in_type: PhantomData,
+		}
+	}
+}
+
+/// raw stats from the test
+pub struct TestResult<I,O> {
+	pub edits: Vec<Duration>,
+	pub full_edits: Vec<Duration>,
+	pub computes: Vec<Duration>,
+	pub full_computes: Vec<Duration>,
+	pub result_data: O,
+	in_type: PhantomData<I>,
+}
+
+/// Cumulative aggregated results
+pub struct TestResultAg {
+	pub edits: Vec<f64>,
+	pub edits_er: Vec<f64>,
+	pub full_edits: Vec<f64>,
+	pub full_edits_er: Vec<f64>,
+	pub computes: Vec<f64>,
+	pub computes_er: Vec<f64>,
+	pub full_computes: Vec<f64>,
+	pub full_computes_er: Vec<f64>,
+}
+
+fn as_milli(dur: &Vec<Duration>, cnt: usize) -> f64 {
+	dur.iter().map(|d|{
+		d.num_nanoseconds().unwrap() as f64 / 1_000_000.0
+	}).take(cnt).sum()
+}
+
+pub fn aggregate<I,O>(data: &[TestResult<I,O>]) -> TestResultAg {
+	if data.is_empty() { panic!("no data") }
+	let mut result = TestResultAg{
+		edits: Vec::new(),
+		edits_er: Vec::new(),
+		full_edits: Vec::new(),
+		full_edits_er: Vec::new(),
+		computes: Vec::new(),
+		computes_er: Vec::new(),
+		full_computes: Vec::new(),
+		full_computes_er: Vec::new(),
+	};
+	let samples = data.len();
+	let samp_sqrt = (samples as f64).sqrt();
+	let changes = data[0].edits.len();
+	for c in 0..changes {
+		let mut edits = OnlineStats::new();
+		let mut full_edits = OnlineStats::new();
+		let mut computes = OnlineStats::new();
+		let mut full_computes = OnlineStats::new();
+		for s in 0..samples {
+			edits.add(as_milli(&data[s].edits,c+1));
+			full_edits.add(as_milli(&data[s].full_edits,c+1));
+			computes.add(as_milli(&data[s].computes,c+1));
+			full_computes.add(as_milli(&data[s].full_computes,c+1));
+		}
+		result.edits.push(edits.mean());
+		result.edits_er.push(edits.stddev()/samp_sqrt);
+		result.full_edits.push(full_edits.mean());
+		result.full_edits_er.push(full_edits.stddev()/samp_sqrt);
+		result.computes.push(computes.mean());
+		result.computes_er.push(computes.stddev()/samp_sqrt);
+		result.full_computes.push(full_computes.mean());
+		result.full_computes_er.push(full_computes.stddev()/samp_sqrt);
+	}
+	result
+}
+
+impl TestResultAg {
+	pub fn write_to(&self, dat: &mut Write) {
+		writeln!(dat,"# '{}'\t'{}'\t'{}'\t'{}'\t'{}'\t'{}'\t'{}'\t'{}'\t'{}'",
+			"Changes",
+			"Edit Time",
+			"Edit Standard Error",
+			"Full Edit Time",
+			"Full Edit Standard Error",
+			"Compute Time",
+			"Compute Standard Error",
+			"Full Compute Time",
+			"Full Compute Standard Error"
+		).unwrap();
+		for i in 0..self.edits.len() {
+			writeln!(dat,"{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+				i,
+				self.edits[i],
+				self.edits_er[i],
+				self.full_edits[i],
+				self.full_edits_er[i],
+				self.computes[i],
+				self.computes_er[i],
+				self.full_computes[i],
+				self.full_computes_er[i]
+			).unwrap();
 		}
 	}
 }
