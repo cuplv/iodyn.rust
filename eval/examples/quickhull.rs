@@ -268,11 +268,16 @@ fn main2() {
   >> = Vec::new();
 
   for i in 0..trials+1 {
+    //reseed rng
+    let new_seed = &[dataseed+i];
+    test_vec.init.coord.reseed(new_seed);
+    test_raz.init.coord.reseed(new_seed);
+
     results_non_inc.push(test_vec.test(&mut rng));
     // for visual debugging
     if do_trace && i == 1 {reflect::dcg_reflect_begin()}
 
-    results_inc.push(test_raz.test(&mut rng));
+    ns(name_of_usize(i),||results_inc.push(test_raz.test(&mut rng)));
 
     if do_trace && i == 1 {
       let traces = reflect::dcg_reflect_end();
