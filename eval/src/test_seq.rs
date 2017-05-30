@@ -155,7 +155,7 @@ impl TestResultAg {
 			"Full Compute Standard Error"
 		).unwrap();
 		for i in 0..self.edits.len() {
-			writeln!(dat,"{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+			writeln!(dat,"{}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}\t{:.4}",
 				i,
 				self.edits[i],
 				self.edits_er[i],

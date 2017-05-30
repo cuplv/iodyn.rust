@@ -203,7 +203,7 @@ fn main2() {
 
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}.pdf'", filename).unwrap();
-  write!(plotscript,"set title \"{}", "Cumulative time to calculate quickhull after inserting element(s)\\n").unwrap();
+  write!(plotscript,"set title \"{}", "Cumulative time to sort after inserting element(s)\\n").unwrap();
   writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}, (t)rials: {}\"", start_size,datagauge,namegauge,edits,trials).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();
