@@ -53,9 +53,9 @@ EditInsert for EvalLList<E,G> {
 		let data_vec = self.coord.gen_iter().take(batch_size).collect::<Vec<_>>().into_iter();
 		let time = Duration::span(||{
 			for val in data_vec {
-				let end = self.list.split_off(loc);
+				let mut end = self.list.split_off(loc);
 				self.list.push_back(val);
-				self.list.extend(end.into_iter())
+				self.list.append(&mut end);
 			}
 		});
 		(time,self)
