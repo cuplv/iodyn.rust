@@ -196,6 +196,53 @@ EditInsert for EvalIRaz<E,G> {
 }
 
 // TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
+impl<E:Adapt,G:Rng,F:Fn(&mut G)->E>
+EditInsertCustom<G,E,F> for EvalIRaz<E,G> {
+	fn insert_custom(mut self, batch_size: usize, create_fn: &F, rng: &mut StdRng) -> (Duration,Self) {
+		let tree = self.raztree.take().unwrap_or_else(||panic!("raz uninitialized"));
+		let len = tree.meta().0;
+		let loc = self.coord.gen::<usize>() % len;
+		let mut focus = None;
+		let focus_time = Duration::span(||{
+			focus = tree.focus(loc);
+		});
+		let mut raz = focus.unwrap_or_else(||panic!("bad edit location: {}/{}",loc,len));
+		// pregenerate data
+		let new_levels = batch_size / self.datagauge;
+		let mut lev_vec = Vec::with_capacity(new_levels);
+		for _ in 0..(new_levels + 1) {
+			lev_vec.push(gen_level(rng))
+		}
+		let new_names = batch_size / (self.namegauge*self.datagauge);
+		let mut name_vec = Vec::with_capacity(new_names);
+		for _ in 0..(new_names + 1) {
+			name_vec.push(Some(self.next_name()));
+		}
+		let mut data_vec = Vec::with_capacity(batch_size);
+		for _ in 0..batch_size {
+			data_vec.push(create_fn(&mut self.coord));
+		}
+		let data_iter = data_vec.into_iter();
+		let mut name_iter = name_vec.into_iter();
+		let mut lev_iter = lev_vec.into_iter();
+		// time insertions
+		let insert_time = Duration::span(||{
+			for data in data_iter {
+				raz.push_left(data);
+				self.counter += 1;
+				if self.counter % (self.namegauge*self.datagauge) == 0 {
+					raz.archive_left(lev_iter.next().expect("lev_name"),name_iter.next().expect("name"));
+				} else if self.counter % self.datagauge == 0 {
+					raz.archive_left(lev_iter.next().expect("lev"),None);
+				}
+			}
+			self.raztree = Some(raz.unfocus());
+		});
+		(focus_time+insert_time,self)
+	}
+}
+
+// TODO: this may generate an unused name/level. It uses the +1 only in unchecked side cases
 impl<E:Adapt+Rand,G:Rng>
 EditAppend for EvalIRaz<E,G> {
 	fn append(mut self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self) {

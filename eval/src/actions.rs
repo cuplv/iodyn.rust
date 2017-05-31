@@ -80,12 +80,22 @@ Editor<Duration,D> for BatchAppend {
 	}
 }
 
-/// Insert multiple elements into the collection at random places
+/// Insert multiple elements into the collection at a random place
 pub struct BatchInsert(pub usize);
 impl<D: EditInsert>
 Editor<Duration,D> for BatchInsert {
 	fn edit(&mut self, data: D, rng: &mut StdRng) -> (Duration,D) {
 		data.insert(self.0, rng)
+	}
+}
+
+/// Insert multiple custom elements into the collection at a random
+pub struct BatchInsertCustom<R:Rng,E,F:Fn(&mut R)->E>(usize,F,PhantomData<R>,PhantomData<E>);
+impl<R:Rng,E,F:Fn(&mut R)->E> BatchInsertCustom<R,E,F> { pub fn new(edits: usize, create: F)->Self{ BatchInsertCustom(edits,create,PhantomData,PhantomData)}}
+impl<R:Rng,E,F:Fn(&mut R)->E,D: EditInsertCustom<R,E,F>>
+Editor<Duration,D> for BatchInsertCustom<R,E,F> {
+	fn edit(&mut self, data: D, rng: &mut StdRng) -> (Duration,D) {
+		data.insert_custom(self.0, &self.1, rng)
 	}
 }
 

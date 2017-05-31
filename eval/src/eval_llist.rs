@@ -62,6 +62,21 @@ EditInsert for EvalLList<E,G> {
 	}
 }
 
+impl<E,G:Rng,F:Fn(&mut G)->E>
+EditInsertCustom<G,E,F> for EvalLList<E,G> {
+	fn insert_custom(mut self, batch_size: usize, create_fn: &F, _rng: &mut StdRng) -> (Duration,Self) {
+		let loc = self.coord.gen::<usize>() % self.list.len();
+		let data_vec = (0..batch_size).map(|_|create_fn(&mut self.coord)).collect::<Vec<_>>().into_iter();
+		let time = Duration::span(||{
+			for val in data_vec {
+				let mut end = self.list.split_off(loc);
+				self.list.push_back(val);
+				self.list.append(&mut end);
+			}
+		});
+		(time,self)
+	}
+}
 
 impl<E:Clone,O,G:Rng>
 CompNative<O> for EvalLList<E,G> {

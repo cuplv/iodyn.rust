@@ -106,6 +106,20 @@ EditInsert for EvalVec<E,G> {
 	}
 }
 
+impl<E,G:Rng,F:Fn(&mut G)->E>
+EditInsertCustom<G,E,F> for EvalVec<E,G> {
+	fn insert_custom(mut self, batch_size: usize, create_fn: &F, _rng: &mut StdRng) -> (Duration,Self) {
+		let loc = self.coord.gen::<usize>() % self.vec.len();
+		let data_vec = (0..batch_size).map(|_|create_fn(&mut self.coord)).collect::<Vec<_>>().into_iter();
+		let time = Duration::span(||{
+			for val in data_vec {
+				self.vec.insert(loc,val);
+			}
+		});
+		(time,self)
+	}
+}
+
 impl<E:Clone+Ord,G:Rng>
 CompMax for EvalVec<E,G> {
 	type Target = Option<E>;

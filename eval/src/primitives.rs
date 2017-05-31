@@ -27,6 +27,10 @@ pub trait EditAppend {
 pub trait EditInsert {
 	fn insert(self, batch_size: usize, rng: &mut StdRng) -> (Duration,Self);
 }
+/// for inserting custom elements at random location
+pub trait EditInsertCustom<R: Rng,E,F:Fn(&mut R)->E>{
+	fn insert_custom(self, batch_size: usize, create_fn: &F, rng: &mut StdRng) -> (Duration,Self);
+}
 /// for computing the max of the collection
 pub trait CompMax {
 	type Target;
