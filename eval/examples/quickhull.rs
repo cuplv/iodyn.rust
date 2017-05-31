@@ -141,28 +141,32 @@ fn main2() {
       Point{x:rng.gen::<isize>() % MAX_EDIT,y: rng.gen::<isize>() % MAX_EDIT}
     }),
     comp: Native::new(|ps:&IRazTree<Point>|{
-      let most_left = ns(name_of_str("left_most"),||ps.clone().fold_up(
-        Rc::new(|a:&Point|a.clone()),
-        Rc::new(|p:Point,q:Point| { if p.x < q.x { p } else { q }}),
-      )).unwrap();
-      let most_right = ns(name_of_str("right_most"),||ps.clone().fold_up(
-        Rc::new(|a:&Point|a.clone()),
-        Rc::new(|p:Point,q:Point| { if p.x > q.x { p } else { q }}),
-      )).unwrap();
-      let t_line = Line { u: most_left.clone(), v: most_right.clone() };
-      let b_line = Line { u: most_right.clone(), v: most_left.clone() };
-      let t_points = ns(name_of_str("top_points"),||above_line(&ps,t_line.clone()));
-      let b_points = ns(name_of_str("bottom_points"),||above_line(&ps,b_line.clone()));
-      let mut hull = IRaz::new();
-      hull.push_left(most_left);
-      let (nb,nt) = name_fork(name_unit());
-      let mut hull = ns(name_of_str("bottom_rec"),||memo!(name_unit() =>> quickhull_rec, n:nb, l:b_line, p:b_points, h:hull));
-      hull.push_left(most_right);
-      ns(name_of_str("hull"),||{hull.archive_left(iodyn::inc_level(),Some(name_unit()))});
-      let hull = ns(name_of_str("top_rec"),||memo!(name_unit() =>> quickhull_rec, n:nt, l:t_line, p:t_points, h:hull));
-      //println!("unfocus and return");
-      //return ns(name_of_str("unfocus"),||{hull.memo_unfocus()});
-      return hull.unfocus();
+      let ps = ps.clone();
+      return ns(name_of_str("qh_main"),||memo!(name_unit() =>> quickhull, p:ps, d:0));
+      fn quickhull(ps:IRazTree<Point>,_d:usize)-> IRazTree<Point>{
+        let most_left = ns(name_of_str("left_most"),||ps.clone().fold_up(
+          Rc::new(|a:&Point|a.clone()),
+          Rc::new(|p:Point,q:Point| { if p.x < q.x { p } else { q }}),
+        )).unwrap();
+        let most_right = ns(name_of_str("right_most"),||ps.clone().fold_up(
+          Rc::new(|a:&Point|a.clone()),
+          Rc::new(|p:Point,q:Point| { if p.x > q.x { p } else { q }}),
+        )).unwrap();
+        let t_line = Line { u: most_left.clone(), v: most_right.clone() };
+        let b_line = Line { u: most_right.clone(), v: most_left.clone() };
+        let t_points = ns(name_of_str("top_points"),||above_line(&ps,t_line.clone()));
+        let b_points = ns(name_of_str("bottom_points"),||above_line(&ps,b_line.clone()));
+        let mut hull = IRaz::new();
+        hull.push_left(most_left);
+        let (nb,nt) = name_fork(name_unit());
+        let mut hull = ns(name_of_str("bottom_rec"),||memo!(name_unit() =>> quickhull_rec, n:nb, l:b_line, p:b_points, h:hull));
+        hull.push_left(most_right);
+        ns(name_of_str("hull"),||{hull.archive_left(iodyn::inc_level(),Some(name_unit()))});
+        let hull = ns(name_of_str("top_rec"),||memo!(name_unit() =>> quickhull_rec, n:nt, l:t_line, p:t_points, h:hull));
+        //println!("unfocus and return");
+        //return ns(name_of_str("unfocus"),||{hull.memo_unfocus()});
+        return hull.unfocus();
+      }
       fn above_line(ps: &IRazTree<Point>, line: Line) -> IRazTree<Point> {
         // build a filtered version of the input tree
         ps.clone().fold_up_gauged(Rc::new(move|v:&Vec<Point>|{
