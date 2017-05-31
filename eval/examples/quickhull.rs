@@ -8,7 +8,7 @@ extern crate eval;
 use std::rc::Rc;
 use std::io::{BufWriter,Write};
 use std::fs::File;
-use rand::{StdRng,SeedableRng};
+use rand::{StdRng,SeedableRng,Rng};
 use adapton::reflect;
 use adapton::engine::*;
 use adapton::macros::*;
@@ -27,17 +27,19 @@ use eval::util::*;
 
 use geom::*;
 mod geom {
+  use rand::{Rng,Rand};
+
   #[derive(Clone, Debug, Hash, Eq, PartialEq)]
   pub struct Point {
     pub x: isize,
     pub y: isize,
   }
-  use rand::{Rng,Rand};
+  // max must be less than 3_000_000_000 to avoid overflow on 64bit machine
+  pub const MAX_GEN:isize = 600_000_000;
+  pub const MAX_EDIT:isize = 1_000_000_000;
   impl Rand for Point{
     fn rand<R: Rng>(rng: &mut R) -> Self {
-      // max must be less than 3_000_000_000 to avoid overflow on 64bit machine
-      let max = 1_000_000_000;
-      Point{x:rng.gen::<isize>() % max,y: rng.gen::<isize>() % max}
+      Point{x:rng.gen::<isize>() % MAX_GEN,y: rng.gen::<isize>() % MAX_GEN}
     }
   }
 
@@ -106,7 +108,7 @@ fn main2() {
     .author("Kyle Headley <kyle.headley@colorado.edu>")
     .args_from_usage("\
       --dataseed=[dataseed]			  'seed for random data'
-      --editseed=[edit_seed]      'seed for random edits (and misc.)'
+      --editseed=[editseed]      'seed for random edits (and misc.)'
       -s, --start=[start]         'starting sequence length'
       -g, --datagauge=[datagauge] 'initial elements per structure unit'
       -n, --namegauge=[namegauge] 'initial tree nodes between each art'
@@ -116,8 +118,8 @@ fn main2() {
       -o, --outfile=[outfile]     'name for output files (of different extensions)'
       --trace                     'produce an output trace of the incremental run' ")
     .get_matches();
-  let dataseed = value_t!(args, "data_seed", usize).unwrap_or(0);
-  let editseed = value_t!(args, "edit_seed", usize).unwrap_or(0);
+  let dataseed = value_t!(args, "dataseed", usize).unwrap_or(0);
+  let editseed = value_t!(args, "editseed", usize).unwrap_or(0);
 	let start_size = value_t!(args, "start", usize).unwrap_or(1_000_000);
 	let datagauge = value_t!(args, "datagauge", usize).unwrap_or(1_000);
 	let namegauge = value_t!(args, "namegauge", usize).unwrap_or(1);
@@ -135,7 +137,9 @@ fn main2() {
       namegauge: namegauge,
       coord: coord.clone(),
     },
-    edit: BatchInsert(edits),
+    edit: BatchInsertCustom::new(edits,|rng:&mut StdRng|{
+      Point{x:rng.gen::<isize>() % MAX_EDIT,y: rng.gen::<isize>() % MAX_EDIT}
+    }),
     comp: Native::new(|ps:&IRazTree<Point>|{
       let most_left = ns(name_of_str("left_most"),||ps.clone().fold_up(
         Rc::new(|a:&Point|a.clone()),
@@ -207,7 +211,9 @@ fn main2() {
       namegauge: namegauge,
       coord: coord.clone(),
     },
-    edit: BatchInsert(edits),
+    edit: BatchInsertCustom::new(edits,|rng:&mut StdRng|{
+      Point{x:rng.gen::<isize>() % MAX_EDIT,y: rng.gen::<isize>() % MAX_EDIT}
+    }),
     comp: Native::new(|ps:&Vec<Point>|{
       let most_left = ps.iter().fold(
         Point{x:100,y:0},

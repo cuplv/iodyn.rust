@@ -108,7 +108,7 @@ fn main2() {
     .author("Kyle Headley <kyle.headley@colorado.edu>")
     .args_from_usage("\
       --dataseed=[dataseed]			  'seed for random data'
-      --editseed=[edit_seed]      'seed for random edits (and misc.)'
+      --editseed=[editseed]      'seed for random edits (and misc.)'
       -s, --start=[start]         'starting sequence length'
       -g, --datagauge=[datagauge] 'initial elements per structure unit'
       -n, --namegauge=[namegauge] 'initial tree nodes between each art'
@@ -118,8 +118,8 @@ fn main2() {
       -o, --outfile=[outfile]     'name for output files (of different extensions)'
       --trace                     'produce an output trace of the incremental run' ")
     .get_matches();
-  let dataseed = value_t!(args, "data_seed", usize).unwrap_or(0);
-  let editseed = value_t!(args, "edit_seed", usize).unwrap_or(0);
+  let dataseed = value_t!(args, "dataseed", usize).unwrap_or(0);
+  let editseed = value_t!(args, "editseed", usize).unwrap_or(0);
 	let start_size = value_t!(args, "start", usize).unwrap_or(1_000_000);
 	let datagauge = value_t!(args, "datagauge", usize).unwrap_or(1_000);
 	let namegauge = value_t!(args, "namegauge", usize).unwrap_or(1);
