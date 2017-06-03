@@ -179,7 +179,7 @@ fn main2() {
   // for visual debugging
   if do_trace {reflect::dcg_reflect_begin()}
 
-  let result_trie1: TestResult<EvalIRaz<GenSetElm,StdRng>,_> = test_trie1.test(&mut rng);
+  //let result_trie1: TestResult<EvalIRaz<GenSetElm,StdRng>,_> = test_trie1.test(&mut rng);
 
   if do_trace {
     let traces = reflect::dcg_reflect_end();
@@ -244,12 +244,12 @@ fn main2() {
 
   // post-process results
   let comp_hash = result_hash.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let comp_trie1 = result_trie1.computes.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  //let comp_trie1 = result_trie1.computes.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_trie2 = result_trie2.computes.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let comp_ivl = inc_veclist.computes.iter().map(|d|d[0].num_nanoseconds().unwrap()).collect::<Vec<_>>();
 
   let edit_hash = result_hash.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
-  let edit_trie1 = result_trie1.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
+  //let edit_trie1 = result_trie1.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_trie2 = result_trie2.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   let edit_ivl = inc_veclist.edits.iter().map(|d|d.num_nanoseconds().unwrap()).collect::<Vec<_>>();
   
@@ -257,7 +257,7 @@ fn main2() {
   println!("----------------------------------------------------------------------------------");
   println!("Computation time (ms): (initial run, first incremental run); Note:do_trace={:?}", do_trace);
   println!("hashmap:  ({:8.3}, {:8.3})", comp_hash[0] as f32 / 1000000.0, comp_hash[1] as f32 / 1000000.0);
-  println!("trie1:     ({:8.3}, {:8.3})", comp_trie1[0] as f32 / 1000000.0, comp_trie1[1] as f32 / 1000000.0);
+  //println!("trie1:     ({:8.3}, {:8.3})", comp_trie1[0] as f32 / 1000000.0, comp_trie1[1] as f32 / 1000000.0);
   println!("trie2:     ({:8.3}, {:8.3})", comp_trie2[0] as f32 / 1000000.0, comp_trie2[1] as f32 / 1000000.0);
   println!("vec_list: ({:8.3}, {:8.3})", comp_ivl[0]  as f32 / 1000000.0, comp_ivl[1]  as f32 / 1000000.0);
 
@@ -289,14 +289,14 @@ fn main2() {
     c += comp_hash[i] as f64 / 1_000_000.0;
     writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
   }
-  writeln!(dat,"").unwrap();
-  writeln!(dat,"").unwrap();
-  e = 0.0; c = 0.0;
-  for i in 0..changes {
-    e += edit_trie1[i] as f64 / 1_000_000.0;
-    c += comp_trie1[i] as f64 / 1_000_000.0;
-    writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
-  }
+  // writeln!(dat,"").unwrap();
+  // writeln!(dat,"").unwrap();
+  // e = 0.0; c = 0.0;
+  // for i in 0..changes {
+  //   e += edit_trie1[i] as f64 / 1_000_000.0;
+  //   c += comp_trie1[i] as f64 / 1_000_000.0;
+  //   writeln!(dat,"{}\t{}\t{}\t{}",i,e,c,e+c).unwrap();    
+  // }
   writeln!(dat,"").unwrap();
   writeln!(dat,"").unwrap();
   e = 0.0; c = 0.0;
@@ -349,7 +349,7 @@ fn main2() {
   //writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Skiplist total").unwrap();
 
   //writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Trie edit").unwrap();
-  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie1").unwrap();
+  //writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie1").unwrap();
   writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie2").unwrap();
   //writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie total").unwrap();
 

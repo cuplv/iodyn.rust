@@ -405,8 +405,6 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 }
             },
             (TrieRec::Empty, TrieRec::Bin(r)) => {
-                //let (e0, e1) = (Vec::new(), Vec::new());
-                //let (l0, l1) = Self::split_vec(l.kvs, bits.len, e0, e1);
                 let (b0, b1) = Self::split_bits(&bits);
                 let (n0, n1) = name_fork(n.clone());
                 let (m0, m1) = name_fork(r.name.clone());
