@@ -54,7 +54,7 @@ pub struct TrieMeta {
     gauge:usize,
 }
 
-#[derive(PartialEq,Eq,Clone,Debug, Hash)]
+#[derive(PartialEq,Eq,Clone,Debug,Hash)]
 enum TrieRec<K:'static+Hash+PartialEq+Eq+Clone+Debug,
              V:'static+Hash+PartialEq+Eq+Clone+Debug>
 {
@@ -62,7 +62,7 @@ enum TrieRec<K:'static+Hash+PartialEq+Eq+Clone+Debug,
     Leaf(TrieLeaf<K,V>),
     Bin(TrieBin<K,V>),
 }
-#[derive(PartialEq,Eq,Clone,Debug)]
+#[derive(PartialEq,Eq,Clone,Debug,Hash)]
 struct TrieLeaf<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 V:'static+Hash+PartialEq+Eq+Clone+Debug> {
     kvs:Rc<Vec<(K,HashVal,V)>>,
@@ -74,15 +74,6 @@ struct TrieBin<K:'static+Hash+PartialEq+Eq+Clone+Debug,
     name:   Name,
     left:   Art<TrieRec<K,V>>,
     right:  Art<TrieRec<K,V>>,
-}
-
-impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
-     V:'static+Hash+PartialEq+Eq+Clone+Debug>
-    Hash for TrieLeaf<K,V> 
-{
-    fn hash<H:Hasher>(&self, _h:&mut H) {
-        unimplemented!()
-    }
 }
 
 impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
@@ -183,10 +174,38 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
         else { TrieRec::Leaf(TrieLeaf{kvs:Rc::new(kvs)}) }
     }
 
+    fn is_wf_rec (t:&TrieRec<K,V>, bits:Bits) -> bool {
+        match *t {
+            TrieRec::Empty => true,
+            TrieRec::Leaf(ref leaf) => {
+                // Check that all of the hash values match the given bit pattern of bits.
+                for &(_,ref hv, _) in leaf.kvs.iter() {
+                    for i in 0..bits.len {
+                        if ((bits.bits & (1 << i)) as usize) == (hv.0 & (1 << i)) { continue }
+                        else { return false }
+                    }
+                }
+                return true
+            }
+            // Check bit patterns match, and that recursive trees are well-formed.
+            TrieRec::Bin(ref b) => { 
+                let (b0, b1) = Self::split_bits(&bits);
+                let lwf = Self::is_wf_rec(& get!(b.left), b0);
+                let rwf = Self::is_wf_rec(& get!(b.right), b1);
+                b.bits == bits && lwf && rwf 
+            }
+        }
+    }
+
+    fn is_wf(self:&Self) -> bool {
+        Self::is_wf_rec(&self.rec, Bits{bits:0, len:0})
+    }
+
     fn join_rec (meta:TrieMeta, lt: TrieRec<K,V>, rt: TrieRec<K,V>, bits:Bits, n:Name) -> TrieRec<K,V> {
         match (lt, rt) {
-            (TrieRec::Empty, rt) => rt,
-            (lt, TrieRec::Empty) => lt,
+            (TrieRec::Empty,   TrieRec::Empty)   => TrieRec::Empty,
+            (TrieRec::Empty,   TrieRec::Leaf(r)) => TrieRec::Leaf(r),
+            (TrieRec::Leaf(l), TrieRec::Empty  ) => TrieRec::Leaf(l),
             (TrieRec::Leaf(l), TrieRec::Leaf(r)) => {
                 if l.kvs.len() == 0 { 
                     TrieRec::Leaf(r)
@@ -210,6 +229,16 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                     TrieRec::Bin(TrieBin{left:t0, right:t1, bits:bits, name:n})
                 }
             },
+            (TrieRec::Empty, TrieRec::Bin(r)) => {
+                //let (e0, e1) = (Vec::new(), Vec::new());
+                //let (l0, l1) = Self::split_vec(l.kvs, bits.len, e0, e1);
+                let (b0, b1) = Self::split_bits(&bits);
+                let (n0, n1) = name_fork(n.clone());
+                let (m0, m1) = name_fork(r.name.clone());
+                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:TrieRec::Empty, r:get!(r.left),  b:b0, n:m0);
+                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:TrieRec::Empty, r:get!(r.right), b:b1, n:m1);
+                TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
+            },
             (TrieRec::Leaf(l), TrieRec::Bin(r)) => {
                 let (e0, e1) = (Vec::new(), Vec::new());
                 let (l0, l1) = Self::split_vec(l.kvs, bits.len, e0, e1);
@@ -218,6 +247,14 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 let (m0, m1) = name_fork(r.name.clone());
                 let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:Self::leaf_or_empty(l0), r:get!(r.left),  b:b0, n:m0);
                 let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:Self::leaf_or_empty(l1), r:get!(r.right), b:b1, n:m1);
+                TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
+            },
+            (TrieRec::Bin(l), TrieRec::Empty) => {
+                let (b0, b1) = Self::split_bits(&bits);
+                let (n0, n1) = name_fork(n.clone());
+                let (m0, m1) = name_fork(l.name.clone());
+                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:get!(l.left),  r:TrieRec::Empty, b:b0, n:m0);
+                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:get!(l.right), r:TrieRec::Empty, b:b1, n:m1);
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Leaf(r)) => {
@@ -231,8 +268,11 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Bin(r)) => {
-                assert!(l.bits == bits);
-                assert!(l.bits == r.bits);
+                let test1 = l.bits == bits;
+                let test2 = l.bits == r.bits;
+                if !(test1 && test2) {
+                    panic!("\nInternal error: {:?} {:?} -- bits:{:?} l.bits:{:?} r.bits:{:?}!!!\n", test1, test2, bits, l.bits, r.bits);
+                };
                 let (n1, n2) = name_fork(n.clone());
                 let (b0, b1) = Self::split_bits(&bits);
                 let o0 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:get!(l.left),  r:get!(r.left), b:b0, n:l.name);
@@ -243,13 +283,36 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
     }               
 }
 
-#[test]
-pub fn test_join () {
+#[test] pub fn test_join_10_1   () { test_join(10,1) }
+#[test] pub fn test_join_100_1  () { test_join(100,1) }
+#[test] pub fn test_join_1000_1 () { test_join(1000,1) }
+
+#[test] pub fn test_join_10_2   () { test_join(10,2) }
+#[test] pub fn test_join_100_2  () { test_join(100,2) }
+#[test] pub fn test_join_1000_2 () { test_join(1000,2) }
+
+#[test] pub fn test_join_10_3   () { test_join(10,3) }
+#[test] pub fn test_join_100_3  () { test_join(100,3) }
+#[test] pub fn test_join_1000_3 () { test_join(1000,3) }
+
+#[test] pub fn test_join_10_4   () { test_join(10,4) }
+#[test] pub fn test_join_100_4  () { test_join(100,4) }
+#[test] pub fn test_join_1000_4 () { test_join(1000,4) }
+
+#[test] pub fn test_join_10_5   () { test_join(10,5) }
+#[test] pub fn test_join_100_5  () { test_join(100,5) }
+#[test] pub fn test_join_1000_5 () { test_join(1000,5) }
+
+
+pub fn test_join (size:usize, gauge:usize) {
     fn at_leaf(v:&Vec<usize>) -> Trie<usize,()> {
         Trie::<usize,()>::from_key_vec(v)
     }    
     fn at_bin(l:Trie<usize,()>,_lev:u32,n:Option<Name>,r:Trie<usize,()>) -> Trie<usize,()> {
-        Trie::join(l,r,n.unwrap())
+        assert!(l.is_wf());
+        assert!(r.is_wf());
+        let n = n.unwrap();
+        ns(n.clone(), || Trie::join(l,r,n) )
     }
     use rand::{thread_rng,Rng};
     use adapton::engine::*;
@@ -260,21 +323,29 @@ pub fn test_join () {
     use raz_meta::Count;
     use std::rc::Rc;
 
-    let mut rng = thread_rng();
-    let mut elms : AStack<usize,_> = AStack::new();
-    let mut elmv : Vec<usize> = vec![];
-    for i in 0..8 {
-        let elm = rng.gen::<usize>() % 100;
-        elmv.push(elm);
-        elms.push(elm);
-        if i % 1 == 0 {
-            elms.archive(Some(name_of_usize(i)), gen_branch_level(&mut rng));
-        }
-    }
-    let tree: RazTree<_,Count> = RazTree::memo_from(&AtHead(elms));
-    println!("{:?}\n", tree);
+    manage::init_dcg();
 
-    let trie = tree.fold_up_gauged(Rc::new(at_leaf),Rc::new(at_bin)).unwrap();
+    let (elmv,tree) = {
+        let mut rng = thread_rng();
+        let mut elms : AStack<usize,_> = AStack::new();
+        let mut elmv : Vec<usize> = vec![];
+        for i in 0..size {
+            let elm = rng.gen::<usize>() % size;
+            elmv.push(elm);
+            elms.push(elm);
+            if i % gauge == 0 {
+                elms.archive(Some(name_of_usize(i)), gen_branch_level(&mut rng));
+            }
+        }
+        let tree: RazTree<_,Count> = 
+            ns( name_of_str("tree_of_stack"), || 
+                RazTree::memo_from(&AtHead(elms) ) );
+        println!("{:?}\n", tree);
+        (elmv,tree)
+    };
+
+    let trie = ns( name_of_str("trie_of_tree"),
+                   || tree.fold_up_gauged(Rc::new(at_leaf),Rc::new(at_bin)).unwrap() );
     println!("{:?}\n", trie);
 
     for i in elmv {

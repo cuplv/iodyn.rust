@@ -39,10 +39,10 @@ pub mod raz_based;      // Some simple structs based on the Raz
 pub mod finite_map;
 
 // Two forms of tries. They work, but performance needs improvement
-#[doc(hidden)]
-pub mod skiplist;
 //#[doc(hidden)]
-pub mod trie;
+pub mod skiplist;
+#[doc(hidden)]
+//pub mod trie;
 pub mod trie2;
 
 /// Gauged Incremental Raz with element counts
