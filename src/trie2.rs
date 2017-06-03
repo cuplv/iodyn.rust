@@ -31,7 +31,7 @@ pub mod hammer_level_tree {
     struct NameCons<X> {
         level:u32,
         name:Name,
-        rec: Art<Rec<X>>,
+        rec:Box<Rec<X>>,
     }
     #[derive(Clone,PartialEq,Eq,Debug,Hash)]
     struct LeafCons<X> {
@@ -42,6 +42,7 @@ pub mod hammer_level_tree {
         Leaf(LeafCons<X>),
         Bin(BinCons<X>),
         Name(NameCons<X>),
+        Art(Art<Rec<X>>),
     }
     #[derive(Clone,PartialEq,Eq,Debug,Hash)]
     pub struct LevTree<X> {
@@ -58,8 +59,28 @@ pub mod hammer_level_tree {
             LevTree{rec:Rec::Bin(BinCons{level:lev,recl:Box::new(l.rec),recr:Box::new(r.rec)})} 
         }
         pub fn name(lev:u32, n:Name, r:Self) -> Self {
-            LevTree{rec:Rec::Name(NameCons{level:lev,name:n.clone(), rec:cell(n,r.rec)}) }
+            LevTree{rec:Rec::Name(NameCons{level:lev,name:n.clone(), rec:Box::new(r.rec)}) }
         }
+        fn art(a:Art<Rec<X>>) -> Self {
+            LevTree{rec:Rec::Art(a)}
+        }
+        pub fn fold_monoid<B:Clone>
+            (t:LevTree<X>, z:X, b:B, bin:fn(B,X,X)->X) -> X {
+                fn m_leaf<B:Clone,X>(m:(B,fn(B,X,X)->X,X), elms:Vec<X>) -> X { 
+                    let mut x = m.2;
+                    for elm in elms { x=m.1(m.0.clone(), x, elm) };
+                    x
+                }
+                fn m_bin<B,X>(m:(B,fn(B,X,X)->X,X), _lev:u32, _n:Option<Name>, l:X, r:X) -> X { 
+                    m.1(m.0, l, r)
+                }
+                Self::fold_up_namebin::<(B,fn(B,X,X)->X,X),
+                                        (B,fn(B,X,X)->X,X),X>
+                    (t,
+                     (b.clone(),bin,z.clone()), m_leaf,
+                     (b,bin,z), m_bin)
+            }
+
         pub fn fold_up<L:Clone,B:Clone,N:Clone,R>
             (t:LevTree<X>, 
              l:L, leaf:fn(L,Vec<X>)->R, 
@@ -74,6 +95,7 @@ pub mod hammer_level_tree {
              b:B, bin:fn(B,u32,R,R)->R,
              n:N, name:fn(N,u32,Name,R)->R) -> R {
                 match t {
+                    Rec::Art(a) => Self::fold_up_rec(get!(a), l, leaf, b, bin, n, name),
                     Rec::Leaf(leafcons) => leaf(l, leafcons.elms),
                     Rec::Bin(bincons)   => {
                         let r1 = Self::fold_up_rec(*bincons.recl, l.clone(), leaf, b.clone(), bin, n.clone(), name);
@@ -81,7 +103,7 @@ pub mod hammer_level_tree {
                         bin(b, bincons.level, r1, r2)
                     }
                     Rec::Name(namecons) => {
-                        let r = Self::fold_up_rec(get!(namecons.rec), l, leaf, b, bin, n.clone(), name);
+                        let r = Self::fold_up_rec(*namecons.rec, l, leaf, b, bin, n.clone(), name);
                         name(n, namecons.level, namecons.name, r)
                     }
                 }
@@ -90,23 +112,24 @@ pub mod hammer_level_tree {
         pub fn fold_up_namebin<L:Clone,B:Clone,R>
             (t:LevTree<X>, 
              l:L, leaf:fn(L,Vec<X>)->R, 
-             b:B, namebin:fn(B,u32,Name,R,R)->R) -> R {
+             b:B, namebin:fn(B,u32,Option<Name>,R,R)->R) -> R {
                 Self::fold_up_namebin_rec(t.rec, l, leaf, b, None, namebin)
             }
         
         fn fold_up_namebin_rec<L:Clone,B:Clone,R>
             (t:Rec<X>, 
              l:L, leaf:fn(L,Vec<X>)->R,
-             b:B, n:Option<Name>, namebin:fn(B,u32,Name,R,R)->R) -> R {
+             b:B, n:Option<Name>, namebin:fn(B,u32,Option<Name>,R,R)->R) -> R {
                  match t {
+                    Rec::Art(a) => Self::fold_up_namebin_rec(get!(a), l, leaf, b, n, namebin),
                      Rec::Leaf(leafcons) => leaf(l, leafcons.elms),
                      Rec::Bin(bincons)   => {
                          let r1 = Self::fold_up_namebin_rec(*bincons.recl, l.clone(), leaf, b.clone(), None, namebin);
                          let r2 = Self::fold_up_namebin_rec(*bincons.recr, l.clone(), leaf, b.clone(), None, namebin);
-                         namebin(b, bincons.level, n.unwrap(), r1, r2)
+                         namebin(b, bincons.level, n, r1, r2)
                      }
                     Rec::Name(namecons) => {
-                        Self::fold_up_namebin_rec(get!(namecons.rec), l, leaf, b, Some(namecons.name.clone()), namebin)
+                        Self::fold_up_namebin_rec(*namecons.rec, l, leaf, b, Some(namecons.name.clone()), namebin)
                     }
                  }
             }
@@ -118,7 +141,14 @@ pub mod hammer_level_tree {
                 }
             fn at_bin<X:'static+Clone+PartialEq+Eq+Debug+Hash>
                 (l:LevTree<X>,lev:u32,n:Option<Name>,r:LevTree<X>) -> LevTree<X> {
-                    LevTree::name(lev, n.unwrap(), LevTree::bin(lev, l, r))
+                    match n {
+                        None => LevTree::bin(lev,l,r),
+                        Some(n) => {
+                            let n_ = n.clone();
+                            let a = LevTree::art(cell(n_, LevTree::bin(lev, l, r).rec));
+                            LevTree::name(lev, n, a)
+                        }
+                    }
                 }
             t.fold_up_gauged(Rc::new(at_leaf), Rc::new(at_bin)).unwrap()
         }
@@ -464,10 +494,10 @@ pub fn test_join (size:usize, gauge:usize) {
     fn at_leaf(_:(), v:Vec<usize>) -> Trie<usize,()> {
         Trie::<usize,()>::from_key_vec(v)
     }    
-    fn at_namebin(_:(), _lev:u32,n:Name,l:Trie<usize,()>,r:Trie<usize,()>) -> Trie<usize,()> {
+    fn at_namebin(_:(), _lev:u32,n:Option<Name>,l:Trie<usize,()>,r:Trie<usize,()>) -> Trie<usize,()> {
         assert!(l.is_wf());
         assert!(r.is_wf());
-        ns(n.clone(), || Trie::join(l,r,n) )
+        ns(n.clone().unwrap(), || Trie::join(l,r,n.unwrap()) )
     }
     let trie = ns( name_of_str("trie_of_lev_tree"),
                    || LevTree::fold_up_namebin( lev_tree,
