@@ -42,7 +42,8 @@ pub mod finite_map;
 //#[doc(hidden)]
 pub mod skiplist;
 #[doc(hidden)]
-//pub mod trie;
+
+pub mod trie1;
 pub mod trie2;
 
 /// Gauged Incremental Raz with element counts
