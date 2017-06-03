@@ -28,7 +28,7 @@ use adapton_lab::labviz::*;
 #[allow(unused)] use eval::accum_lists::*;
 
 //use iodyn::inc_gauged_trie::{FinMap,Trie};
-use iodyn::skiplist::{FinMap,Skiplist};
+//use iodyn::skiplist::{FinMap,Skiplist};
 use iodyn::trie2::{Trie};
 use eval::test_seq::{TestResult,TestMResult,EditComputeSequence};
 use adapton::engine::manage::*;
@@ -114,7 +114,7 @@ fn main2() {
     },
     edit: BatchInsert(edits),
     comp: TreeFoldG::new(
-      |v:&Vec<GenSetElm>|{ Trie::<_,()>::from_key_vec(v) },
+      |v:&Vec<GenSetElm>|{ Trie::<_,()>::from_key_vec_ref(v) },
       move|t1,_lev,nm,t2|{ 
           let nm2 = nm.clone();
           ns(nm.unwrap().clone(),||Trie::join(t1, t2, nm2.unwrap())) 

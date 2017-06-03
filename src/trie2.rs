@@ -13,6 +13,118 @@ use std::collections::hash_map::DefaultHasher;
 use adapton::engine::*;
 use adapton::macros::*;
 
+pub mod hammer_level_tree {
+    use std::fmt::Debug;
+    use std::hash::{Hash};
+    use adapton::macros::*;
+    use adapton::engine::{Name,Art,cell,force};
+    use raz::RazTree;
+    use raz_meta::Count;
+
+    #[derive(Clone,PartialEq,Eq,Debug,Hash)]
+    struct BinCons<X> {
+        level: u32,
+        recl:Box<Rec<X>>,
+        recr:Box<Rec<X>>
+    }
+    #[derive(Clone,PartialEq,Eq,Debug,Hash)]
+    struct NameCons<X> {
+        level:u32,
+        name:Name,
+        rec: Art<Rec<X>>,
+    }
+    #[derive(Clone,PartialEq,Eq,Debug,Hash)]
+    struct LeafCons<X> {
+        elms:Vec<X>,
+    }
+    #[derive(Clone,PartialEq,Eq,Debug,Hash)]
+    enum Rec<X> {
+        Leaf(LeafCons<X>),
+        Bin(BinCons<X>),
+        Name(NameCons<X>),
+    }
+    #[derive(Clone,PartialEq,Eq,Debug,Hash)]
+    pub struct LevTree<X> {
+        rec:Rec<X>
+    }
+
+    impl<X:'static+Clone+PartialEq+Eq+Debug+Hash> 
+        LevTree<X> 
+    {
+        pub fn leaf(xs:Vec<X>) -> Self { 
+            LevTree{rec:Rec::Leaf(LeafCons{elms:xs})} 
+        }
+        pub fn bin(lev:u32, l:Self, r:Self) -> Self { 
+            LevTree{rec:Rec::Bin(BinCons{level:lev,recl:Box::new(l.rec),recr:Box::new(r.rec)})} 
+        }
+        pub fn name(lev:u32, n:Name, r:Self) -> Self {
+            LevTree{rec:Rec::Name(NameCons{level:lev,name:n.clone(), rec:cell(n,r.rec)}) }
+        }
+        pub fn fold_up<L:Clone,B:Clone,N:Clone,R>
+            (t:LevTree<X>, 
+             l:L, leaf:fn(L,Vec<X>)->R, 
+             b:B, bin:fn(B,u32,R,R)->R,
+             n:N, name:fn(N,u32,Name,R)->R) -> R {
+                Self::fold_up_rec(t.rec, l, leaf, b, bin, n, name)
+            }
+        
+        fn fold_up_rec<L:Clone,B:Clone,N:Clone,R>
+            (t:Rec<X>, 
+             l:L, leaf:fn(L,Vec<X>)->R, 
+             b:B, bin:fn(B,u32,R,R)->R,
+             n:N, name:fn(N,u32,Name,R)->R) -> R {
+                match t {
+                    Rec::Leaf(leafcons) => leaf(l, leafcons.elms),
+                    Rec::Bin(bincons)   => {
+                        let r1 = Self::fold_up_rec(*bincons.recl, l.clone(), leaf, b.clone(), bin, n.clone(), name);
+                        let r2 = Self::fold_up_rec(*bincons.recr, l.clone(), leaf, b.clone(), bin, n.clone(), name);
+                        bin(b, bincons.level, r1, r2)
+                    }
+                    Rec::Name(namecons) => {
+                        let r = Self::fold_up_rec(get!(namecons.rec), l, leaf, b, bin, n.clone(), name);
+                        name(n, namecons.level, namecons.name, r)
+                    }
+                }
+            }
+
+        pub fn fold_up_namebin<L:Clone,B:Clone,R>
+            (t:LevTree<X>, 
+             l:L, leaf:fn(L,Vec<X>)->R, 
+             b:B, namebin:fn(B,u32,Name,R,R)->R) -> R {
+                Self::fold_up_namebin_rec(t.rec, l, leaf, b, None, namebin)
+            }
+        
+        fn fold_up_namebin_rec<L:Clone,B:Clone,R>
+            (t:Rec<X>, 
+             l:L, leaf:fn(L,Vec<X>)->R,
+             b:B, n:Option<Name>, namebin:fn(B,u32,Name,R,R)->R) -> R {
+                 match t {
+                     Rec::Leaf(leafcons) => leaf(l, leafcons.elms),
+                     Rec::Bin(bincons)   => {
+                         let r1 = Self::fold_up_namebin_rec(*bincons.recl, l.clone(), leaf, b.clone(), None, namebin);
+                         let r2 = Self::fold_up_namebin_rec(*bincons.recr, l.clone(), leaf, b.clone(), None, namebin);
+                         namebin(b, bincons.level, n.unwrap(), r1, r2)
+                     }
+                    Rec::Name(namecons) => {
+                        Self::fold_up_namebin_rec(get!(namecons.rec), l, leaf, b, Some(namecons.name.clone()), namebin)
+                    }
+                 }
+            }
+
+        pub fn from_raz_tree(t:RazTree<X,Count>) -> LevTree<X> {
+            fn at_leaf<X:'static+Clone+PartialEq+Eq+Debug+Hash>
+                (v:&Vec<X>) -> LevTree<X> {
+                    LevTree::leaf(v.clone())
+                }
+            fn at_bin<X:'static+Clone+PartialEq+Eq+Debug+Hash>
+                (l:LevTree<X>,lev:u32,n:Option<Name>,r:LevTree<X>) -> LevTree<X> {
+                    LevTree::name(lev, n.unwrap(), LevTree::bin(lev, l, r))
+                }
+            t.fold_up_gauged(Rc::new(at_leaf), Rc::new(at_bin)).unwrap()
+        }
+    }
+}
+
 fn my_hash<T>(obj: T) -> HashVal
   where T: Hash
 {
@@ -145,11 +257,21 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
              rec:TrieRec::Leaf(TrieLeaf{kvs:Rc::new(vec)})}
     }
 
-    pub fn from_key_vec(vec_in:&Vec<K>) -> Trie<K,()> { 
+    pub fn from_key_vec_ref(vec_in:&Vec<K>) -> Trie<K,()> { 
         let mut vec = Vec::new();
         for k in vec_in.iter() {
             let k_hash = my_hash(k);
             vec.push((k.clone(),k_hash,()));
+        };
+        Trie{meta:Self::meta(vec.len()), 
+             rec:TrieRec::Leaf(TrieLeaf{kvs:Rc::new(vec)})}
+    }
+
+    pub fn from_key_vec(vec_in:Vec<K>) -> Trie<K,()> { 
+        let mut vec = Vec::new();
+        for k in vec_in {
+            let k_hash = my_hash(&k);
+            vec.push((k,k_hash,()));
         };
         Trie{meta:Self::meta(vec.len()), 
              rec:TrieRec::Leaf(TrieLeaf{kvs:Rc::new(vec)})}
@@ -305,15 +427,6 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
 
 
 pub fn test_join (size:usize, gauge:usize) {
-    fn at_leaf(v:&Vec<usize>) -> Trie<usize,()> {
-        Trie::<usize,()>::from_key_vec(v)
-    }    
-    fn at_bin(l:Trie<usize,()>,_lev:u32,n:Option<Name>,r:Trie<usize,()>) -> Trie<usize,()> {
-        assert!(l.is_wf());
-        assert!(r.is_wf());
-        let n = n.unwrap();
-        ns(n.clone(), || Trie::join(l,r,n) )
-    }
     use rand::{thread_rng,Rng};
     use adapton::engine::*;
     use archive_stack::*;
@@ -321,11 +434,11 @@ pub fn test_join (size:usize, gauge:usize) {
     use memo::*;
     use level_tree::*;
     use raz_meta::Count;
-    use std::rc::Rc;
+    use self::hammer_level_tree::LevTree;
 
     manage::init_dcg();
 
-    let (elmv,tree) = {
+    let (elmv,lev_tree) = {
         let mut rng = thread_rng();
         let mut elms : AStack<usize,_> = AStack::new();
         let mut elmv : Vec<usize> = vec![];
@@ -337,15 +450,29 @@ pub fn test_join (size:usize, gauge:usize) {
                 elms.archive(Some(name_of_usize(i)), gen_branch_level(&mut rng));
             }
         }
-        let tree: RazTree<_,Count> = 
+        let raz_tree: RazTree<_,Count> = 
             ns( name_of_str("tree_of_stack"), || 
                 RazTree::memo_from(&AtHead(elms) ) );
-        println!("{:?}\n", tree);
-        (elmv,tree)
+
+        let lev_tree: LevTree<_> = 
+            ns( name_of_str("lev_tree_of_raz_tree"), || 
+                LevTree::from_raz_tree(raz_tree) );
+
+        (elmv,lev_tree)
     };
 
-    let trie = ns( name_of_str("trie_of_tree"),
-                   || tree.fold_up_gauged(Rc::new(at_leaf),Rc::new(at_bin)).unwrap() );
+    fn at_leaf(_:(), v:Vec<usize>) -> Trie<usize,()> {
+        Trie::<usize,()>::from_key_vec(v)
+    }    
+    fn at_namebin(_:(), _lev:u32,n:Name,l:Trie<usize,()>,r:Trie<usize,()>) -> Trie<usize,()> {
+        assert!(l.is_wf());
+        assert!(r.is_wf());
+        ns(n.clone(), || Trie::join(l,r,n) )
+    }
+    let trie = ns( name_of_str("trie_of_lev_tree"),
+                   || LevTree::fold_up_namebin( lev_tree,
+                                                (), at_leaf,
+                                                (), at_namebin ) );
     println!("{:?}\n", trie);
 
     for i in elmv {
