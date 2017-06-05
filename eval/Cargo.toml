@@ -3,6 +3,9 @@ name = "eval"
 version = "0.1.0"
 authors = ["kyleheadley <kyle.headley@colorado.edu>"]
 
+#[dependencies.adapton]
+#path = "/Users/hammer/repo/adapton.rust"
+
 [dependencies]
 iodyn = { path = "../" }
 adapton = "0.3"
@@ -10,6 +13,7 @@ adapton-lab = "0.1"
 time = "0.1"
 rand = "0.3"
 streaming-stats = "0.1"
+
 
 [dev-dependencies]
 clap = "2"

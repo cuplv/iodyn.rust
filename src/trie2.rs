@@ -17,7 +17,7 @@ pub mod hammer_level_tree {
     use std::fmt::Debug;
     use std::hash::{Hash};
     use adapton::macros::*;
-    use adapton::engine::{Name,Art,cell,force,thunk,ArtIdChoice};
+    use adapton::engine::*;
     use raz::RazTree;
     use raz_meta::Count;
 
@@ -141,18 +141,22 @@ pub mod hammer_level_tree {
                     Rec::Art(a) => Self::fold_up_namebin_rec(get!(a), l, leaf, b, n, namebin, art),
                     Rec::Leaf(leafcons) => leaf(l, leafcons.elms),
                     Rec::Bin(bincons)   => {
-                        let r1 = Self::fold_up_namebin_rec(*bincons.recl, l.clone(), leaf, b.clone(), None, namebin, art);
-                        let r2 = Self::fold_up_namebin_rec(*bincons.recr, l.clone(), leaf, b.clone(), None, namebin, art);
+                        let (n1,n2) = forko!(n.clone());
+                        let r1 = memo!([n1]? Self::fold_up_namebin_rec; 
+                                       t:*bincons.recl, 
+                                       l:l.clone(), leaf:leaf, b:b.clone(), n:None, namebin:namebin, art:art);
+                        let r1 = art(r1.0,r1.1);
+                        let r2 = memo!([n2]? Self::fold_up_namebin_rec;
+                                       t:*bincons.recr, 
+                                       l:l.clone(), leaf:leaf, b:b.clone(), n:None, namebin:namebin, art:art);
+                        let r2 = art(r2.0,r2.1);
                         namebin(b, bincons.level, n, r1, r2)
                     }
                     Rec::Name(namecons) => {
-                        let (a,x) = eager!( 
-                            namecons.name.clone() =>> Self::fold_up_namebin_rec,
-                            t:*namecons.rec, 
-                            l:l, leaf:leaf,
-                            b:b, n:Some(namecons.name), namebin:namebin, art:art 
-                        );
-                        art(a,x)
+                        Self::fold_up_namebin_rec(
+                            *namecons.rec, 
+                            l, leaf, b, Some(namecons.name), namebin, art
+                        )
                     }
                 }
             }
@@ -235,7 +239,7 @@ pub struct TrieLeaf<K:'static+Hash+PartialEq+Eq+Clone+Debug,
 #[derive(Hash,PartialEq,Eq,Clone,Debug)]
 pub struct TrieBin<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                    V:'static+Hash+PartialEq+Eq+Clone+Debug> {
-    name:   Name,
+    name:   Option<Name>,
     bits:   Bits,
     left:   Art<TrieRec<K,V>>,
     right:  Art<TrieRec<K,V>>,
@@ -330,12 +334,6 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
              rec:TrieRec::Leaf(TrieLeaf{kvs:Rc::new(vec)})}
     }
 
-    pub fn join (n:Name, lt: Self, rt: Self) -> Self {
-        //assert_eq!(lt.gauge, rt.gauge); // ??? -- Or take the min? Or the max? Or the average?
-        let gauge = if lt.meta.gauge > rt.meta.gauge { lt.meta.gauge } else { rt.meta.gauge };
-        Trie{rec:Self::join_rec(TrieMeta{gauge:gauge}, lt.rec, rt.rec, Bits{len:0, bits:0}, n),..lt}
-    }
-
     fn split_bits (bits:&Bits) -> (Bits, Bits) {
         let lbits = Bits{len:bits.len+1, bits:/* zero ------ */ bits.bits };
         let rbits = Bits{len:bits.len+1, bits:(1 << bits.len) | bits.bits };
@@ -376,7 +374,13 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
         Self::is_wf_rec(&self.rec, Bits{bits:0, len:0})
     }
 
-    fn join_rec (meta:TrieMeta, lt: TrieRec<K,V>, rt: TrieRec<K,V>, bits:Bits, n:Name) -> TrieRec<K,V> {
+    pub fn join (n:Option<Name>, lt: Self, rt: Self) -> Self {
+        //assert_eq!(lt.gauge, rt.gauge); // ??? -- Or take the min? Or the max? Or the average?
+        let gauge = if lt.meta.gauge > rt.meta.gauge { lt.meta.gauge } else { rt.meta.gauge };
+        Trie{rec:Self::join_rec(TrieMeta{gauge:gauge}, n, lt.rec, rt.rec, Bits{len:0, bits:0}),..lt}
+    }
+
+    fn join_rec (meta:TrieMeta, n:Option<Name>, lt: TrieRec<K,V>, rt: TrieRec<K,V>, bits:Bits) -> TrieRec<K,V> {
         match (lt, rt) {
             (TrieRec::Empty,   TrieRec::Empty)   => TrieRec::Empty,
             (TrieRec::Empty,   TrieRec::Leaf(r)) => TrieRec::Leaf(r),
@@ -398,46 +402,46 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                     let (e0, e1) = (Vec::new(), Vec::new());
                     let (l0, l1) = Self::split_vec(l.kvs, bits.len, e0, e1);
                     let (r0, r1) = Self::split_vec(r.kvs, bits.len, l0, l1);
-                    let (n1, n2) = name_fork(n.clone());
-                    let t0 = cell(n1, TrieRec::Leaf(TrieLeaf{kvs:Rc::new(r0)}));
-                    let t1 = cell(n2, TrieRec::Leaf(TrieLeaf{kvs:Rc::new(r1)}));
+                    let (n1, n2) = forko!{n.clone()};
+                    let t0 = cell!([n1]? TrieRec::Leaf(TrieLeaf{kvs:Rc::new(r0)}));
+                    let t1 = cell!([n2]? TrieRec::Leaf(TrieLeaf{kvs:Rc::new(r1)}));
                     TrieRec::Bin(TrieBin{left:t0, right:t1, bits:bits, name:n})
                 }
             },
             (TrieRec::Empty, TrieRec::Bin(r)) => {
                 let (b0, b1) = Self::split_bits(&bits);
-                let (n0, n1) = name_fork(n.clone());
-                let (m0, m1) = name_fork(r.name.clone());
-                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:TrieRec::Empty, r:get!(r.left),  b:b0, n:m0);
-                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:TrieRec::Empty, r:get!(r.right), b:b1, n:m1);
+                let (n0, n1) = forko!{n.clone()};
+                let (m0, m1) = forko!{r.name.clone()};
+                let o0 = memo!([n0]? Self::join_rec; m:meta.clone(), n:m0, l:TrieRec::Empty, r:get!(r.left), b:b0);
+                let o1 = memo!([n1]? Self::join_rec; m:meta.clone(), n:m1, l:TrieRec::Empty, r:get!(r.right), b:b1);
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             },
             (TrieRec::Leaf(l), TrieRec::Bin(r)) => {
                 let (e0, e1) = (Vec::new(), Vec::new());
                 let (l0, l1) = Self::split_vec(l.kvs, bits.len, e0, e1);
                 let (b0, b1) = Self::split_bits(&bits);
-                let (n0, n1) = name_fork(n.clone());
-                let (m0, m1) = name_fork(r.name.clone());
-                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:Self::leaf_or_empty(l0), r:get!(r.left),  b:b0, n:m0);
-                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:Self::leaf_or_empty(l1), r:get!(r.right), b:b1, n:m1);
+                let (n0, n1) = forko!{n.clone()};
+                let (m0, m1) = forko!{r.name.clone()};
+                let o0 = memo!([n0]? Self::join_rec; m:meta.clone(), n:m0, l:Self::leaf_or_empty(l0), r:get!(r.left),  b:b0);
+                let o1 = memo!([n1]? Self::join_rec; m:meta.clone(), n:m1, l:Self::leaf_or_empty(l1), r:get!(r.right), b:b1);
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Empty) => {
                 let (b0, b1) = Self::split_bits(&bits);
-                let (n0, n1) = name_fork(n.clone());
-                let (m0, m1) = name_fork(l.name.clone());
-                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:get!(l.left),  r:TrieRec::Empty, b:b0, n:m0);
-                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:get!(l.right), r:TrieRec::Empty, b:b1, n:m1);
+                let (n0, n1) = forko!{n.clone()};
+                let (m0, m1) = forko!{l.name.clone()};
+                let o0 = memo!([n0]? Self::join_rec; m:meta.clone(), n:m0, l:get!(l.left),  r:TrieRec::Empty, b:b0);
+                let o1 = memo!([n1]? Self::join_rec; m:meta.clone(), n:m1, l:get!(l.right), r:TrieRec::Empty, b:b1);
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Leaf(r)) => {
                 let (e0, e1) = (Vec::new(), Vec::new());
                 let (r0, r1) = Self::split_vec(r.kvs, bits.len, e0, e1);
                 let (b0, b1) = Self::split_bits(&bits);
-                let (n0, n1) = name_fork(n.clone());
-                let (m0, m1) = name_fork(l.name.clone());
-                let o0 = eager!(n0 =>> Self::join_rec, m:meta.clone(), l:get!(l.left),  r:Self::leaf_or_empty(r0), b:b0, n:m0);
-                let o1 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:get!(l.right), r:Self::leaf_or_empty(r1), b:b1, n:m1);
+                let (n0, n1) = forko!{n.clone()};
+                let (m0, m1) = forko!{l.name.clone()};
+                let o0 = memo!([n0]? Self::join_rec; m:meta.clone(), n:m0, l:get!(l.left),  r:Self::leaf_or_empty(r0), b:b0);
+                let o1 = memo!([n1]? Self::join_rec; m:meta.clone(), n:m1, l:get!(l.right), r:Self::leaf_or_empty(r1), b:b1);
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             },
             (TrieRec::Bin(l), TrieRec::Bin(r)) => {
@@ -446,10 +450,10 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 if !(test1 && test2) {
                     panic!("\nInternal error: {:?} {:?} -- bits:{:?} l.bits:{:?} r.bits:{:?}!!!\n", test1, test2, bits, l.bits, r.bits);
                 };
-                let (n1, n2) = name_fork(n.clone());
+                let (n1, n2) = forko!{n.clone()};
                 let (b0, b1) = Self::split_bits(&bits);
-                let o0 = eager!(n1 =>> Self::join_rec, m:meta.clone(), l:get!(l.left),  r:get!(r.left), b:b0, n:l.name);
-                let o1 = eager!(n2 =>> Self::join_rec, m:meta.clone(), l:get!(l.right), r:get!(r.right), b:b1, n:r.name);
+                let o0 = memo!([n1]? Self::join_rec; m:meta.clone(), n:l.name, l:get!(l.left),  r:get!(r.left), b:b0);
+                let o1 = memo!([n2]? Self::join_rec; m:meta.clone(), n:r.name, l:get!(l.right), r:get!(r.right), b:b1);
                 TrieRec::Bin(TrieBin{ left:o0.0, right:o1.0, name:n, bits:bits })
             }
         }
@@ -518,7 +522,7 @@ pub fn test_join (size:usize, gauge:usize) {
     fn at_namebin(_:(), _lev:u32,n:Option<Name>,l:Trie<usize,()>,r:Trie<usize,()>) -> Trie<usize,()> {
         assert!(l.is_wf());
         assert!(r.is_wf());
-        ns(n.clone().unwrap(), || Trie::join(n.unwrap(),l,r) )
+        ns(n.clone().unwrap(), || Trie::join(n,l,r) )
     }
     fn at_art(_a:Art<Trie<usize,()>>, t:Trie<usize,()>) -> Trie<usize,()> {
         t 

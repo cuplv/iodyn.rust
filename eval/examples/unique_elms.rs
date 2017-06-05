@@ -137,7 +137,7 @@ fn main2() {
       |v:&Vec<GenSetElm>|{ Trie2::<_,()>::from_key_vec_ref(v) },
       move|t1,_lev,nm,t2|{ 
           let nm2 = nm.clone();
-          ns(nm.unwrap().clone(), || Trie2::join(nm2.unwrap(),t1,t2) )
+          ns(nm.unwrap().clone(), || Trie2::join(Some(nm2.unwrap()),t1,t2) )
       },
     ),
     changes: changes,
