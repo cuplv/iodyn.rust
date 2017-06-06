@@ -104,6 +104,12 @@ fn treetop_meta<E,M>(t: Option<&tree::Tree<TreeData<E,M>>>) -> M where
 	}
 }
 
+/// Type passed into the function call from fold_up_gauged_safe
+pub enum FoldUpGauged<E,R> {
+	Sub(Rc<Vec<E>>),
+	Bin(R,u32,Option<Name>,R),
+}
+
 impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 	/// get the meta data
 	pub fn meta(&self) -> &M {&self.meta}
@@ -171,6 +177,46 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 		})
 	}
 
+	/// Runs an incremental binary function over the sequence data
+	///
+	/// This is calculated from data in leaves of a tree structure,
+	/// so the operation must be associative. Returns None if there
+	/// are no elements.
+	/// Function pointers are used to avoid issues with equality of closures.
+	pub fn fold_up_safe<R,P>(
+		self, init_func: fn(E,P) -> R, bin_func: fn(R,R,P)->R, params:P,
+	) -> Option<R> where
+		R: 'static + Eq+Clone+Hash+Debug,
+		P: 'static + Eq+Clone+Hash+Debug,
+	{
+		fn raz_fold<E,M,R,P>(
+			l:Option<R>, e:TreeData<E,M>, _lv:u32, _nm:Option<Name>, r:Option<R>,
+			(init_func,bin_func,params):(fn(E,P)->R,fn(R,R,P)->R,P)
+		) -> R where
+			E: 'static + Eq+Clone+Hash+Debug,
+			M: RazMeta<E>,
+			R: 'static + Eq+Clone+Hash+Debug,
+			P: 'static + Eq+Clone+Hash+Debug,
+		{
+			match e {
+				TreeData::Leaf(vec) => {
+					// TODO: remove these clones
+					// the problem is that functions with references as parameters
+					// do not impl Clone (but do impl Copy...)
+					let mut iter = vec.iter().map(|elm|init_func((*elm).clone(),params.clone()));
+					let first = iter.next().expect("leaf with empty vec");
+					iter.fold(first, |x,y|bin_func(x,y,params.clone()))
+				},
+				_ => { match (l,r) {
+					(None, None) => panic!("branch with no data"),
+					(Some(r),None) | (None, Some(r)) => r,
+					(Some(r1),Some(r2)) => bin_func(r1,r2,params),
+				}},
+			}
+		}
+		self.tree.map(|tree|{tree.fold_up_meta_safe(raz_fold,(init_func,bin_func,params))})
+	}
+
 	/// Runs an incremental binary function over the sequence data, levels, and names
 	///
 	/// This is calculated from data in leaves of a tree structure,
@@ -227,6 +273,38 @@ impl<E: Debug+Clone+Eq+Hash+'static, M:RazMeta<E>> RazTree<E,M> {
 				}
 			}))
 		})
+	}
+
+	/// Runs an incremental binary function over subsequences, levels, and names
+	///
+	/// Subsequences allow potential for optimization. The binary function
+	/// still operates on the results from the subsequence conputation.
+	/// Function pointers are used to avoid issues with equality of closures.
+	pub fn fold_up_gauged_safe<R,P>(
+		self, func: fn(FoldUpGauged<E,R>,P) -> R, params:P,
+	) -> Option<R> where
+		R: 'static + Eq+Clone+Hash+Debug,
+		P: 'static + Eq+Clone+Hash+Debug,
+	{
+		fn raz_fold<E,M,R,P>(
+			l:Option<R>, e:TreeData<E,M>, lv:u32, nm:Option<Name>, r:Option<R>,
+			(func,params):(fn(FoldUpGauged<E,R>,P)->R,P)
+		) -> R where
+			E: 'static + Eq+Clone+Hash+Debug,
+			M: RazMeta<E>,
+			R: 'static + Eq+Clone+Hash+Debug,
+			P: 'static + Eq+Clone+Hash+Debug,
+		{
+			match e {
+				TreeData::Leaf(vec) => { func(FoldUpGauged::Sub(vec),params) },
+				_ => { match (l,r) {
+					(None, None) => panic!("branch with no data"),
+					(Some(r),None) | (None, Some(r)) => r,
+					(Some(lr),Some(rr)) => func(FoldUpGauged::Bin(lr,lv,nm,rr),params),
+				}}
+			}
+		}
+		self.tree.map(|tree|{tree.fold_up_meta_safe(raz_fold,(func,params))})
 	}
 
 	/// Runs an incremental fold over the sequence, left to right

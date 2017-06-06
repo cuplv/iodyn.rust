@@ -119,6 +119,38 @@ Tree<E> {
 		}}
 	}
 
+	/// incremental tree fold operation with levels and names
+	/// 
+	/// Names passed to the mapping function are USED (as is and forked) in the
+	/// resulting tree and should not be reused directly for the creation of arts.
+	/// This version uses function pointers rather than closures to avoid
+	/// issues with closure equality.
+	pub fn fold_up_meta_safe<R,P>(
+		self,
+		node_calc: fn(Option<R>,E,u32,Option<Name>,Option<R>,P) -> R,
+		params: P,
+	) -> R where
+		R:Eq+Clone+Hash+Debug+'static,
+		P:Eq+Clone+Hash+Debug+'static,
+	{
+		match force(&self.link) { TreeNode{ data, l_branch, r_branch } => {
+			let (l,r) = match self.name.clone() {
+				None => {(
+					l_branch.map(|t| t.fold_up_meta_safe(node_calc.clone(),params.clone()) ),
+					r_branch.map(|t| t.fold_up_meta_safe(node_calc.clone(),params.clone()) ),
+				)},
+				Some(name) => {
+					let (n1, n2) = name_fork(name);
+					(
+						l_branch.map(|t| memo!( n1 =>> Self::fold_up_meta_safe, t:t, f:node_calc.clone(), p:params.clone() )),
+						r_branch.map(|t| memo!( n2 =>> Self::fold_up_meta_safe, t:t, f:node_calc.clone(), p:params.clone() )),
+					)
+				}
+			};
+			node_calc(l, data, self.level, self.name, r, params)
+		}}
+	}
+
 	/// incremental fold operation, left to right
 	pub fn fold_lr<A,F>(self, accum: A, node_calc: Rc<F>) -> A where
 		A: 'static + Eq + Clone + Hash + Debug,
