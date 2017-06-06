@@ -3,16 +3,17 @@
 iodyn::skiplist
 look at quickhull in eval/examples for plot generation
 
-transitive graph closure
-read IncAL paper
-andersen's analysis explanation: in #vmfuture
+write Andersen's analysis
 */
 
 
 use {IRaz, IRazTree, inc_level};
 use std::hash::Hash;
 use std::fmt::Debug;
+use adapton;
 use adapton::engine::name_of_usize;
+use adapton::engine::*;
+use adapton::macros::*;
 use std::vec::Vec;
 use std::collections::vec_deque::VecDeque;
 use std::collections::HashMap;
@@ -22,10 +23,10 @@ use std::fs::File;
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]
-struct SizedMap<V> where V: Clone + Debug + Eq + Hash + 'static {
+pub struct SizedMap<V> where V: Clone + Debug + Eq + Hash + 'static {
 	size: usize,
 	gran: usize,
-	map: IRazTree<Option<V>>,
+	pub map: IRazTree<Option<V>>,
 }
 
 #[derive(Debug,Clone)]
@@ -489,6 +490,7 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 		data.found_cycle
 	}
 	
+	//Warshall's algorithm
 	fn closure(curr: Self) -> Self {
 		let mut ret = curr.clone();
 		
@@ -543,6 +545,45 @@ fn unfold_simple<A,B,C>(init:A, f:Rc<C>) -> B where C: Fn(A) -> Result<A,B> {
 	match f(init) {
 		Ok(cont) => unfold_simple(cont, f),
 		Err(res) => res
+	}
+}
+
+fn unfold<S,T,Lev>(init:(S,Lev), f:Rc<Fn(S) -> Result<S,T>>, 
+						hf:Rc<Fn(S) -> Option<(adapton::engine::Name,Lev)>>) -> T 
+			where Lev: PartialOrd+Debug+Hash+Clone+Eq+'static, S:Debug+Hash+Clone+Eq+'static, T:Debug+Hash+Clone+Eq+'static {
+	match unfold_rec(init.clone(), f.clone(), hf.clone()) {
+		//TODO: NOT WORKING
+		//Where is level introduced?
+		Ok(cont) => unfold(init, f, hf), //WRONG WRONG WRONG
+		Err(res) => res
+	}
+}
+
+fn unfold_rec<S,T,Lev>(init:(S,Lev), body:Rc<Fn(S) -> Result<S,T>>,
+							hf:Rc<Fn(S) -> Option<(adapton::engine::Name,Lev)>>) -> Result<S,T> 
+			where Lev: PartialOrd+Debug+Hash+Clone+Eq+'static, S:Debug+Hash+Clone+Eq+'static, T:Debug+Hash+Clone+Eq+'static {
+	let (st, lev) = init.clone();
+	match body(st) {
+		Ok(st1) => {
+			match hf(st1.clone()) {
+				None => unfold_rec((st1, lev), body, hf),
+				Some((nm, lev1)) => {
+					if lev1 <= lev {
+						let (nm1, nm2) = name_fork(nm);
+						let i1 = (st1, lev1.clone());
+						let c = memo!(nm1 =>> unfold_rec, i1:init.clone();; body:body.clone(), hf:hf.clone());
+						match c {
+							Ok(st2) => {
+								let i2 = (st2, lev1);
+								memo!(nm2 =>> unfold_rec, i2:init;; body:body, hf:hf)
+							},
+							Err(res) => Err(res),
+						}
+					} else { Ok(st1) }
+				},
+			}
+		},
+		Err(res) => Err(res),
 	}
 }
 
