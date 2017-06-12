@@ -1,6 +1,7 @@
 extern crate iodyn;
 
 use iodyn::finite_map::*;
+use std::rc::Rc;
 use std::collections::vec_deque::VecDeque;
 
 /*
@@ -34,7 +35,7 @@ pub struct CStatement<N> where N : Eq + Clone {
 	num: usize, //numbering follows rules above
 }
 
-fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G {
+fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>) -> G {
 	//based on an edge and a list of stmts, returns a list of AndersenRules to be checked
 	fn genCandRules<N:Eq+Clone>(left: N, right: N, stmts: Vec<CStatement<N>>) -> VecDeque<AndersenRule<N>> {
 		let mut ret: VecDeque<AndersenRule<N>> = VecDeque::new();
@@ -66,11 +67,15 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G
 		ret
 	}
 	
-	//based on an AndersenRule and an existing graph, outputs modified graph if necessary
+	//based on an AndersenRule and an existing graph, outputs modified graph (with added edges) if necessary
 	fn chkapply<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(g: G, rule: AndersenRule<N>) -> (G, Vec<(N, N)>) {
+		let mut retedges: Vec<(N, N)> = vec!();
 		match rule.rulenum {
 			//rule 1: p := q && q -> r ==> p -> r
-			1 => DirectedGraph::add_directed_edge(g, rule.stmtl, rule.edger),
+			1 => {
+				retedges.push((rule.stmtl.clone(), rule.edger.clone()));
+				(DirectedGraph::add_directed_edge(g, rule.stmtl, rule.edger), retedges)
+			},
 			//rule 2: p := *q && q -> r && r -> s ==> p -> s
 			2 => {
 				if rule.stmtr == rule.edgel {
@@ -78,14 +83,16 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G
 					let nexts: Vec<N> = Graph::adjacents(g.clone(), rule.edger);
 					let mut ret = g.clone();
 					for s in nexts {
+						retedges.push((rule.stmtl.clone(), s.clone()));
 						ret = DirectedGraph::add_directed_edge(ret, rule.stmtl.clone(), s);
 					}
-					ret
+					(ret, retedges)
 				} else {
 					//edge is r -> s. If q -> r exists, add p -> s
 					if Graph::has_edge(g.clone(), rule.stmtr, rule.edgel) {
-						DirectedGraph::add_directed_edge(g.clone(), rule.stmtl, rule.edger)
-					} else { g }
+						retedges.push((rule.stmtl.clone(), rule.edger.clone()));
+						(DirectedGraph::add_directed_edge(g.clone(), rule.stmtl, rule.edger), retedges)
+					} else { (g, retedges) }
 				}
 			},
 			//rule 3: *p := q && p -> r && q -> s ==> r -> s
@@ -95,17 +102,19 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G
 					let nexts: Vec<N> = Graph::adjacents(g.clone(), rule.stmtr);
 					let mut ret = g.clone();
 					for s in nexts {
+						retedges.push((rule.edger.clone(), s.clone()));
 						ret = DirectedGraph::add_directed_edge(ret, rule.edger.clone(), s);
 					}
-					ret
+					(ret, retedges)
 				} else if rule.stmtr == rule.edgel {
 					//edge is q -> s. Find each p -> r, and add r -> s
 					let nexts: Vec<N> = Graph::adjacents(g.clone(), rule.stmtl);
 					let mut ret = g.clone();
 					for r in nexts {
+						retedges.push((r.clone(), rule.edger.clone()));
 						ret = DirectedGraph::add_directed_edge(ret, r, rule.edger.clone());
 					}
-					ret
+					(ret, retedges)
 				} else { panic!("bad rule of type 3 in chkapply"); }
 			},
 			_ => panic!("bad rulenum found its way to chkapply")
@@ -123,8 +132,12 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G
 		q.append(&mut genCandRules(r.left.clone(), r.right.clone(), stmts.clone()));
 	}
 	
+	fn process_queue<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>((q, g):(VecDeque<AndersenRule<N>>, G)) -> 
+		Result<(VecDeque<AndersenRule<N>>, G), G> {
+			panic!("stubbed");
+		}
 	
-	panic!("stubbed");
+	unfold_simple((q, g), Rc::new(process_queue))
 }
 
 fn main() {

@@ -542,7 +542,7 @@ fn dgraph_from_col<T:DirectedGraph<usize, usize> + Clone + FinMap<usize, (Option
 	g
 }
 
-fn unfold_simple<A,B,C>(init:A, f:Rc<C>) -> B where C: Fn(A) -> Result<A,B> {
+pub fn unfold_simple<A,B,C>(init:A, f:Rc<C>) -> B where C: Fn(A) -> Result<A,B> {
 	match f(init) {
 		Ok(cont) => unfold_simple(cont, f),
 		Err(res) => res
