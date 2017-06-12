@@ -3,6 +3,7 @@
 iodyn::skiplist
 look at quickhull in eval/examples for plot generation
 
+unfold test: count from 1 to 100
 write Andersen's analysis
 */
 
@@ -30,10 +31,10 @@ pub struct SizedMap<V> where V: Clone + Debug + Eq + Hash + 'static {
 }
 
 #[derive(Debug,Clone)]
-struct SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash + 'static, K:Hash + Eq {
+pub struct SizedHashMap<K, V> where V: Clone + Debug + Eq + Hash + 'static, K:Hash + Eq {
 	size: usize,
 	gran: usize,
-	map: HashMap<K, V>
+	pub map: HashMap<K, V>
 }
 
 /*

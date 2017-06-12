@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use time::{Duration};
 use rand::{StdRng};
 use actions::{Creator,Editor,Computor,Testor};
+use iodyn::finite_map::{Graph,FinMap};
 
 pub struct TestResult<I,O> {
 	pub edits: Vec<Duration>,
