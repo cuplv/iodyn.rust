@@ -132,17 +132,22 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>
 		q.append(&mut genCandRules(r.left.clone(), r.right.clone(), stmts.clone()));
 	}
 	
-	fn process_queue<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>((q, g):(VecDeque<AndersenRule<N>>, G)) -> 
-		Result<(VecDeque<AndersenRule<N>>, G), G> {
+	fn process_queue<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>((mut q, mut g, stmts):(VecDeque<AndersenRule<N>>, G, Vec<CStatement<N>>)) -> 
+		Result<(VecDeque<AndersenRule<N>>, G, Vec<CStatement<N>>), G> {
 			match q.pop_back() {
 				Some(r) => {
-					panic!("stubbed");
+					let edges: Vec<(N, N)>;
+					let (g, edges) = chkapply(g, r);
+					for (l, r) in edges {
+						q.append(&mut genCandRules(l, r, stmts.clone()));
+					}
+					Ok((q, g, stmts))
 				},
 				None => Err(g)
 			}
 		}
 	
-	unfold_simple((q, g), Rc::new(process_queue))
+	unfold_simple((q, g, stmts), Rc::new(process_queue))
 }
 
 fn main() {
