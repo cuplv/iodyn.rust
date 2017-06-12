@@ -67,7 +67,7 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G
 	}
 	
 	//based on an AndersenRule and an existing graph, outputs modified graph if necessary
-	fn chkapply<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(g: G, rule: AndersenRule<N>) -> G {
+	fn chkapply<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(g: G, rule: AndersenRule<N>) -> (G, Vec<(N, N)>) {
 		match rule.rulenum {
 			//rule 1: p := q && q -> r ==> p -> r
 			1 => DirectedGraph::add_directed_edge(g, rule.stmtl, rule.edger),
@@ -122,6 +122,7 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G
 		g = DirectedGraph::add_directed_edge(g, r.left.clone(), r.right.clone());
 		q.append(&mut genCandRules(r.left.clone(), r.right.clone(), stmts.clone()));
 	}
+	
 	
 	panic!("stubbed");
 }
