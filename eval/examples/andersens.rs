@@ -15,8 +15,8 @@ Rules for Andersen's analysis:
 AndersenRule corresponds to a rule from andersens analysis to be processed by the algorithm,
 the edge (previously added to the graph) that triggered it, and the id of the corresponding statement.
 Ex: 
-If q -> r is added to the graph and p := *q is in the bag (rule 3), the AndersenRule added to the queue is:
-stmtl = p, stmtr = q, edgel = q, edger = r, rulenum = 3
+If q -> r is added to the graph and p := *q is in the bag (rule 2), the AndersenRule added to the queue is:
+stmtl = p, stmtr = q, edgel = q, edger = r, rulenum = 2
 N is the type of the node from the graph
 */
 pub struct AndersenRule<N> where N : Eq {
@@ -36,31 +36,31 @@ pub struct CStatement<N> where N : Eq + Clone {
 
 fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G {
 	//based on an edge and a list of stmts, returns a list of AndersenRules to be checked
-	fn genCandRules<N:Eq+Clone>(left: N, right: N, stmts: Vec<CStatement<N>>) -> Vec<AndersenRule<N>> {
-		let mut ret: Vec<AndersenRule<N>> = vec!();
+	fn genCandRules<N:Eq+Clone>(left: N, right: N, stmts: Vec<CStatement<N>>) -> VecDeque<AndersenRule<N>> {
+		let mut ret: VecDeque<AndersenRule<N>> = VecDeque::new();
 		
 		//rule 1: p := q && q -> r ==> p -> r
 		let mut r1stmts = stmts.clone();
 		r1stmts.retain(|x:&CStatement<N>| {x.num == 1 && x.right == left});
 		for r in r1stmts {
-			ret.push(AndersenRule{stmtl: r.left, stmtr: r.right, 
-								  edgel: left.clone(), edger: right.clone(), rulenum: 1});
+			ret.push_back(AndersenRule{stmtl: r.left, stmtr: r.right, 
+									   edgel: left.clone(), edger: right.clone(), rulenum: 1});
 		}
 		
 		//rule 2: p := *q && q -> r && r -> s ==> p -> s
 		let mut r2stmts = stmts.clone();
 		r2stmts.retain(|x:&CStatement<N>| {x.num == 2});
 		for r in r2stmts {
-			ret.push(AndersenRule{stmtl: r.left, stmtr: r.right,
-								  edgel: left.clone(), edger: right.clone(), rulenum: 2});
+			ret.push_back(AndersenRule{stmtl: r.left, stmtr: r.right,
+									   edgel: left.clone(), edger: right.clone(), rulenum: 2});
 		}
 		
 		//rule 3: *p := q && p -> r && q -> s ==> r -> s
 		let mut r3stmts = stmts.clone();
 		r3stmts.retain(|x:&CStatement<N>| {x.num == 3 && (x.left == left || x.right == left)});
 		for r in r3stmts {
-			ret.push(AndersenRule{stmtl: r.left, stmtr: r.right,
-								  edgel: left.clone(), edger: right.clone(), rulenum: 3});
+			ret.push_back(AndersenRule{stmtl: r.left, stmtr: r.right,
+									   edgel: left.clone(), edger: right.clone(), rulenum: 3});
 		}
 		
 		ret
@@ -112,12 +112,17 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>>(stmts: Vec<CStatement<N>>) -> G
 		}
 	}
 	
-	let g: G = Graph::new(stmts.len(), (stmts.len()/10)+1);
-	let q: VecDeque<AndersenRule<N>> = VecDeque::new();
+	let mut g: G = Graph::new(stmts.len(), (stmts.len()/10)+1);
+	let mut q: VecDeque<AndersenRule<N>> = VecDeque::new();
 	
 	//preprocess: initialize the graph by adding the base "rule 0" edges
 	let mut roots = stmts.clone();
 	roots.retain(|x:&CStatement<N>| {x.num == 0});
+	for r in roots {
+		g = DirectedGraph::add_directed_edge(g, r.left.clone(), r.right.clone());
+		q.append(&mut genCandRules(r.left.clone(), r.right.clone(), stmts.clone()));
+	}
+	
 	panic!("stubbed");
 }
 
