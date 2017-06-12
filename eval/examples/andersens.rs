@@ -134,7 +134,12 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>
 	
 	fn process_queue<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>((q, g):(VecDeque<AndersenRule<N>>, G)) -> 
 		Result<(VecDeque<AndersenRule<N>>, G), G> {
-			panic!("stubbed");
+			match q.pop_back() {
+				Some(r) => {
+					panic!("stubbed");
+				},
+				None => Err(g)
+			}
 		}
 	
 	unfold_simple((q, g), Rc::new(process_queue))
