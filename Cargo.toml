@@ -1,6 +1,6 @@
 [package]
 name = "iodyn"
-version = "0.2.0"
+version = "0.2.1"
 authors = [
 	"Kyle Headley <kyle.headley@colorado.edu>",
 	"Matthew A. Hammer <Matthew.Hammer@Colorado.Edu>"
