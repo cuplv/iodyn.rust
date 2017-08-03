@@ -1,3 +1,11 @@
+/*
+Look into Datalog frontends (Doop) and see if they have an IR to plug into?
+Look at Soot in andersen's analysis (Spark?)
+Look at cil as well. Ben hardekopf?
+Find systematization of andersen's rule for Java
+Do pre-processing hashmaps for algorithm?
+*/
+
 extern crate iodyn;
 
 use iodyn::finite_map::*;
@@ -121,13 +129,15 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>
 		}
 	}
 	
-	let mut g: G = Graph::new(stmts.len(), (stmts.len()/10)+1);
+	let mut g: G = Graph::new(100, 10);
 	let mut q: VecDeque<AndersenRule<N>> = VecDeque::new();
 	
 	//preprocess: initialize the graph by adding the base "rule 0" edges
 	let mut roots = stmts.clone();
 	roots.retain(|x:&CStatement<N>| {x.num == 0});
 	for r in roots {
+		g = Graph::add_node(g, r.left.clone(), None);
+		g = Graph::add_node(g, r.right.clone(), None);
 		g = DirectedGraph::add_directed_edge(g, r.left.clone(), r.right.clone());
 		q.append(&mut genCandRules(r.left.clone(), r.right.clone(), stmts.clone()));
 	}
@@ -151,5 +161,12 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>
 }
 
 fn main() {
-	println!("it's the main!");
+	let mut stmts = vec!(CStatement{left: 0, right: 1, num: 0});
+	let mut dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100,10);
+	dt = andersen(stmts.clone());
+	assert_eq!(vec!(1), Graph::adjacents(dt, 0));
+	stmts.push(CStatement{left: 10, right: 0, num: 1});
+	dt = andersen(stmts.clone());
+	assert_eq!(vec!(1), Graph::adjacents(dt, 10));
+	println!("executed");
 }
