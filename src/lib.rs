@@ -46,6 +46,8 @@ pub mod skiplist;
 pub mod trie1;
 pub mod trie2;
 
+pub mod kvlog;
+
 /// Gauged Incremental Raz with element counts
 pub type IRaz<E> = raz::Raz<E,raz_meta::Count>;
 pub type Giraz<E> = raz::Raz<E,raz_meta::Count>;
