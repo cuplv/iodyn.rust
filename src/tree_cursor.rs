@@ -458,6 +458,28 @@ Iterator for IterR<T> {
 	}
 }
 
+impl<T: TreeUpdate+Debug+Clone+Eq+Hash+'static>
+Iterator for IterL<T> {
+	type Item = T;
+	fn next(&mut self) -> Option<Self::Item> {
+		let result = self.0.peek();
+		// choose next tree node
+		if self.0.down_left() {
+			while self.0.down_right() {};
+		} else { loop {
+			match self.0.up_discard() {
+				UpResult::Left => { break },
+				UpResult::Right => {},
+				UpResult::Fail => {
+					self.0 = Cursor::new();
+					break;
+				}
+			}
+		}}
+		return result;
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -554,7 +576,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_iter_r() {
+	fn test_iters() {
 		let t = 
 		Tree::new(5, Some(name_of_usize(5)),1,
 			Tree::new(3, Some(name_of_usize(3)),2,
@@ -578,10 +600,12 @@ mod tests {
 		assert!(c.down_right());
 		assert!(c.down_left());
 		assert!(c.down_right());
-		let (_,t,iter) = c.into_iters();
+		let (iter_l,t,iter_r) = c.into_iters();
 
 		assert_eq!(Some(11),t.map(|e|e.peek()));
-		let right = iter.collect::<Vec<_>>();
+		let left = iter_l.collect::<Vec<_>>();
+		let right = iter_r.collect::<Vec<_>>();
+		assert_eq!(vec![8,10,2,4], left);
 		assert_eq!(vec![5,9,1,6,3,7], right);
 
 	}

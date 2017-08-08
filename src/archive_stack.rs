@@ -131,6 +131,14 @@ AStack<E,M> {
 		}
 	}
 
+	/// Exposes the data archive and associated meta
+	/// data, disregaurding the first metadata if active vector is empty
+	pub fn next_archive_force(&mut self) -> Option<(Vec<E>,Option<M>)> {
+		if let Some((v,m)) = self.next_archive() {
+			if v.len() > 0 { Some((v,m)) } else { self.next_archive() }
+		} else { None }
+	}
+
 	/// peeks at the entire active vector
 	pub fn active_data(&self) -> &Vec<E> {
 		&self.current
@@ -145,8 +153,16 @@ AStack<E,M> {
 		if self.is_empty() { return None }
 		if self.current.len() == 0 {
 			let (_,v) = self.archived.peek().unwrap();
-	    Some(v.last().unwrap().clone())
+			Some(v.last().unwrap().clone())
 		} else { Some(self.current.last().unwrap().clone()) }
+	}
+
+	pub fn peek_meta(&self) -> Option<M> {
+		if self.is_empty() { return None }
+		match self.archived.peek() {
+			None => None,
+			Some((m,_)) => Some(m),
+		}
 	}
 
 	/// push the entire active vector into the archive, along with

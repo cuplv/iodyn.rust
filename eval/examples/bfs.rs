@@ -1,26 +1,31 @@
 extern crate rand;
 #[macro_use] extern crate clap;
-extern crate adapton;
+#[macro_use] extern crate adapton;
 extern crate adapton_lab;
 extern crate iodyn;
 extern crate eval;
 
+use std::rc::Rc;
 use std::io::BufWriter;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::collections::HashMap;
 use rand::{StdRng,SeedableRng};
 use adapton::reflect;
 use adapton::engine::*;
+use adapton::macros::*;
 use adapton::engine::manage::*;
 use adapton_lab::labviz::*;
 #[allow(unused)] use iodyn::{IRaz,IRazTree};
 #[allow(unused)] use iodyn::archive_stack::{AtTail,AStack as IAStack};
+use iodyn::finite_map::*;
 #[allow(unused)] use eval::eval_iraz::EvalIRaz;
 #[allow(unused)] use eval::eval_vec::EvalVec;
 #[allow(unused)] use eval::eval_iastack::EvalIAStack;
 #[allow(unused)] use eval::accum_lists::*;
 #[allow(unused)] use eval::types::*;
+#[allow(unused)] use eval::eval_hashmap::EvalHashMap;
 use eval::actions::*;
 use eval::test_seq::{TestResult,EditComputeSequence};
 
@@ -36,8 +41,7 @@ fn main () {
 fn main2() {
 // end provide additional stack memory
 
-  //command-line
-  let args = clap::App::new("to_string")
+let args = clap::App::new("quickhull")
     .version("0.1")
     .author("Kyle Headley <kyle.headley@colorado.edu>")
     .args_from_usage("\
@@ -62,7 +66,7 @@ fn main2() {
   let do_trace = args.is_present("trace");
 	let coord = StdRng::from_seed(&[dataseed]);
 
-  let mut test = EditComputeSequence{
+let mut test_raz = EditComputeSequence{
     init: IncrementalInit {
       size: start_size,
       datagauge: datagauge,
@@ -70,31 +74,48 @@ fn main2() {
       coord: coord.clone(),
     },
     edit: BatchInsert(edits),
-    comp: Mapper::new(
-      name_of_str("to_string"),
-      |num|{ format!("{:?}",num) },
-    ),
+    comp: Native::new(|g:&IRazTree<Option<(Option<usize>,Vec<usize>)>>| {
+	    let gsized = SizedMap { size: start_size*2, gran: datagauge, map: *g };
+	    let ret: SizedMap<(Option<usize>, Vec<usize>)> = Graph::bfs(gsized, 1);
+	    ret.map
+    }),
     changes: changes,
   };
 
-  init_dcg(); assert!(engine_is_dcg());
+let mut test_vec = EditComputeSequence{
+    init: IncrementalInit {
+      size: start_size,
+      datagauge: datagauge,
+      namegauge: namegauge,
+      coord: coord.clone(),
+    },
+    edit: BatchInsert(edits),
+    comp: Native::new(|g:&HashMap<usize, (Option<usize>, Vec<usize>)>| {
+	    let gsized = SizedHashMap { size: 1000000, gran: 10000, map: *g };
+	    let ret: SizedHashMap<usize, (Option<usize>, Vec<usize>)> = Graph::bfs(gsized, 1);
+    	ret.map
+    }),
+    changes: changes,
+  };
+
+	init_dcg(); assert!(engine_is_dcg());
 
   // run experiments
 
   let mut rng = StdRng::from_seed(&[editseed]);
 
   let result_non_inc: TestResult<
-    EvalVec<usize,StdRng>,
-    Vec<_>,
-  > = test.test(&mut rng);
+    EvalHashMap<(Option<usize>, Vec<usize>),StdRng>,
+    HashMap<_, _>,
+  > = test_vec.test(&mut rng);
 
   // for visual debugging
   if do_trace {reflect::dcg_reflect_begin()}
 
   let result_inc: TestResult<
-    EvalIRaz<usize,StdRng>,
-    IRazTree<_>,
-  > = test.test(&mut rng);
+    EvalIRaz<Option<(Option<usize>,Vec<usize>)>,StdRng>,
+    IRazTree<Option<(Option<usize>,Vec<usize>)>>,
+  > = test_raz.test(&mut rng);
 
   if do_trace {
 	  let traces = reflect::dcg_reflect_end();
@@ -110,6 +131,7 @@ fn main2() {
 	  }
 	}
 
+/*correctness check malformed for this case
   // correctness check
 
   let non_inc_comparison =
@@ -126,12 +148,12 @@ fn main2() {
     true => println!("Final results from both versions match"),
     false => {
       println!("Final results differ:");
-      println!("incremental results({}): {:?}", inc_comparison.len(),inc_comparison);
+      println!("the incremental results({}): {:?}", inc_comparison.len(),inc_comparison);
       println!("non incremental results({}): {:?}", non_inc_comparison.len(),non_inc_comparison);
       println!("This is an error");
       ::std::process::exit(1);
     }
-  }
+  }*/
 
   // post-process results
 
@@ -220,7 +242,7 @@ fn main2() {
 
   writeln!(plotscript,"set terminal pdf").unwrap();
   writeln!(plotscript,"set output '{}'", filename.to_owned()+".pdf").unwrap();
-  write!(plotscript,"set title \"{}", "Cumulative time to map elements to strings after inserting element(s)\\n").unwrap();
+  write!(plotscript,"set title \"{}", "Cumulative time to calculate quickhull after inserting element(s)\\n").unwrap();
   writeln!(plotscript,"(s)ize: {}, (g)auge: {}, (n)ame-gauge: {}, (e)dit-batch: {}\"", start_size,datagauge,namegauge,edits).unwrap();
   writeln!(plotscript,"set xlabel '{}'", "(c)hanges").unwrap();
   writeln!(plotscript,"set ylabel '{}'","Time(ms)").unwrap();

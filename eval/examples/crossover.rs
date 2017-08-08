@@ -81,8 +81,26 @@ fn main2() {
 
   // run experiments
   let mut rng = StdRng::from_seed(&[editseed]);
-  let result_raz: TestResult<EvalIRaz<usize,StdRng>> = test.test(&mut rng);
-  let result_vec: TestResult<EvalVec<usize,StdRng>> = test.test(&mut rng);
+  let result_raz: TestResult<
+    EvalIRaz<usize,StdRng>,
+    Option<usize>,
+  > = test.test(&mut rng);
+  let result_vec: TestResult<
+    EvalVec<usize,StdRng>,
+    Option<usize>,
+  > = test.test(&mut rng);
+
+  // correctness check
+  match result_raz.result_data == result_vec.result_data {
+    true => println!("Final results from both versions match"),
+    false => {
+      println!("Final results differ:");
+      println!("incremental result: {:?}",result_raz.result_data);
+      println!("non incremental result: {:?}",result_vec.result_data);
+      println!("This is an error");
+      ::std::process::exit(1);
+    }
+  }
 
   // post-process results
   let comp_raz = result_raz.computes.iter().map(|d|d.num_nanoseconds().unwrap());

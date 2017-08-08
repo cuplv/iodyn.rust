@@ -35,6 +35,8 @@ pub mod level_tree;     // generic tree with cannonical structure, basis for inc
 pub mod tree_cursor;    // interface for traversing a level tree
 pub mod raz;            // Gauged Incremental Random Access Zipper
 pub mod raz_meta;       // Generic interface and concrete versions of metadata for searching the Raz
+pub mod raz_based;      // Some simple structs based on the Raz
+pub mod finite_map;
 
 // Two forms of tries. They work, but performance needs improvement
 #[doc(hidden)]
@@ -44,6 +46,7 @@ pub mod trie;
 
 /// Gauged Incremental Raz with element counts
 pub type IRaz<E> = raz::Raz<E,raz_meta::Count>;
+pub type Giraz<E> = raz::Raz<E,raz_meta::Count>;
 /// Unfocused `IRaz`
 pub type IRazTree<E> = raz::RazTree<E,raz_meta::Count>;
 /// Cross between vector and persistent stack
