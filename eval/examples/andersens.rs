@@ -45,7 +45,7 @@ pub struct CStatement<N> where N : Eq + Clone {
 
 fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>) -> G {
 	//based on an edge and a list of stmts, returns a list of AndersenRules to be checked
-	fn genCandRules<N:Eq+Clone>(left: N, right: N, stmts: Vec<CStatement<N>>) -> VecDeque<AndersenRule<N>> {
+	fn gen_cand_rules<N:Eq+Clone>(left: N, right: N, stmts: Vec<CStatement<N>>) -> VecDeque<AndersenRule<N>> {
 		let mut ret: VecDeque<AndersenRule<N>> = VecDeque::new();
 		
 		//rule 1: p := q && q -> r ==> p -> r
@@ -139,17 +139,17 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>
 		g = Graph::add_node(g, r.left.clone(), None);
 		g = Graph::add_node(g, r.right.clone(), None);
 		g = DirectedGraph::add_directed_edge(g, r.left.clone(), r.right.clone());
-		q.append(&mut genCandRules(r.left.clone(), r.right.clone(), stmts.clone()));
+		q.append(&mut gen_cand_rules(r.left.clone(), r.right.clone(), stmts.clone()));
 	}
 	
-	fn process_queue<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>((mut q, mut g, stmts):(VecDeque<AndersenRule<N>>, G, Vec<CStatement<N>>)) -> 
+	fn process_queue<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>((mut q, g, stmts):(VecDeque<AndersenRule<N>>, G, Vec<CStatement<N>>)) -> 
 		Result<(VecDeque<AndersenRule<N>>, G, Vec<CStatement<N>>), G> {
 			match q.pop_back() {
 				Some(r) => {
 					let edges: Vec<(N, N)>;
 					let (g, edges) = chkapply(g, r);
 					for (l, r) in edges {
-						q.append(&mut genCandRules(l, r, stmts.clone()));
+						q.append(&mut gen_cand_rules(l, r, stmts.clone()));
 					}
 					Ok((q, g, stmts))
 				},
@@ -162,7 +162,7 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>
 
 fn main() {
 	let mut stmts = vec!(CStatement{left: 0, right: 1, num: 0});
-	let mut dt: SizedMap<(Option<usize>, Vec<usize>)> = Graph::new(100,10);
+	let mut dt: SizedMap<(Option<usize>, Vec<usize>)>;
 	dt = andersen(stmts.clone());
 	assert_eq!(vec!(1), Graph::adjacents(dt, 0));
 	stmts.push(CStatement{left: 10, right: 0, num: 1});
