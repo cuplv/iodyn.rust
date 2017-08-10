@@ -161,12 +161,31 @@ fn andersen<N:Eq+Clone,G:DirectedGraph<N,usize>+Clone>(stmts: Vec<CStatement<N>>
 }
 
 fn main() {
-	let mut stmts = vec!(CStatement{left: 0, right: 1, num: 0});
+	let mut stmts = vec!(CStatement{left: 1, right: 0, num: 0});
 	let mut dt: SizedMap<(Option<usize>, Vec<usize>)>;
 	dt = andersen(stmts.clone());
-	assert_eq!(vec!(1), Graph::adjacents(dt, 0));
-	stmts.push(CStatement{left: 10, right: 0, num: 1});
+	assert_eq!(vec!(0), Graph::adjacents(dt, 1));
+	
+	stmts.push(CStatement{left: 2, right: 1, num: 1});
 	dt = andersen(stmts.clone());
-	assert_eq!(vec!(1), Graph::adjacents(dt, 10));
-	println!("executed");
+	assert_eq!(vec!(0), Graph::adjacents(dt, 2));
+	
+	stmts.push(CStatement{left: 3, right: 2, num: 2});
+	dt = andersen(stmts.clone());
+	assert_eq!(vec!(0), Graph::adjacents(dt, 3));					//Test fail: expected "0", got ""
+	
+	stmts.push(CStatement{left: 10, right: 9, num: 0});
+	stmts.push(CStatement{left: 1, right: 10, num: 3});
+	dt = andersen(stmts.clone());
+	assert_eq!(vec!(9), Graph::adjacents(dt, 0));					//Test fail: expected "9", got "9, 9"
+	
+	println!("executed basic test");
+	
+	let mut test_dt: SizedMap<(Option<usize>, Vec<usize>)>;
+	let mut broad_test = vec!(CStatement{left: 1, right: 0, num: 0});
+	broad_test.push(CStatement{left: 2, right: 1, num: 1});
+	
+	test_dt = andersen(broad_test.clone());
+	assert_eq!(vec!(0), Graph::adjacents(test_dt, 2));
+	println!("executed broad test");
 }
