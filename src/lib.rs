@@ -49,6 +49,7 @@ pub type IRaz<E> = raz::Raz<E,raz_meta::Count>;
 pub type Giraz<E> = raz::Raz<E,raz_meta::Count>;
 /// Unfocused `IRaz`
 pub type IRazTree<E> = raz::RazTree<E,raz_meta::Count>;
+pub type GirazTree<E> = raz::RazTree<E,raz_meta::Count>;
 /// Cross between vector and persistent stack
 pub type ArchiveStack<E> = archive_stack::AStack<E,()>;
 
