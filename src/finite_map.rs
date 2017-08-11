@@ -374,7 +374,10 @@ impl<T, Data> DirectedGraph<usize, Data> for T
 			ret = Graph::add_node(ret.clone(), dst, None);
 		}
 		let (k, mut adjs) = FinMap::get(ret.clone(), src).unwrap();
-		adjs.push(dst);
+		if !adjs.contains(&dst) {
+			//println!("adding edge: src: {}, dst: {}", src, dst);
+			adjs.push(dst);
+		}
 		FinMap::put(ret, src, (k, adjs))
 	}
 	
