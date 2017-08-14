@@ -11,6 +11,7 @@ extern crate iodyn;
 use iodyn::finite_map::*;
 use std::rc::Rc;
 use std::collections::vec_deque::VecDeque;
+use std::time::Instant;
 
 /*
 Rules for Andersen's analysis:
@@ -167,7 +168,9 @@ fn main() {
 	stmts.push(CStatement{left: 3, right: 2, num: 2});
 	stmts.push(CStatement{left: 10, right: 9, num: 0});
 	stmts.push(CStatement{left: 1, right: 10, num: 3});
+	let start = Instant::now();
 	dt = andersen(stmts.clone());
+	println!("basic test time with Raz: {} nanoseconds", start.elapsed().subsec_nanos());
 	assert_eq!(vec!(0), Graph::adjacents(dt.clone(), 1));
 	assert_eq!(vec!(0), Graph::adjacents(dt.clone(), 2));
 	assert_eq!(vec!(9), Graph::adjacents(dt.clone(), 3));
@@ -175,11 +178,16 @@ fn main() {
 	
 	println!("executed basic test");
 	
-	/*let mut test_dt: SizedMap<(Option<usize>, Vec<usize>)>;
-	let mut broad_test = vec!(CStatement{left: 1, right: 0, num: 0});
-	broad_test.push(CStatement{left: 2, right: 1, num: 1});
+	let mut dt: SizedHashMap<usize, (Option<usize>, Vec<usize>)>;
+	let start = Instant::now();
+	dt = andersen(stmts.clone());
+	println!("basic test time with Rust Hashmap: {} nanoseconds", start.elapsed().subsec_nanos());
+	assert_eq!(vec!(0), Graph::adjacents(dt.clone(), 1));
+	assert_eq!(vec!(0), Graph::adjacents(dt.clone(), 2));
+	assert_eq!(vec!(9), Graph::adjacents(dt.clone(), 3));
+	assert_eq!(vec!(9), Graph::adjacents(dt.clone(), 0));
 	
-	test_dt = andersen(broad_test.clone());
-	assert_eq!(vec!(0), Graph::adjacents(test_dt, 2));
-	println!("executed broad test");*/
+	println!("executed basic test with Hashmap");
+	
+	//results: raz around 3,900,000 nanoseconds, rust hashmap around 600,000 nanoseconds
 }
