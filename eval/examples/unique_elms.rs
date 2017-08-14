@@ -350,11 +350,11 @@ fn main2() {
 
   //writeln!(plotscript,"'{}' i 1 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc Trie edit").unwrap();
   //writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie1").unwrap();
-  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie2").unwrap();
+  writeln!(plotscript,"'{}' i 1 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie2").unwrap();
   //writeln!(plotscript,"'{}' i 1 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc Trie total").unwrap();
 
   //writeln!(plotscript,"'{}' i 2 u 1:3:4 t '{}' with filledcu fs solid 0.1,\\",filename.to_owned()+".dat", "Inc List edit").unwrap();
-  writeln!(plotscript,"'{}' i 3 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List").unwrap();
+  writeln!(plotscript,"'{}' i 2 u 1:3 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List").unwrap();
   //writeln!(plotscript,"'{}' i 2 u 1:4 t '{}' with linespoints,\\",filename.to_owned()+".dat","Inc List total").unwrap();
 
   ::std::process::Command::new("gnuplot").arg(filename.to_owned()+".plotscript").output().unwrap();
