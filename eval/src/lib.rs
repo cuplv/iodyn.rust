@@ -19,3 +19,4 @@ pub mod eval_raz_name_index;
 pub mod eval_vec;
 pub mod eval_llist;
 pub mod eval_iastack;
+pub mod eval_hashmap;

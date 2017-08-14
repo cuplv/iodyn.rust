@@ -36,6 +36,7 @@ pub mod tree_cursor;    // interface for traversing a level tree
 pub mod raz;            // Gauged Incremental Random Access Zipper
 pub mod raz_meta;       // Generic interface and concrete versions of metadata for searching the Raz
 pub mod raz_based;      // Some simple structs based on the Raz
+pub mod finite_map;
 
 // Two forms of tries. They work, but performance needs improvement
 #[doc(hidden)]
