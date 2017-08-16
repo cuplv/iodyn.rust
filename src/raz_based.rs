@@ -37,13 +37,17 @@ impl<E:Debug+Clone+Eq+Hash+'static> Queue<E> {
 		raz.archive_left(::inc_level(), Some(nm));
 		Queue{repr:raz, ready_to_dequeue:false}
 	}
-	pub fn dequeue_name(self) -> (Self, Option<(E,Option<Option<Name>>)>) {
+	pub fn dequeue_name(self) -> (Self, Option<(E,Option<Name>)>) {
 		let Queue{repr,ready_to_dequeue} = self;
 		let mut raz = if !ready_to_dequeue {
 			repr.unfocus().focus(Position::first()).unwrap()
 		} else { repr };
 		let pop = raz.pop_right_level_name();
-		let ret = pop.map(|(v,l)|{(v,l.map(|(_,n)|{n}))});
+		let ret = pop.map(|(v,l)|{(v, match l {
+			None => None,
+			Some((_,None)) => None,
+			Some((_,n)) => n,
+		})});
 		(Queue{repr:raz, ready_to_dequeue:true},ret)
 	}
 }
