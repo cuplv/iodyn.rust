@@ -21,6 +21,3 @@ travis-ci = { repository = "https://github.com/cuplv/iodyn.rust" }
 [dependencies]
 rand = "0.3"
 adapton = "0.3"
-
-#[dependencies.adapton]
-#path = "/Users/hammer/repo/adapton.rust"
