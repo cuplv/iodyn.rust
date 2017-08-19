@@ -5,20 +5,22 @@ IODyn: Collections for **Dynamic Input and Output**
 [Adapton](http://rust.adapton.org), a general-purpose framework for
 incremental computing.
 
-IODyn consists of collections for sequences, finite maps, sets and graphs.
+IODyn consists of incremental, Adapton-based collections for sequences, finite maps, sets and graphs.
 
-Sequences
--------------
+# Done: 
+
+## Sequences
+
 - **Random Access Zipper (RAZ)**: Sequence as a zipper, with a cursor for local edits, local navigation, and global navigation (via an associated _level tree_ representation)
 - **Level tree**: Sequence as a balanced tree; efficient global navigation, e.g., to an offset, to either end (first or last), or based on user-defined navigation data.
 - **Stack** (last in first out): push, pop
 
-Finite Maps and Sets
------------------------
-- **Skip list**: put, get, remove
+# In progress
 
-In progress
---------------
+## Finite maps and sets:
+See https://github.com/cuplv/iodyn.rust/issues/20 for details
+
+## More:
 - Queue (first in first out): push, pop
 - Trie (persistent sets): put, get, remove, union, intersect
 - Directed graph: XXX
