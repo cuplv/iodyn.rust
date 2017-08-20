@@ -1,24 +1,31 @@
 // author: matthew.hammer@colorado.edu
-/*! 
+/*!
 **Key-value log**, a sequence of key-value accesses _and updates_.
 
 # Key value log
 
 A key-value log records a (totally-ordered) sequential history of
-associations between keys and values.  For efficiency (to tune
-overhead), we store the log in a chunked representation, permitting us
-to amortize each Adapton-level operation over _many_ key-value log
-operations, which form chunks.
+associations between keys and values.  At any point, the user can
+append a new key-value association (function `put`) and access the most
+recent value, if any, associated with a given key (function `get`).
+
+For efficiency (to tune Adapton's overhead), we store the log in a chunked
+representation, permitting us to amortize each Adapton-level operation
+over _many_ key-value log operations, which form chunks.  The
+programmer controls where/when the log breaks into separate chunks by
+periodically calling `archive`.
 
 ## Interface overview
 
 Abstract type `Log` represents a chunky key-value log:
 
-- function `emp` produces the empty `Log`  
-- function `get` accesses the latest value for a given key  
-- function `put` updates the value for the given key  
+- function `emp` produces the empty `Log`
+- function `get` accesses the latest value for a given key
+- function `put` updates the value for the given key
 - function `archive` controls the representation's chunking, including the role of
    persistence and Adapton-level amortization.
+
+See [this listing](#example-0) for a small example.
 
 ## Implementation discussion
 
@@ -30,7 +37,7 @@ The chunky log representation amortizes Adapton operations over many
 `put`/`get` operations.
 
 - function `put` does not require any Adapton operations (it only
-affects the current chunk), and 
+affects the current chunk), and
 
 - function `get` uses Adapton operations in some cases, but not all:
 
@@ -97,10 +104,10 @@ string that forms the prefix of two or more distinct keys.
 
 ### Bit string addresses for keys
 
-We divide the hash of each key (the "key bits") into three parts:  
+We divide the hash of each key (the "key bits") into three parts:
 
 - the "chunk bits" (least significant), e.g., 10 bits,
-- the "jump bits" (next significant), e.g., the next 0--20 bits and  
+- the "jump bits" (next significant), e.g., the next 0--20 bits and
 - the extra bits (least significant) that we do not use.
 
 The number of "key bits" should suffice to make each distinct key have
@@ -112,7 +119,7 @@ Ideally, the number of "chunk bits" plus the number of "jump bits"
 should be close to the [expected address
 length](#expected-address-length) of the kv log.
 
-**Examples**  
+**Examples**
 
 - For 4096 distinct keys, we expect the address length to be 12 bits,
 since 2^12 = 4096; if we set the chunk size to 1k, the number of chunk
@@ -141,12 +148,12 @@ of extra bits is zero.
 In practice, computing and storing jump pointers has an upfront cost.
 To tune this, we chould set the number of "jump bits" to be fewer
 than this ideal choice, and the "chunk bits" plus "jump bits" together
-may not assign distinct bits to distinct key bit strings.  
+may not assign distinct bits to distinct key bit strings.
 
 Varying this balance presents a trade off: the imprecision of having
 fewer bits for locating keys makes _building_ the log's kv tables
 cheaper, but each _key lookup_ later on becomes (potentially) less
-precise and more expensive, in expectation.  
+precise and more expensive, in expectation.
 
 In the limit, the number of "jump bits" is zero, and only the "chunk
 bits" are used to distinguish keys, where the number of keys could be
@@ -168,8 +175,8 @@ we introduce the following definitions:
 
 - The **expected dependency fanout** of a chunk is the expected
   number of distinct **chunks** that each chunk _directly observes_
-  while 
-  - performing `get` operations on earlier chunks and 
+  while
+  - performing `get` operations on earlier chunks and
   - performing the `archive` operation, which computes the chunk's kv table, and its jump pointers.
   - (recall that `put` operations do not observe earlier chunks)
 
@@ -184,6 +191,49 @@ distribution of operations over keys, what are the expected fan outs
 of the log's chunks?
 
 In particular, how is it related to the expected path length?
+
+# Examples
+
+## Example 0
+
+```
+extern crate adapton;
+extern crate iodyn;
+use adapton::engine::*;
+use iodyn::kvlog::Log;
+
+fn main () {
+    let mut l = Log::emp();
+
+    l.put(1, 1);
+    l.put(2, 2);
+    l.put(2, 3);
+    l.put(2, 1);
+    l.put(3, 3);
+    l.put(4, 4);
+
+    assert_eq!(l.get(0), None);
+    assert_eq!(l.get(1), Some(1));
+    assert_eq!(l.get(2), Some(1));
+    assert_eq!(l.get(3), Some(3));
+    assert_eq!(l.get(4), Some(4));
+    assert_eq!(l.get(5), None);
+    assert_eq!(l.get(6), None);
+
+    l = l.archive(Some(name_of_usize(4)));
+    l.put(5, 5);
+    l.put(6, 6);
+    l.put(2, 4);
+
+    assert_eq!(l.get(0), None);
+    assert_eq!(l.get(1), Some(1));
+    assert_eq!(l.get(2), Some(4));
+    assert_eq!(l.get(3), Some(3));
+    assert_eq!(l.get(4), Some(4));
+    assert_eq!(l.get(5), Some(5));
+    assert_eq!(l.get(6), Some(6));
+}
+```
 
 !*/
 
@@ -201,10 +251,17 @@ In particular, how is it related to the expected path length?
 use std::rc::Rc;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::HashMap;
-
+use std::collections::hash_map::{HashMap,DefaultHasher};
 use adapton::engine::*;
 use trie2;
+
+fn my_hash<T>(obj: T) -> u64
+  where T: Hash
+{
+  let mut hasher = DefaultHasher::new();
+  obj.hash(&mut hasher);
+  hasher.finish()
+}
 
 const CHUNK_BITS : u32 = 0x4ff;
 
@@ -251,23 +308,23 @@ type KvTable<K,V> = HashMap<ChunkBits, Vec<Kv<K, V>>> ;
 // that have keys with related hash strings.
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
 struct Kv<K, V> {
-    // bits consists of all of the hash bits of the key, including the
-    // "here" bits and "path" bits. if this full hash matches during a
-    // key-value lookup, the lookup key's value is in the current
-    // chunk, and no jump to another chunk is necessary. otherwise, if
-    // the "chunk bits" match but the full bits do not, consult the
-    // `path` field at the offset of first "path bit" mismatch.
-    bits: KeyBits,
-    // for each "path bit" in the Kv, we give an optional log chunk.
-    // This chunk represents where to lookup next when the lookup bit
-    // does not match a path bit. if all jump bits match, but two keys
-    // are distinct, then use `prev` to find earlier occurrences of
-    // the same bit pattern.
-    path: Vec<Option<Art<Chunk<K, V>>>>,
     // Key
     key: K,
     // Value
     val: V,
+    // bits consists of all of the hash bits of the key, including the
+    // "chunk" bits and "jump" bits. if this full hash matches during a
+    // key-value lookup, the lookup key's value is in the current
+    // chunk, and no jump to another chunk is necessary. otherwise, if
+    // the "chunk bits" match but the full bits do not, consult the
+    // `jumps` field at the offset of first "jump bit" mismatch.
+    bits: KeyBits,
+    // for each "jump bit" in the Kv, we give an optional log chunk.
+    // This chunk represents where to lookup next when the lookup bit
+    // does not match a jump bit. if all jump bits match, but two keys
+    // are distinct, then use `prev` to find earlier occurrences of
+    // the same bit pattern.
+    jumps: Vec<Option<Art<Chunk<K, V>>>>,
     // the previous chunk that contains a key with _the exact same_
     // chunk bits and jump bits. this field is needed when two distinct
     // keys have the same chunk+jump bits; it permits us to traverse
@@ -298,17 +355,21 @@ impl<K:Hash,V:Hash> Hash for Chunk<K,V> {
 impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
       V:'static+Hash+PartialEq+Eq+Clone+Debug> Log<K,V> {
 
-    pub fn emp() -> Log<K,V> { Log(None) }
+    fn key_bits(key: &K) -> KeyBits { KeyBits(my_hash(key)) }
+    
+    fn chunk_bits(bits:&KeyBits) -> ChunkBits {
+        ChunkBits((bits.0 & (CHUNK_BITS as u64)) as u32)
+    }
 
     fn build_path_rec
         (bits: KeyBits,
          chunk_art: Option<&Art<Chunk<K,V>>>, chunk: &Chunk<K,V>,
-         depth: usize, path: &mut Vec<Option<Art<Chunk<K,V>>>>)
+         jumps: &mut Vec<Option<Art<Chunk<K,V>>>>)
          -> Option<Art<Chunk<K,V>>>
     {
         match chunk.here {
             Here::Vec(ref kvs) => {
-                for &(ref k, ref kbits, ref v) in kvs.iter() {
+                for &(ref k, ref kbits, ref v) in kvs.iter().rev() {
                     if bits.0 == kbits.0 {
                         assert_eq!(chunk_art, None);
                         return None
@@ -319,17 +380,15 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 match chunk.prev {
                     None => None,
                     Some(ref prev) => {
-                        Self::build_path_rec(bits, Some(prev), &force(prev), 
-                                            depth /* ?? */, path /* ?? */)
+                        Self::build_path_rec(bits, Some(prev), &force(prev), jumps)
                     },
                 }
             }
             Here::Table(ref kvt) => {
-                let here_bits = ChunkBits((bits.0 & (CHUNK_BITS as u64)) as u32);
-                match kvt.get(&here_bits) {
-                    None => { 
+                match kvt.get(&Self::chunk_bits(&bits)) {
+                    None => {
                         // the key does not exist
-                        return None 
+                        return None
                     }
                     Some(kvs) => {
                         // first, look for an exact KeyBits match among the Kvs
@@ -344,27 +403,103 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                         // we need to "jump" to another chunk.
                         let mut next_chunk_art : Option<&Art<Chunk<K,V>>> = None;
                         // to determine the next chunk, look for
-                        // longest KeyBits match among the Kvs we
-                        // have in `kvs`, and the chunk with the
-                        // longest matching KeyBits prefix (as given
-                        // by the path vector of the longest jump).
+                        // longest KeyBits match among the Kvs we have
+                        // in `kvs`, and its jumps.
                         for kv in kvs.iter() {
                             // TODO look for longest match among the Kvs
+                            // If found, extend jumps for each matching bit
+                            unimplemented!()
                         };
-                        // find the next chunk by looking in the
-                        // longest match among the jumps.
+                        // search in the next chunk, if any
                         match next_chunk_art {
                             None => None,
                             Some(chunk_art) => {
                                 return Self::build_path_rec
-                                    (bits, Some(chunk_art), &force(chunk_art),
-                                     depth + 1 /* len TODO/??? */ , path)
+                                    (bits, Some(chunk_art), &force(chunk_art), jumps)
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+
+    pub fn emp() -> Log<K,V> { Log(None) }
+
+    pub fn get(&mut self, key: K) -> Option<V> {
+        let mut do_put : bool = false ;
+        let key_bits = Self::key_bits(&key);        
+        let vo : Option<V> = match self.0 {
+            None => None,
+            Some(ref mut chunk) => {
+                match chunk.here {
+                    Here::Vec(ref mut kvs) => {
+                        let mut vo = None ;
+                        for &(ref k, ref bits, ref v) in kvs.iter().rev() {
+                            if &key_bits == bits {
+                                assert_eq!(&key, k);
+                                vo = Some(v.clone());
+                                break;
+                            }
+                        };
+                        if vo == None { // key not found in vector. if
+                            // we find it elsewhere in an earlier
+                            // chunk, also put it in this chunk.
+                            do_put = true;
+                            match chunk.prev {
+                                None => (),
+                                Some(ref x) => {
+                                    vo = Log(Some(force(x))).get(key.clone());                                    
+                                }
+                            }
+                        }
+                        vo
+                    },
+                    Here::Table(ref tab) => {
+                        match tab.get(&Self::chunk_bits(&key_bits)) {
+                            None => None,
+                            Some(ref kvs) => {
+                                let mut vo = None ;
+                                for kv in kvs.iter() {
+                                    if key_bits == kv.bits {
+                                        assert_eq!(&key, &kv.key);
+                                        vo = Some(kv.val.clone());
+                                        break;
+                                    }
+                                };
+                                if vo == None {
+                                    // Now, we need to use one of the "jumps" (if any) to proceed
+                                    unimplemented!()
+                                };
+                                vo
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        if do_put {
+            // TODO-Someday: Store value options for keys (not merely
+            // values), to also store the _absence_ of values.
+            vo.map(|x|{self.put(key, x.clone()); x})
+        } else {
+            vo
+        }
+    }
+
+    pub fn put(&mut self, key: K, val: V) {
+        let key_bits = Self::key_bits(&key);
+        match self.0 {
+            None => self.0 = Some(Chunk{
+                here:Here::Vec(vec![ (key, key_bits, val) ]),
+                prev:None,
+                name:None,
+            }),
+            Some(ref mut chunk) => match chunk.here {
+                Here::Vec(ref mut kvs) => kvs.push((key, key_bits, val)),
+                Here::Table(_) => unreachable!(),
+            }};
     }
 
     pub fn archive(mut self, on:Option<Name>) -> Self {
@@ -375,7 +510,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 name:on,
             })),
             Some(mut chunk) => {
-                let jt = HashMap::new();
+                let mut tab = HashMap::new();
                 match chunk.here {
                     Here::Table(kvt) => {
                         // not possible, since an invariant is that
@@ -385,42 +520,48 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                     },
                     Here::Vec(kvs) => {
                         // initial kv table consists of most recent key bindings from _this chunk_:
-                        for (k, kbits, v) in kvs /* TODO: reverse order; bigger indices first */ {
-                            // let k_bits = hash(k);
-                            // if k not already in jt {
-                            //   let here_bits = here_bits(k_bits);
-                            //   let mut path = Vec::new();
-                            //   let prev = build_path_rec(k_bits, prev, &prev_art, here_bits_depth, &mut path);
-                            //   jt.update(here_bits, ||vec::new(), |v| v.push(Kv{bits:k_bits, path:path, prev:prev}));
-                            // }
-                            unimplemented!()
-                        }; 
+                        for (k, kbits, v) in kvs.into_iter().rev() {
+                            let chunk_bits = Self::chunk_bits(&kbits);
+                            if ! tab.contains_key(&chunk_bits) {
+                                tab.insert(chunk_bits.clone(), vec![] );
+                            };
+                            match tab.get_mut(&chunk_bits) {
+                                None => unreachable!(), // impossible: just inserted an empty vector here.
+                                Some(kvs) => {
+                                    let mut jumps = Vec::new();
+                                    let prev = match chunk.prev {
+                                        None => None,
+                                        Some(ref chunk_art) => {
+                                            Self::build_path_rec
+                                                (kbits.clone(), Some(chunk_art), &force(chunk_art), &mut jumps)
+                                        }
+                                    };
+                                    kvs.push(Kv{key:k, val:v, bits:kbits, prev:prev, jumps:jumps})
+                                }
+                            }
+                        };
                         // next, temporarily borrow chunk to follow
                         // prev pointer; update any "holes" in the kv
                         // table with kvs from the previous kv table.
-                        { 
-                            let x: &Option<Art<Chunk<K,V>>> = &chunk.prev ;
-                            let prev_jt : Rc<KvTable<K,V>> =
-                                match force(
-                                    // TODO-minor: better syntax for
-                                    // this unwrap-ref-option pattern?
-                                    match *x {Some(ref x) => x, 
-                                              None => unreachable!()} ).here {
-                                    Here::Table(ref kvt) => kvt.clone(),
+                        {
+                            match chunk.prev { 
+                                None => (),
+                                Some(ref a) => match get!(a).here {
                                     Here::Vec(_) => unreachable!(),
+                                    Here::Table(ref prev_tab) => {
+                                        for (bits, kvs) in prev_tab.iter() {
+                                            if ! tab.contains_key(bits) {
+                                                tab.insert(bits.clone(), kvs.clone());
+                                            }
+                                        }
+                                    }
                                 }
-                            ;
-                            for (bits, kvs) in prev_jt.iter() {
-                                // if not jt.mem(bits) { jt.add(bits, kvs.clone()) }
-                                // else { /* do nothing */ }
-                                drop((bits, kvs));
-                                unimplemented!()
                             }
                         };
                         // save the kv table we just computed,
                         // replacing the vector representation of the
-                        // current chunk. 
-                        chunk.here = Here::Table(Rc::new(jt));
+                        // current chunk.
+                        chunk.here = Here::Table(Rc::new(tab));
                         // The new/empty chunk consists of an empty
                         // vector; current chunk becomes the previous
                         // chunk of this new, empty head chunk.
@@ -433,14 +574,6 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                 }
             }
         }
-    }
-
-    pub fn get(&mut self, key: K) -> Option<V> {
-        unimplemented!()
-    }
-
-    pub fn put(&mut self, key: K, val: V) {
-        unimplemented!()
     }
 
     pub fn into_trie(self) -> trie2::Trie<K,V> {
@@ -478,4 +611,49 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
     pub fn into_trie(mut self) -> trie2::Trie<K,V> {
         unimplemented!()
     }
+}
+
+
+
+
+#[test]
+fn kvlog_tiny () {
+    use adapton::engine::{name_unit, name_of_usize};
+    let mut c = Log::emp();
+    c.put(1, 1);
+    println!("{:?}\n", c);
+    c.put(2, 2);
+    c.put(2, 3);
+    println!("{:?}\n", c);
+    c.put(2, 1);
+    c.put(3, 3);
+    println!("{:?}\n", c);
+    c.put(4, 4);
+
+    println!("lookup 1--6:\n");
+
+    assert_eq!(c.get(0), None);
+    assert_eq!(c.get(1), Some(1));
+    assert_eq!(c.get(2), Some(1));
+    assert_eq!(c.get(3), Some(3));
+    assert_eq!(c.get(4), Some(4));
+    assert_eq!(c.get(5), None);
+    assert_eq!(c.get(6), None);
+
+    println!("done.\n");
+
+    c = c.archive(Some(name_of_usize(4)));
+    println!("{:?}\n", c);
+    c.put(5, 5);
+    println!("{:?}\n", c);
+    c.put(6, 6);
+    println!("{:?}\n", c);
+
+    assert_eq!(c.get(0), None);
+    assert_eq!(c.get(1), Some(1));
+    assert_eq!(c.get(2), Some(1));
+    assert_eq!(c.get(3), Some(3));
+    assert_eq!(c.get(4), Some(4));
+    assert_eq!(c.get(5), Some(5));
+    assert_eq!(c.get(6), Some(6));
 }
