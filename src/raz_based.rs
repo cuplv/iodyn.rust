@@ -4,6 +4,8 @@ use raz::{Raz};
 use raz_meta::{Position,FirstLast};
 use adapton::engine::{Name};
 
+/// A queue based on the Raz that refocuses each time
+/// the operation on it switches between input and output.
 pub struct Queue<E:Debug+Clone+Eq+Hash+'static>{
 	// internally, the data is left to right in the order
 	// it will be read.
@@ -11,8 +13,6 @@ pub struct Queue<E:Debug+Clone+Eq+Hash+'static>{
 	ready_to_dequeue: bool,
 }
 
-/// A queue based on the Raz that refocuses each time
-/// the operation on it switches between input and output.
 impl<E:Debug+Clone+Eq+Hash+'static> Queue<E> {
 	pub fn new() -> Self {
 		Queue{repr:Raz::new(), ready_to_dequeue:true}
@@ -56,6 +56,9 @@ impl<E:Debug+Clone+Eq+Hash+'static> Queue<E> {
 	}
 }
 
+/// A queue based on the Raz that uses the raz cursor,
+/// refocusing only for the first enqueued item
+/// since the last refocus.
 pub struct ZipQueue<E:Debug+Clone+Eq+Hash+'static>{
 	// internally, the raz cursor marks the read head, and
 	// moves left to right, pushing behind and poping ahead
