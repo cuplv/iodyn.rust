@@ -173,12 +173,11 @@ fn main() {
     stdin.lock().read_line(&mut line).unwrap();
     let num_vars = line.trim().parse::<usize>().unwrap();
     
-    //generate num_vars^2 random, distinct CStatements from num_vars variables, and put into stmts
-    //for n vars there are 4n^2 - 4n possible statements, this parameter need not be fixed
+    //generate all distinct CStatements possible from num_vars variables
     let mut all_stmts: Vec<CStatement<usize>> = vec!();
-    for i in 1..num_vars {
-    	for j in 1..num_vars {
-    		for k in 0..3 {
+    for i in 1..num_vars+1 {
+    	for j in 1..num_vars+1 {
+    		for k in 0..4 {
     			if i != j {
 	    			all_stmts.push(CStatement{left: i, right: j, num: k});
     			}
@@ -186,14 +185,18 @@ fn main() {
     	}
     }
     
+    println!("all_stmts size: {}", all_stmts.len());
+    
     let mut stmts: Vec<CStatement<usize>> = vec!();
     let mut rng = thread_rng();
-    for i in 1..num_vars^2 {
+    for i in 1..num_vars.pow(2)+1 {
     	rng.shuffle(&mut all_stmts);
     	stmts.push(all_stmts.pop().expect("popped from empty vec"));
     }
     
     println!("created statement list, beginning analysis");
+    println!("statement list size: {}", stmts.len());
+    println!("statment list: {:?}", stmts.clone());
     
     let mut dt: SizedMap<(Option<usize>, Vec<usize>)>;
     let start = Instant::now();
