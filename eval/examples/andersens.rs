@@ -163,16 +163,48 @@ fn andersen<N:Eq+Clone+std::fmt::Display,G:DirectedGraph<N,usize>+Clone>(stmts: 
 
 
 use std::io::{self,BufRead};
+extern crate rand;
+use rand::{thread_rng, Rng};
 fn main() {
 	println!("Input number of variables for this example as an int: ");
 	
 	let mut line = String::new();
     let stdin = io::stdin();
     stdin.lock().read_line(&mut line).unwrap();
-    let num_vars = line.parse::<i32>().unwrap();
+    let num_vars = line.trim().parse::<usize>().unwrap();
     
-    //generate num_vars^(1.5) random, distinct CStatements from num_vars variables, and put into stmts
-    let mut stmts: Vec<CStatement>;
+    //generate num_vars^2 random, distinct CStatements from num_vars variables, and put into stmts
+    //for n vars there are 4n^2 - 4n possible statements, this parameter need not be fixed
+    let mut all_stmts: Vec<CStatement<usize>> = vec!();
+    for i in 1..num_vars {
+    	for j in 1..num_vars {
+    		for k in 0..3 {
+    			if i != j {
+	    			all_stmts.push(CStatement{left: i, right: j, num: k});
+    			}
+    		}
+    	}
+    }
+    
+    let mut stmts: Vec<CStatement<usize>> = vec!();
+    let mut rng = thread_rng();
+    for i in 1..num_vars^2 {
+    	rng.shuffle(&mut all_stmts);
+    	stmts.push(all_stmts.pop().expect("popped from empty vec"));
+    }
+    
+    println!("created statement list, beginning analysis");
+    
+    let mut dt: SizedMap<(Option<usize>, Vec<usize>)>;
+    let start = Instant::now();
+    dt = andersen(stmts.clone());
+    println!("time elapsed using Raz: {} nanoseconds", start.elapsed().subsec_nanos());
+    
+    let mut dt: SizedHashMap<usize, (Option<usize>, Vec<usize>)>;
+    let start = Instant::now();
+    dt = andersen(stmts.clone());
+    println!("time elapsed using Rust Hashmap: {} nanoseconds", start.elapsed().subsec_nanos());
+    
 }
 
 #[cfg(test)]
