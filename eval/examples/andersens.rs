@@ -161,8 +161,18 @@ fn andersen<N:Eq+Clone+std::fmt::Display,G:DirectedGraph<N,usize>+Clone>(stmts: 
 	unfold_simple((q, g, stmts), Rc::new(process_queue))
 }
 
+
+use std::io::{self,BufRead};
 fn main() {
+	println!("Input number of variables for this example as an int: ");
 	
+	let mut line = String::new();
+    let stdin = io::stdin();
+    stdin.lock().read_line(&mut line).unwrap();
+    let num_vars = line.parse::<i32>().unwrap();
+    
+    //generate num_vars^(1.5) random, distinct CStatements from num_vars variables, and put into stmts
+    let mut stmts: Vec<CStatement>;
 }
 
 #[cfg(test)]
