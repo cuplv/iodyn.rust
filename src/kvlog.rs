@@ -536,7 +536,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                                 // if no exact match, recur using the jumps of the longest match, if any
                                 if vo == None {
                                     Self::longest_match(key_bits, kvs).map(|(match_idx, match_len)|{
-                                        println!("longest_match:: key:{:?}, match_idx:{}, match_len:{}", key, match_idx, match_len);
+                                        println!("longest_match:: key:{:?}, kvs.len:{}, match_idx:{}, match_len:{}", key, kvs.len(), match_idx, match_len);
                                         match *kvs[match_idx].jumps.get(match_len - CHUNK_BITC).unwrap_or(&None) {
                                             None => (),
                                             Some(ref x) => { vo = Log(Some(force(x))).get(key) }
@@ -590,23 +590,26 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                     },
                     Here::Vec(kvs) => {
                         // initial kv table consists of most recent key bindings from _this chunk_:
+                        let mut uniq_keys : HashMap<KeyBits, ()> = HashMap::new();
                         for (k, kbits, v) in kvs.into_iter().rev() {
                             let chunk_bits = Self::chunk_bits(&kbits);
-                            if ! tab.contains_key(&chunk_bits) {
-                                tab.insert(chunk_bits.clone(), vec![] );
-                            };
-                            match tab.get_mut(&chunk_bits) {
-                                None => unreachable!(), // impossible: just inserted an empty vector here.
-                                Some(kvs) => {
-                                    let mut jumps = Vec::new();
-                                    let prev = match chunk.prev {
-                                        None => None,
-                                        Some(ref chunk_art) => {
-                                            Self::build_path_rec
-                                                (kbits.clone(), Some(chunk_art), &force(chunk_art), &mut jumps)
-                                        }
-                                    };
-                                    kvs.push(Kv{key:k, val:v, bits:kbits, prev:prev, jumps:jumps})
+                            if ! uniq_keys.contains_key(&kbits) {
+                                if ! tab.contains_key(&chunk_bits) {
+                                    tab.insert(chunk_bits.clone(), vec![] );
+                                };
+                                match tab.get_mut(&chunk_bits) {
+                                    None => unreachable!(), // impossible: just inserted an empty vector here.
+                                    Some(kvs) => {
+                                        let mut jumps = Vec::new();
+                                        let prev = match chunk.prev {
+                                            None => None,
+                                            Some(ref chunk_art) => {
+                                                Self::build_path_rec
+                                                    (kbits.clone(), Some(chunk_art), &force(chunk_art), &mut jumps)
+                                            }
+                                        };
+                                        kvs.push(Kv{key:k, val:v, bits:kbits, prev:prev, jumps:jumps})
+                                    }
                                 }
                             }
                         };
@@ -776,8 +779,8 @@ fn kvlog_vs_hashmap () {
     let mut t = Log::emp();
 
     for i in 0..numops {
-        let r1 : usize = rng.gen(); let r1 = r1 % numkeys;
-        let r2 : usize = rng.gen(); let r2 = r2 % numkeys;
+        let r1 : usize = rng.gen(); let r1 = r1 % (i + 1);
+        let r2 : usize = rng.gen(); let r2 = r2 % (i + 1);
         let nm = if gauged && i % gauge == 0 { Some(name_of_usize(i)) } else { None };
 
         // Test random insertion
@@ -793,7 +796,7 @@ fn kvlog_vs_hashmap () {
 
         // Test random lookup
         let r3 : usize = rng.gen();
-        let r3 = r3 % (numkeys * 2); // Look for non-existent keys with prob 0.5
+        let r3 = r3 % (i * 2 + 1); // Look for non-existent keys with prob 0.5
         println!("get-{:?}:: key {:?} maps to {:?}", i, r3, m.get(&r3));
         assert_eq!(m.get(&r3).map(|&n|n.clone()), t.get(&r3));
     }
