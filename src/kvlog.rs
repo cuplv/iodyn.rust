@@ -204,34 +204,42 @@ use iodyn::kvlog::Log;
 
 fn main () {
     let mut l = Log::emp();
-
     l.put(1, 1);
+    println!("{:?}\n", l);
     l.put(2, 2);
     l.put(2, 3);
+    println!("{:?}\n", l);
     l.put(2, 1);
     l.put(3, 3);
+    println!("{:?}\n", l);
     l.put(4, 4);
 
-    assert_eq!(l.get(0), None);
-    assert_eq!(l.get(1), Some(1));
-    assert_eq!(l.get(2), Some(1));
-    assert_eq!(l.get(3), Some(3));
-    assert_eq!(l.get(4), Some(4));
-    assert_eq!(l.get(5), None);
-    assert_eq!(l.get(6), None);
+    println!("lookup 1--6:\n");
+
+    assert_eq!(l.get(&0), None);
+    assert_eq!(l.get(&1), Some(1));
+    assert_eq!(l.get(&2), Some(1));
+    assert_eq!(l.get(&3), Some(3));
+    assert_eq!(l.get(&4), Some(4));
+    assert_eq!(l.get(&5), None);
+    assert_eq!(l.get(&6), None);
+
+    println!("done.\n");
 
     l = l.archive(Some(name_of_usize(4)));
+    println!("{:?}\n", l);
     l.put(5, 5);
+    println!("{:?}\n", l);
     l.put(6, 6);
-    l.put(2, 4);
+    println!("{:?}\n", l);
 
-    assert_eq!(l.get(0), None);
-    assert_eq!(l.get(1), Some(1));
-    assert_eq!(l.get(2), Some(4));
-    assert_eq!(l.get(3), Some(3));
-    assert_eq!(l.get(4), Some(4));
-    assert_eq!(l.get(5), Some(5));
-    assert_eq!(l.get(6), Some(6));
+    assert_eq!(l.get(&0), None);
+    assert_eq!(l.get(&1), Some(1));
+    assert_eq!(l.get(&2), Some(1));
+    assert_eq!(l.get(&3), Some(3));
+    assert_eq!(l.get(&4), Some(4));
+    assert_eq!(l.get(&5), Some(5));
+    assert_eq!(l.get(&6), Some(6));
 }
 ```
 
@@ -263,7 +271,10 @@ fn my_hash<T>(obj: T) -> u64
   hasher.finish()
 }
 
-const CHUNK_BITS : u32 = 0x4ff;
+//const CHUNK_BITS : u32 = 0x3ff; // 4 + 4 + 2 = 10 bits
+const CHUNK_BITS : u32 = 0x3; // 2 bits
+const CHUNK_BITC : usize = 2;
+const KEY_BITC : usize = 64;
 
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub struct Log<K,V> ( Option<Chunk<K, V>> );
@@ -356,11 +367,48 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
       V:'static+Hash+PartialEq+Eq+Clone+Debug> Log<K,V> {
 
     fn key_bits(key: &K) -> KeyBits { KeyBits(my_hash(key)) }
-    
+
     fn chunk_bits(bits:&KeyBits) -> ChunkBits {
         ChunkBits((bits.0 & (CHUNK_BITS as u64)) as u32)
     }
 
+    // find the longest matching bit index (and length), if any
+    fn longest_match (bits:KeyBits, kvs:&Vec<Kv<K,V>>) -> Option<(usize, usize)> {
+        let mut best_match : Option<(usize, usize)> = None;
+        for kv_idx in 0..kvs.len() {
+            let mut match_len = 0;
+            for bit_idx in 0..KEY_BITC {
+                let mask = 1 << bit_idx;
+                if (kvs[kv_idx].bits.0 & mask) == (bits.0 & mask) {
+                    match_len += 1;
+                } else {
+                    // invariant for each use of this function: chunk
+                    // bits cannot differ here
+                    assert!( bit_idx >= CHUNK_BITC );
+                    break
+                }
+            };
+            // update the best_match when it's unset, or we get a longer match
+            if best_match == None || match_len > best_match.unwrap().1 {
+                best_match = Some((kv_idx, match_len));
+            }
+        }
+        return best_match
+    }
+
+    // build the (conceptual) paths in the (conceptual) hash trie.
+    //
+    // concretely, this function extends a vector of jumps as it
+    // "traverses" the conceptual trie to construct a new (conceptual)
+    // trie path.  Concretely, the function returns the terminal chunk
+    // of the traversal, if some prior chunk was found with the same
+    // exact bits, or else None; the function is initially called with
+    // None for the chunk_art.
+    //
+    // TODO: In some future version, we'll limit the total len for
+    // jumps, optionally.  In these cases, we return Some(_) in cases
+    // where the _truncated_ bits match.
+    //
     fn build_path_rec
         (bits: KeyBits,
          chunk_art: Option<&Art<Chunk<K,V>>>, chunk: &Chunk<K,V>,
@@ -369,7 +417,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
     {
         match chunk.here {
             Here::Vec(ref kvs) => {
-                for &(ref k, ref kbits, ref v) in kvs.iter().rev() {
+                for &(ref _k, ref kbits, ref _v) in kvs.iter().rev() {
                     if bits.0 == kbits.0 {
                         assert_eq!(chunk_art, None);
                         return None
@@ -401,19 +449,37 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                         };
                         // no exact match for all KeyBits here.  So,
                         // we need to "jump" to another chunk.
-                        let mut next_chunk_art : Option<&Art<Chunk<K,V>>> = None;
-                        // to determine the next chunk, look for
-                        // longest KeyBits match among the Kvs we have
-                        // in `kvs`, and its jumps.
-                        for kv in kvs.iter() {
-                            // TODO look for longest match among the Kvs
-                            // If found, extend jumps for each matching bit
-                            unimplemented!()
-                        };
+                        let mut next_chunk_art : Option<Art<Chunk<K,V>>> = None;
+                        Self::longest_match(bits.clone(), kvs).map(  |(match_idx, match_len)| {
+                            let curr_idx = CHUNK_BITC + jumps.len();
+                            // Question: How to prove this?
+                            assert!( curr_idx <= match_len );
+                            if curr_idx <= match_len {
+                                // progress! conceptually, we are
+                                // "traversing" more of the trie's
+                                // internal structure as we "traverse"
+                                // these additional bits at >= curr_idx.
+                                for i in curr_idx..match_len {
+                                    // copy jumps for each matching bit
+                                    jumps.push(kvs[match_idx].jumps
+                                               .get(i - CHUNK_BITC).unwrap_or(&None).clone())
+                                };
+                                next_chunk_art = kvs[match_idx].jumps
+                                    .get(match_len - CHUNK_BITC).unwrap_or(&None).clone();
+                                jumps.push(chunk_art.map(|x|x.clone()));
+                            }
+                            else {
+                                // TODO: Handle the case where we
+                                // limit the jump bits, and sometimes
+                                // we get to a "max length"
+                                next_chunk_art = panic!("TODO: bits:{:b}, kv.bits:{:b} curr_idx:{}, match_len:{}",
+                                                        bits.0, kvs[match_idx].bits.0, curr_idx, match_len)
+                            }
+                        });
                         // search in the next chunk, if any
                         match next_chunk_art {
                             None => None,
-                            Some(chunk_art) => {
+                            Some(ref chunk_art) => {
                                 return Self::build_path_rec
                                     (bits, Some(chunk_art), &force(chunk_art), jumps)
                             }
@@ -424,12 +490,11 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
         }
     }
 
-
     pub fn emp() -> Log<K,V> { Log(None) }
 
-    pub fn get(&mut self, key: K) -> Option<V> {
+    pub fn get(&mut self, key: &K) -> Option<V> {
         let mut do_put : bool = false ;
-        let key_bits = Self::key_bits(&key);        
+        let key_bits = Self::key_bits(&key);
         let vo : Option<V> = match self.0 {
             None => None,
             Some(ref mut chunk) => {
@@ -438,7 +503,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                         let mut vo = None ;
                         for &(ref k, ref bits, ref v) in kvs.iter().rev() {
                             if &key_bits == bits {
-                                assert_eq!(&key, k);
+                                assert_eq!(key, k);
                                 vo = Some(v.clone());
                                 break;
                             }
@@ -450,7 +515,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                             match chunk.prev {
                                 None => (),
                                 Some(ref x) => {
-                                    vo = Log(Some(force(x))).get(key.clone());                                    
+                                    vo = Log(Some(force(x))).get(key);
                                 }
                             }
                         }
@@ -463,15 +528,20 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                                 let mut vo = None ;
                                 for kv in kvs.iter() {
                                     if key_bits == kv.bits {
-                                        assert_eq!(&key, &kv.key);
+                                        assert_eq!(key, &kv.key);
                                         vo = Some(kv.val.clone());
                                         break;
                                     }
                                 };
+                                // if no exact match, recur using the jumps of the longest match, if any
                                 if vo == None {
-                                    // Now, we need to use one of the "jumps" (if any) to proceed
-                                    unimplemented!()
-                                };
+                                    Self::longest_match(key_bits, kvs).map(|(match_idx, match_len)|{
+                                        println!("longest_match:: key:{:?}, match_idx:{}, match_len:{}", key, match_idx, match_len);
+                                        match *kvs[match_idx].jumps.get(match_len - CHUNK_BITC).unwrap_or(&None) {
+                                            None => (),
+                                            Some(ref x) => { vo = Log(Some(force(x))).get(key) }
+                                        }})
+                                } else { None };
                                 vo
                             }
                         }
@@ -482,7 +552,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
         if do_put {
             // TODO-Someday: Store value options for keys (not merely
             // values), to also store the _absence_ of values.
-            vo.map(|x|{self.put(key, x.clone()); x})
+            vo.map(|x|{self.put(key.clone(), x.clone()); x})
         } else {
             vo
         }
@@ -502,7 +572,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
             }};
     }
 
-    pub fn archive(mut self, on:Option<Name>) -> Self {
+    pub fn archive(self, on:Option<Name>) -> Self {
         match self.0 {
             None => Log(Some(Chunk{
                 here:Here::Vec(vec![]),
@@ -512,7 +582,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
             Some(mut chunk) => {
                 let mut tab = HashMap::new();
                 match chunk.here {
-                    Here::Table(kvt) => {
+                    Here::Table(_kvt) => {
                         // not possible, since an invariant is that
                         // the head of every log is a chunk with Vec
                         // representation.
@@ -544,7 +614,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                         // prev pointer; update any "holes" in the kv
                         // table with kvs from the previous kv table.
                         {
-                            match chunk.prev { 
+                            match chunk.prev {
                                 None => (),
                                 Some(ref a) => match get!(a).here {
                                     Here::Vec(_) => unreachable!(),
@@ -586,7 +656,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
 /// `LinLog` Demonstrates another API variation, where the log is
 /// _moved_ by its operations, as a _"linear resource"_. The mutable
 /// ref interface for `Log` suffices to implement this interface.
-struct LinLog<K,V> (Log<K,V>);
+pub struct LinLog<K,V> (Log<K,V>);
 impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
       V:'static+Hash+PartialEq+Eq+Clone+Debug> LinLog<K,V> {
 
@@ -594,7 +664,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
         LinLog(Log(None))
     }
 
-    pub fn archive(mut self, on:Option<Name>) -> LinLog<K,V> {
+    pub fn archive(self, on:Option<Name>) -> LinLog<K,V> {
         LinLog(self.0.archive(on))
     }
 
@@ -603,57 +673,128 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
         self
     }
 
-    pub fn get(mut self, key: K) -> (Option<V>, LinLog<K,V>) {
+    pub fn get(mut self, key: &K) -> (Option<V>, LinLog<K,V>) {
         let vo = self.0.get(key);
         (vo, self)
     }
 
-    pub fn into_trie(mut self) -> trie2::Trie<K,V> {
+    pub fn into_trie(self) -> trie2::Trie<K,V> {
         unimplemented!()
     }
 }
 
 
-
-
 #[test]
 fn kvlog_tiny () {
-    use adapton::engine::{name_unit, name_of_usize};
-    let mut c = Log::emp();
-    c.put(1, 1);
-    println!("{:?}\n", c);
-    c.put(2, 2);
-    c.put(2, 3);
-    println!("{:?}\n", c);
-    c.put(2, 1);
-    c.put(3, 3);
-    println!("{:?}\n", c);
-    c.put(4, 4);
+    use adapton::engine::{name_of_usize};
+    use adapton::engine::manage::{init_dcg};
+    init_dcg();
+    let mut l = Log::emp();
+    l.put(1, 1);
+    println!("{:?}\n", l);
+    l.put(2, 2);
+    l.put(2, 3);
+    println!("{:?}\n", l);
+    l.put(2, 1);
+    l.put(3, 3);
+    println!("{:?}\n", l);
+    l.put(4, 4);
 
     println!("lookup 1--6:\n");
 
-    assert_eq!(c.get(0), None);
-    assert_eq!(c.get(1), Some(1));
-    assert_eq!(c.get(2), Some(1));
-    assert_eq!(c.get(3), Some(3));
-    assert_eq!(c.get(4), Some(4));
-    assert_eq!(c.get(5), None);
-    assert_eq!(c.get(6), None);
+    assert_eq!(l.get(&0), None);
+    assert_eq!(l.get(&1), Some(1));
+    assert_eq!(l.get(&2), Some(1));
+    assert_eq!(l.get(&3), Some(3));
+    assert_eq!(l.get(&4), Some(4));
+    assert_eq!(l.get(&5), None);
+    assert_eq!(l.get(&6), None);
 
     println!("done.\n");
 
-    c = c.archive(Some(name_of_usize(4)));
-    println!("{:?}\n", c);
-    c.put(5, 5);
-    println!("{:?}\n", c);
-    c.put(6, 6);
-    println!("{:?}\n", c);
+    l = l.archive(Some(name_of_usize(4)));
+    println!("{:?}\n", l);
+    l.put(5, 5);
+    println!("{:?}\n", l);
+    l.put(6, 6);
+    println!("{:?}\n", l);
 
-    assert_eq!(c.get(0), None);
-    assert_eq!(c.get(1), Some(1));
-    assert_eq!(c.get(2), Some(1));
-    assert_eq!(c.get(3), Some(3));
-    assert_eq!(c.get(4), Some(4));
-    assert_eq!(c.get(5), Some(5));
-    assert_eq!(c.get(6), Some(6));
+    assert_eq!(l.get(&0), None);
+    assert_eq!(l.get(&1), Some(1));
+    assert_eq!(l.get(&2), Some(1));
+    assert_eq!(l.get(&3), Some(3));
+    assert_eq!(l.get(&4), Some(4));
+    assert_eq!(l.get(&5), Some(5));
+    assert_eq!(l.get(&6), Some(6));
+
+    l = l.archive(Some(name_of_usize(5)));
+    println!("{:?}\n", l);
+    l.put(5, 5);
+    println!("{:?}\n", l);
+    l.put(3, 6);
+    println!("{:?}\n", l);
+
+    assert_eq!(l.get(&0), None);
+    assert_eq!(l.get(&1), Some(1));
+    assert_eq!(l.get(&2), Some(1));
+    assert_eq!(l.get(&3), Some(6));
+    assert_eq!(l.get(&4), Some(4));
+    assert_eq!(l.get(&5), Some(5));
+    assert_eq!(l.get(&6), Some(6));
+
+    l = l.archive(Some(name_of_usize(6)));
+    println!("{:?}\n", l);
+    l.put(7, 5);
+    println!("{:?}\n", l);
+    l.put(6, 6);
+    println!("{:?}\n", l);
+
+    assert_eq!(l.get(&0), None);
+    assert_eq!(l.get(&1), Some(1));
+    assert_eq!(l.get(&2), Some(1));
+    assert_eq!(l.get(&3), Some(6));
+    assert_eq!(l.get(&4), Some(4));
+    assert_eq!(l.get(&5), Some(5));
+    assert_eq!(l.get(&6), Some(6));
+    assert_eq!(l.get(&7), Some(5));
+}
+
+#[test]
+fn kvlog_vs_hashmap () {
+    use std::collections::HashMap;
+    use rand::{Rng,thread_rng};
+    use adapton::engine::{manage,name_of_usize,name_unit};
+    let mut rng = thread_rng();
+    let numops = 10000;
+    let numkeys = 100;
+    let gauged = true;
+    let gauge = 10;
+
+    manage::init_dcg();
+
+    let mut m = HashMap::new();
+    let mut t = Log::emp();
+
+    for i in 0..numops {
+        let r1 : usize = rng.gen(); let r1 = r1 % numkeys;
+        let r2 : usize = rng.gen(); let r2 = r2 % numkeys;
+        let nm = if gauged && i % gauge == 0 { Some(name_of_usize(i)) } else { None };
+
+        // Test random insertion
+        //if !(nm == None) { println!("=========\nname {:?}:", nm); };
+        println!("put-{:?}:: key {:?} maps to {:?}", i, r1, r2);
+        m.insert(r1, r2);
+        t.put(r1, r2);
+        t = match nm {
+            Some(nm) => { println!("archive:: nm:{:?}", nm);
+                          t.archive(Some(nm)) }
+            None => t,
+        };
+
+        // Test random lookup
+        let r3 : usize = rng.gen();
+        let r3 = r3 % (numkeys * 2); // Look for non-existent keys with prob 0.5
+        println!("get-{:?}:: key {:?} maps to {:?}", i, r3, m.get(&r3));
+        assert_eq!(m.get(&r3).map(|&n|n.clone()), t.get(&r3));
+    }
 }
