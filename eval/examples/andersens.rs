@@ -168,7 +168,7 @@ fn andersen<N:Eq+Clone+std::fmt::Display,G:DirectedGraph<N,usize>+Clone>(stmts: 
 			}
 		}
 	
-	unfold_simple((q, g, stmts), Rc::new(process_queue))
+	unfold_simple2((q, g, stmts), Rc::new(process_queue))
 }
 
 fn main () {
@@ -218,19 +218,12 @@ fn main2() {
     let mut dt: SizedMap<(Option<usize>, Vec<usize>)>;
     let start = Instant::now();
     dt = andersen(stmts.clone());
-    println!("time elapsed using Raz: {} nanoseconds", start.elapsed().subsec_nanos());
+    println!("time elapsed using Raz: {} seconds", start.elapsed().as_secs() as f64 + start.elapsed().subsec_nanos() as f64 * 1e-9);
     
     let mut dt: SizedHashMap<usize, (Option<usize>, Vec<usize>)>;
     let start = Instant::now();
     dt = andersen(stmts.clone());
-    println!("time elapsed using Rust Hashmap: {} nanoseconds", start.elapsed().subsec_nanos());
-	
-    /*let mut dt: SizedMap<(Option<usize>, Vec<usize>)>;
-    let stmts: Vec<CStatement<usize>> = vec!(CStatement { left: 2, right: 1, num: 0 }, 
-									    	 CStatement { left: 2, right: 1, num: 1 }, 
-									    	 CStatement { left: 1, right: 2, num: 1 }, 
-									    	 CStatement { left: 1, right: 2, num: 2 });
-    dt = andersen(stmts);*/
+    println!("time elapsed using Rust Hashmap: {} seconds", start.elapsed().as_secs() as f64 + start.elapsed().subsec_nanos() as f64 * 1e-9);
 }
 
 #[cfg(test)]
