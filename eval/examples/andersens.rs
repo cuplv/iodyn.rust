@@ -82,8 +82,10 @@ fn andersen<N:Eq+Clone+std::fmt::Display,G:DirectedGraph<N,usize>+Clone>(stmts: 
 		match rule.rulenum {
 			//rule 1: p := q && q -> r ==> p -> r
 			1 => {
-				retedges.push((rule.stmtl.clone(), rule.edger.clone()));
-				(DirectedGraph::add_directed_edge(g, rule.stmtl, rule.edger), retedges)
+				if !Graph::has_edge(g.clone(), rule.stmtl.clone(), rule.edger.clone()) {
+					retedges.push((rule.stmtl.clone(), rule.edger.clone()));
+					(DirectedGraph::add_directed_edge(g, rule.stmtl, rule.edger), retedges)
+				} else {(g, retedges)}
 			},
 			//rule 2: p := *q && q -> r && r -> s ==> p -> s
 			2 => {
@@ -92,15 +94,19 @@ fn andersen<N:Eq+Clone+std::fmt::Display,G:DirectedGraph<N,usize>+Clone>(stmts: 
 					let nexts: Vec<N> = Graph::adjacents(g.clone(), rule.edger);
 					let mut ret = g.clone();
 					for s in nexts {
-						retedges.push((rule.stmtl.clone(), s.clone()));
-						ret = DirectedGraph::add_directed_edge(ret, rule.stmtl.clone(), s);
+						if !Graph::has_edge(g.clone(), rule.stmtl.clone(), s.clone()) {
+							retedges.push((rule.stmtl.clone(), s.clone()));
+							ret = DirectedGraph::add_directed_edge(ret, rule.stmtl.clone(), s);
+						}
 					}
 					(ret, retedges)
 				} else {
 					//edge is r -> s. If q -> r exists, add p -> s
 					if Graph::has_edge(g.clone(), rule.stmtr, rule.edgel) {
-						retedges.push((rule.stmtl.clone(), rule.edger.clone()));
-						(DirectedGraph::add_directed_edge(g.clone(), rule.stmtl, rule.edger), retedges)
+						if !Graph::has_edge(g.clone(), rule.stmtl.clone(), rule.edger.clone()) {
+							retedges.push((rule.stmtl.clone(), rule.edger.clone()));
+							(DirectedGraph::add_directed_edge(g.clone(), rule.stmtl, rule.edger), retedges)
+						} else { (g, retedges) }
 					} else { (g, retedges) }
 				}
 			},
@@ -111,8 +117,10 @@ fn andersen<N:Eq+Clone+std::fmt::Display,G:DirectedGraph<N,usize>+Clone>(stmts: 
 					let nexts: Vec<N> = Graph::adjacents(g.clone(), rule.stmtr);
 					let mut ret = g.clone();
 					for s in nexts {
-						retedges.push((rule.edger.clone(), s.clone()));
-						ret = DirectedGraph::add_directed_edge(ret, rule.edger.clone(), s);
+						if !Graph::has_edge(g.clone(), rule.edger.clone(), s.clone()) {
+							retedges.push((rule.edger.clone(), s.clone()));
+							ret = DirectedGraph::add_directed_edge(ret, rule.edger.clone(), s);
+						}
 					}
 					(ret, retedges)
 				} else if rule.stmtr == rule.edgel {
@@ -120,8 +128,10 @@ fn andersen<N:Eq+Clone+std::fmt::Display,G:DirectedGraph<N,usize>+Clone>(stmts: 
 					let nexts: Vec<N> = Graph::adjacents(g.clone(), rule.stmtl);
 					let mut ret = g.clone();
 					for r in nexts {
-						retedges.push((r.clone(), rule.edger.clone()));
-						ret = DirectedGraph::add_directed_edge(ret, r, rule.edger.clone());
+						if !Graph::has_edge(g.clone(), r.clone(), rule.edger.clone()) {
+							retedges.push((r.clone(), rule.edger.clone()));
+							ret = DirectedGraph::add_directed_edge(ret, r, rule.edger.clone());
+						}
 					}
 					(ret, retedges)
 				} else { panic!("bad rule of type 3 in chkapply"); }
@@ -194,7 +204,6 @@ fn main() {
     	stmts.push(all_stmts.pop().expect("popped from empty vec"));
     }
     
-    println!("created statement list, beginning analysis");
     println!("statement list size: {}", stmts.len());
     println!("statment list: {:?}", stmts.clone());
     
@@ -207,7 +216,13 @@ fn main() {
     let start = Instant::now();
     dt = andersen(stmts.clone());
     println!("time elapsed using Rust Hashmap: {} nanoseconds", start.elapsed().subsec_nanos());
-    
+	
+    /*let mut dt: SizedMap<(Option<usize>, Vec<usize>)>;
+    let stmts: Vec<CStatement<usize>> = vec!(CStatement { left: 2, right: 1, num: 0 }, 
+									    	 CStatement { left: 2, right: 1, num: 1 }, 
+									    	 CStatement { left: 1, right: 2, num: 1 }, 
+									    	 CStatement { left: 1, right: 2, num: 2 });
+    dt = andersen(stmts);*/
 }
 
 #[cfg(test)]
