@@ -171,11 +171,19 @@ fn andersen<N:Eq+Clone+std::fmt::Display,G:DirectedGraph<N,usize>+Clone>(stmts: 
 	unfold_simple((q, g, stmts), Rc::new(process_queue))
 }
 
+fn main () {
+  use std::thread;
+  let child =
+    thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(move || { 
+      main2()
+    });
+  let _ = child.unwrap().join();
+}
 
 use std::io::{self,BufRead};
 extern crate rand;
 use rand::{thread_rng, Rng};
-fn main() {
+fn main2() {
 	println!("Input number of variables for this example as an int: ");
 	
 	let mut line = String::new();
