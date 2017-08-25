@@ -39,10 +39,14 @@ pub mod raz_based;      // Some simple structs based on the Raz
 pub mod finite_map;
 
 // Two forms of tries. They work, but performance needs improvement
-#[doc(hidden)]
+//#[doc(hidden)]
 pub mod skiplist;
 #[doc(hidden)]
-pub mod trie;
+
+pub mod trie1;
+pub mod trie2;
+
+pub mod kvlog;
 
 /// Gauged Incremental Raz with element counts
 pub type IRaz<E> = raz::Raz<E,raz_meta::Count>;
@@ -57,3 +61,4 @@ pub type ArchiveStack<E> = archive_stack::AStack<E,()>;
 pub fn inc_level() -> u32 {
   level_tree::gen_branch_level(&mut rand::thread_rng())
 }
+

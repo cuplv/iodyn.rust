@@ -40,7 +40,7 @@ impl Add for Gen10k{
 #[derive(Clone,Copy,Debug,PartialEq,Eq,PartialOrd,Ord)]
 pub struct Elm(pub usize);
 
-const HASH_LOOP_COUNT: usize = 100;
+const HASH_LOOP_COUNT: usize = 1;
 impl Hash for Elm {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for _ in 0..HASH_LOOP_COUNT {

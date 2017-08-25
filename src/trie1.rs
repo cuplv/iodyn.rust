@@ -557,24 +557,24 @@ impl<K:'static+Hash+PartialEq+Eq+Clone+Debug,
 }
 
 #[test] pub fn test_join_10_1   () { test_join(10,1) }
-#[test] pub fn test_join_100_1  () { test_join(100,1) }
-#[test] pub fn test_join_1000_1 () { test_join(1000,1) }
+//#[test] pub fn test_join_100_1  () { test_join(100,1) }
+//#[test] pub fn test_join_1000_1 () { test_join(1000,1) }
 
 #[test] pub fn test_join_10_2   () { test_join(10,2) }
-#[test] pub fn test_join_100_2  () { test_join(100,2) }
-#[test] pub fn test_join_1000_2 () { test_join(1000,2) }
+//#[test] pub fn test_join_100_2  () { test_join(100,2) }
+//#[test] pub fn test_join_1000_2 () { test_join(1000,2) }
 
 #[test] pub fn test_join_10_3   () { test_join(10,3) }
-#[test] pub fn test_join_100_3  () { test_join(100,3) }
-#[test] pub fn test_join_1000_3 () { test_join(1000,3) }
+//#[test] pub fn test_join_100_3  () { test_join(100,3) }
+//#[test] pub fn test_join_1000_3 () { test_join(1000,3) }
 
 #[test] pub fn test_join_10_4   () { test_join(10,4) }
-#[test] pub fn test_join_100_4  () { test_join(100,4) }
-#[test] pub fn test_join_1000_4 () { test_join(1000,4) }
+//#[test] pub fn test_join_100_4  () { test_join(100,4) }
+//#[test] pub fn test_join_1000_4 () { test_join(1000,4) }
 
 #[test] pub fn test_join_10_5   () { test_join(10,5) }
-#[test] pub fn test_join_100_5  () { test_join(100,5) }
-#[test] pub fn test_join_1000_5 () { test_join(1000,5) }
+//#[test] pub fn test_join_100_5  () { test_join(100,5) }
+//#[test] pub fn test_join_1000_5 () { test_join(1000,5) }
 
 
 pub fn test_join (size:usize, gauge:usize) {
