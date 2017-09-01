@@ -396,6 +396,27 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
         return best_match
     }
 
+    // find the longest matching bit index (and length), if any
+    fn all_matches (bits:KeyBits, kvs:&Vec<Kv<K,V>>) -> Vec<(usize, usize)> {
+        let mut all_matches : Vec<(usize, usize)> = vec![];
+        for kv_idx in 0..kvs.len() {
+            let mut match_len = 0;
+            for bit_idx in 0..KEY_BITC {
+                let mask = 1 << bit_idx;
+                if (kvs[kv_idx].bits.0 & mask) == (bits.0 & mask) {
+                    match_len += 1;
+                } else {
+                    // invariant for each use of this function: chunk
+                    // bits cannot differ here
+                    assert!( bit_idx >= CHUNK_BITC );
+                    break
+                }
+            };
+            all_matches.push((kv_idx, match_len))
+        }
+        return all_matches
+    }
+
     // build the (conceptual) paths in the (conceptual) hash trie.
     //
     // concretely, this function extends a vector of jumps as it
@@ -415,6 +436,9 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
          jumps: &mut Vec<Option<Art<Chunk<K,V>>>>)
          -> Option<Art<Chunk<K,V>>>
     {
+        use std::cmp::Ordering;
+        println!("  build_path_rec:: {:064b} chunk_art:{:?} jumps.len():{:?}", bits.0, chunk_art, jumps.len());
+
         match chunk.here {
             Here::Vec(ref kvs) => {
                 for &(ref _k, ref kbits, ref _v) in kvs.iter().rev() {
@@ -435,47 +459,72 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
             Here::Table(ref kvt) => {
                 match kvt.get(&Self::chunk_bits(&bits)) {
                     None => {
+                        println!("  build_path_rec:: chunk bits not found: `{:b}`", Self::chunk_bits(&bits).0);
                         // the key does not exist
                         return None
                     }
                     Some(kvs) => {
-                        // first, look for an exact KeyBits match among the Kvs
-                        for kv in kvs.iter() {
-                            // compare kv.bits with bits. How many of them match?
-                            // assert invariant: at least depth (+1?) bits match?
-                            if bits == kv.bits {
+                        // This exact-match logic is broken: We need
+                        // to inspect _all_ of the matches here,
+                        // whereas below we just ignore the other
+                        // non-exact matches, which should precipitate
+                        // jumps to the current chunk in those
+                        // mis-matched positions.
+                        //
+                        // // first, look for an exact KeyBits match among the Kvs
+                        // for kv in kvs.iter() {
+                        //     // compare kv.bits with bits. How many of them match?
+                        //     // assert invariant: at least depth (+1?) bits match?
+                        //     if bits == kv.bits {
+                        //         // for each position we have yet to
+                        //         // traverse in the trie, extend jumps
+                        //         // with all of the jumps of the match
+                        //         for pos in jumps.len()..kv.jumps.len() {
+                        //             jumps.push( kv.jumps[ pos ].clone() )
+                        //         };
+                        //         return chunk_art.map(|x|x.clone())
+                        //     }
+                        // };
+
+                        let mut next_chunk_art : Option<Art<Chunk<K,V>>> = None;
+                        let mut all_matches = Self::all_matches(bits.clone(), kvs);
+                        all_matches.sort_by(
+                            |&(_i, leni), &(_j, lenj)|
+                            if leni < lenj { Ordering::Less } else { Ordering::Greater }
+                        );
+                        let mut pos = jumps.len() + CHUNK_BITC;
+                        println!("   all_matches:: all_matches.len():{}, chunk_art:{:?}",
+                                 all_matches.len(), chunk_art);
+                        for (kv_idx, differ_pos) in all_matches {
+                            if differ_pos == KEY_BITC {
+                                // Exact match; we have processed all shorter matches already.
+                                println!("    found exact k:{:?}, with value {:?}", kvs[kv_idx].key, kvs[kv_idx].val);
+                                for i in pos..(kvs[kv_idx].jumps.len() + CHUNK_BITC) {
+                                    println!("   - copy jump[{}] = {:?}", i, kvs[kv_idx].jumps[i - CHUNK_BITC] );
+                                    jumps.push(kvs[kv_idx].jumps[i - CHUNK_BITC].clone());
+                                };
                                 return chunk_art.map(|x|x.clone())
+
+                            } else if pos <= differ_pos {
+                                println!("   {:064b} k:{:?}, v:{:?}, pos:{}, differ_pos=len:{}",
+                                         kvs[kv_idx].bits.0, kvs[kv_idx].key, kvs[kv_idx].val, pos, differ_pos);
+                                // this key extends match with more bits; for each, copy a jump bit
+                                for i in pos..differ_pos {
+                                    println!("     {:064b} pos:{} .. i:{} .. differ_pos:{}",
+                                             kvs[kv_idx].bits.0, pos, i, differ_pos);
+                                    // skip this idx if we are at it already;
+                                    jumps.push(kvs[kv_idx].jumps.get(i - CHUNK_BITC).unwrap_or(&None).clone());
+                                };
+                                pos = differ_pos;
+                                jumps.push(chunk_art.map(|x|x.clone()));
+                                pos += 1;
+                                next_chunk_art = kvs[kv_idx].jumps
+                                    .get(differ_pos - CHUNK_BITC).unwrap_or(
+                                        &kvs[kv_idx].prev // ???
+                                    ).clone();
                             }
                         };
-                        // no exact match for all KeyBits here.  So,
-                        // we need to "jump" to another chunk.
-                        let mut next_chunk_art : Option<Art<Chunk<K,V>>> = None;
-                        Self::longest_match(bits.clone(), kvs).map(  |(match_idx, match_len)| {
-                            let curr_idx = CHUNK_BITC + jumps.len();
-                            // Question: How to prove this?
-                            assert!( curr_idx <= match_len );
-                            if curr_idx <= match_len {
-                                // progress! conceptually, we are
-                                // "traversing" more of the trie's
-                                // internal structure as we "traverse"
-                                // these additional bits at >= curr_idx.
-                                for i in curr_idx..match_len {
-                                    // copy jumps for each matching bit
-                                    jumps.push(kvs[match_idx].jumps
-                                               .get(i - CHUNK_BITC).unwrap_or(&None).clone())
-                                };
-                                next_chunk_art = kvs[match_idx].jumps
-                                    .get(match_len - CHUNK_BITC).unwrap_or(&None).clone();
-                                jumps.push(chunk_art.map(|x|x.clone()));
-                            }
-                            else {
-                                // TODO: Handle the case where we
-                                // limit the jump bits, and sometimes
-                                // we get to a "max length"
-                                next_chunk_art = panic!("TODO: bits:{:b}, kv.bits:{:b} curr_idx:{}, match_len:{}",
-                                                        bits.0, kvs[match_idx].bits.0, curr_idx, match_len)
-                            }
-                        });
+
                         // search in the next chunk, if any
                         match next_chunk_art {
                             None => None,
@@ -515,6 +564,7 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                             match chunk.prev {
                                 None => (),
                                 Some(ref x) => {
+                                    println!(" ::get k:{:?} recur on prev {:?}", key, x);
                                     vo = Log(Some(force(x))).get(key);
                                 }
                             }
@@ -536,11 +586,19 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                                 // if no exact match, recur using the jumps of the longest match, if any
                                 if vo == None {
                                     Self::longest_match(key_bits, kvs).map(|(match_idx, match_len)|{
-                                        println!("longest_match:: key:{:?}, kvs.len:{}, match_idx:{}, match_len:{}", key, kvs.len(), match_idx, match_len);
+                                        println!(" longest_match:: {:064b} k:{:?}, match_len:{}",
+                                                 kvs[match_idx].bits.0, kvs[match_idx].key, match_len);
+                                        println!("   jumps: {:?}", kvs[match_idx].jumps);
+                                        println!("   prev:  {:?}", kvs[match_idx].prev);
+
                                         match *kvs[match_idx].jumps.get(match_len - CHUNK_BITC).unwrap_or(&None) {
                                             None => (),
-                                            Some(ref x) => { vo = Log(Some(force(x))).get(key) }
-                                        }})
+                                            Some(ref x) => {
+                                                println!(" ::get k:{:?} recur on jump to {:?}", key, x);
+                                                vo = Log(Some(force(x))).get(key)
+                                            }
+                                        }
+                                    })
                                 } else { None };
                                 vo
                             }
@@ -593,7 +651,9 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                         let mut uniq_keys : HashMap<KeyBits, ()> = HashMap::new();
                         for (k, kbits, v) in kvs.into_iter().rev() {
                             let chunk_bits = Self::chunk_bits(&kbits);
+                            println!(" archive chunk slot `{:0b}`, k:{:?}, v:{:?}", chunk_bits.0, k, v);
                             if ! uniq_keys.contains_key(&kbits) {
+                                uniq_keys.insert(kbits.clone(), ());
                                 if ! tab.contains_key(&chunk_bits) {
                                     tab.insert(chunk_bits.clone(), vec![] );
                                 };
@@ -601,13 +661,23 @@ impl <K:'static+Hash+PartialEq+Eq+Clone+Debug,
                                     None => unreachable!(), // impossible: just inserted an empty vector here.
                                     Some(kvs) => {
                                         let mut jumps = Vec::new();
+                                        println!(" compute jumps + prev for: {:064b}", kbits.0);
                                         let prev = match chunk.prev {
-                                            None => None,
+                                            None => {
+                                                println!("  fresh chunk id `{:b}`", chunk_bits.0);
+                                                None
+                                            },
                                             Some(ref chunk_art) => {
                                                 Self::build_path_rec
                                                     (kbits.clone(), Some(chunk_art), &force(chunk_art), &mut jumps)
                                             }
                                         };
+                                        let mut i = 0;
+                                        for j in jumps.iter() {
+                                            println!("  - jump[{}]: {:?}", i, j);
+                                            i += 1;
+                                        };
+                                        println!("  - prev:{:?}", prev);
                                         kvs.push(Kv{key:k, val:v, bits:kbits, prev:prev, jumps:jumps})
                                     }
                                 }
@@ -768,7 +838,7 @@ fn kvlog_vs_hashmap () {
     use rand::{Rng,thread_rng};
     use adapton::engine::{manage,name_of_usize,name_unit};
     let mut rng = thread_rng();
-    let numops = 10000;
+    let numops = 1000;
     let numkeys = 100;
     let gauged = true;
     let gauge = 10;
@@ -785,7 +855,7 @@ fn kvlog_vs_hashmap () {
 
         // Test random insertion
         //if !(nm == None) { println!("=========\nname {:?}:", nm); };
-        println!("put-{:?}:: key {:?} maps to {:?}", i, r1, r2);
+        println!("put-{:?}:: k:{:?} maps to {:?}", i, r1, r2);
         m.insert(r1, r2);
         t.put(r1, r2);
         t = match nm {
@@ -797,7 +867,7 @@ fn kvlog_vs_hashmap () {
         // Test random lookup
         let r3 : usize = rng.gen();
         let r3 = r3 % (i * 2 + 1); // Look for non-existent keys with prob 0.5
-        println!("get-{:?}:: key {:?} maps to {:?}", i, r3, m.get(&r3));
+        println!("get-{:?}:: k:{:?} maps to {:?}", i, r3, m.get(&r3));
         assert_eq!(m.get(&r3).map(|&n|n.clone()), t.get(&r3));
     }
 }
